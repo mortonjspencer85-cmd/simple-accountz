@@ -2371,8 +2371,8 @@
       ? "You sign in with the card issuer. This links a business credit account. The full number is not stored."
       : "You sign in with the card issuer. This links a personal credit account. The full number is not stored.";
     document.getElementById("assistant-note").textContent = business
-      ? "It can draft, match, file, figure a late fee, repeat a month, and write the weekly note. It sends or changes a record only after you tap the lime button."
-      : "It can file a receipt. It changes a record only after you tap the lime button.";
+      ? "It works on its own: it matches deposits, files expenses, and starts next month’s drafts, with Undo. Anything your customer would see waits for one tap. Turn it off in Settings."
+      : "It files your expenses on its own, with Undo. Turn it off in Settings.";
     const intro = document.getElementById("assistant-intro");
     if (intro && !assistantStarted) {
       intro.textContent = business
@@ -3619,6 +3619,7 @@
     if (DEMO) {
       const screen = /[?&]screen=([a-z-]+)/.exec(location.search);
       if (screen && document.getElementById(screen[1])) setTimeout(() => show(screen[1]), 0);
+      if (screen && screen[1] === "assistant") setTimeout(() => ask("owed"), 0);
       return;
     }
     loadSync();
