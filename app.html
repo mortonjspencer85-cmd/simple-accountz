@@ -6,6 +6,8 @@
 <title>Simple Accountz</title>
 <meta name="description" content="Invoices, expenses, receipt photos, and an assistant that does the bookkeeping for you.">
 <meta name="theme-color" content="#163300">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
+<meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -567,6 +569,85 @@
   .auto-row.wait .pill { flex: none; }
   .auto-panel .textlink { font-size: 13px; padding: 2px 0; }
 
+  [hidden] { display: none !important; }
+  /* ---- Account and sign-in ---- */
+  .auth-wrap { max-width: 420px; margin: 4px auto 40px; }
+  .auth-card { background: var(--paper); border-radius: 24px; padding: 28px 24px; border: 1px solid rgba(14,15,12,.06);
+    box-shadow: 0 1px 2px rgba(14,15,12,.06), 0 14px 36px rgba(22,51,0,.10); }
+  .auth-logo { width: 52px; height: 52px; border-radius: 15px; display: block; margin: 0 auto 14px; box-shadow: 0 6px 16px rgba(22,51,0,.25); }
+  .auth-title { text-align: center; font-size: 24px; font-weight: 800; letter-spacing: -.03em; color: var(--obsidian); margin: 0 0 6px; }
+  .auth-sub { text-align: center; color: var(--slate); font-size: 14px; margin: 0 0 20px; line-height: 1.45; }
+  .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--fog); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
+  .auth-tabs button { border: 0; background: transparent; border-radius: 9px; padding: 10px; font: 600 14px Inter, sans-serif; color: var(--slate); cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
+  .auth-tabs button.on { background: var(--paper); color: var(--obsidian); box-shadow: 0 1px 3px rgba(14,15,12,.14); }
+  .auth-label { display: block; font-size: 13px; font-weight: 600; color: var(--charcoal); margin: 0 0 6px; }
+  .auth-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .auth-input { width: 100%; height: 48px; border: 1.5px solid #d5d9d2; border-radius: 12px; padding: 0 14px; font: 500 16px Inter, sans-serif;
+    color: var(--obsidian); background: #fbfcfa; margin-bottom: 16px; transition: border-color .15s, box-shadow .15s, background .15s; }
+  .auth-input:focus { outline: none; border-color: var(--spruce); background: #fff; box-shadow: 0 0 0 4px rgba(0,137,74,.15); }
+  .auth-input.code { letter-spacing: .15em; font-variant-numeric: tabular-nums; }
+  .pw-wrap { position: relative; }
+  .pw-wrap .auth-input { padding-right: 70px; }
+  .pw-toggle { position: absolute; right: 8px; top: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent;
+    color: var(--spruce); font: 600 13px Inter, sans-serif; cursor: pointer; }
+  .pw-toggle:hover { background: var(--linen); }
+  .auth-hint { font-size: 12px; color: var(--slate); margin: -8px 0 16px; line-height: 1.4; }
+  .btn-primary { position: relative; width: 100%; height: 50px; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: linear-gradient(180deg, #1f4a00, var(--forest)); color: #fff; font: 700 16px Inter, sans-serif; letter-spacing: -.01em; cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 6px 16px rgba(22,51,0,.28); transition: transform .12s ease, box-shadow .15s ease, filter .15s ease; }
+  .btn-primary:hover { filter: brightness(1.15); box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 10px 24px rgba(22,51,0,.34); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary:disabled { opacity: .75; cursor: progress; }
+  .btn-primary .spinner { display: none; width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .7s linear infinite; }
+  .btn-primary.loading .spinner { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-secondary { width: 100%; height: 48px; border-radius: 12px; border: 1.5px solid #d5d9d2; background: #fff; color: var(--obsidian); font: 600 15px Inter, sans-serif; cursor: pointer; transition: border-color .15s, background .15s; }
+  .btn-secondary:hover { border-color: var(--spruce); background: #f7fbf3; }
+  .btn-small { height: 36px; padding: 0 14px; border-radius: 10px; border: 1.5px solid #d5d9d2; background: #fff; font: 600 13px Inter, sans-serif; cursor: pointer; color: var(--obsidian); white-space: nowrap; }
+  .btn-small:hover { border-color: var(--spruce); }
+  .btn-small.danger, .auth-link.danger { color: #c0160c; }
+  .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-small:focus-visible, .auth-tabs button:focus-visible, .auth-link:focus-visible, .pw-toggle:focus-visible, .sync-chip:focus-visible {
+    outline: 3px solid var(--lime); outline-offset: 2px; }
+  .auth-link { border: 0; background: none; padding: 0; color: var(--spruce); font: 600 13px Inter, sans-serif; cursor: pointer; }
+  .auth-link:hover { text-decoration: underline; }
+  .auth-center { text-align: center; margin-top: 16px; }
+  .auth-msg { min-height: 20px; margin: 12px 0 0; font-size: 14px; color: #c0160c; text-align: center; line-height: 1.4; }
+  .auth-msg.good { color: var(--spruce); }
+  .auth-foot { font-size: 12px; color: var(--slate); text-align: center; margin: 18px 0 0; line-height: 1.45; }
+  .auth-divider { display: flex; align-items: center; gap: 12px; color: var(--pebble); font-size: 12px; margin: 18px 0; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #e3e6e0; }
+  .acct-head { display: flex; gap: 14px; align-items: center; }
+  .avatar { width: 48px; height: 48px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 20px; color: var(--lime);
+    background: linear-gradient(135deg, var(--forest), var(--spruce)); }
+  .acct-head b { display: block; font-size: 16px; color: var(--obsidian); word-break: break-all; }
+  .acct-head span { font-size: 13px; color: var(--slate); }
+  .acct-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .acct-section { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--slate); margin: 24px 0 4px; }
+  .acct-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #eceee9; }
+  .acct-item b { display: block; font-size: 15px; color: var(--obsidian); }
+  .acct-item span { font-size: 13px; color: var(--slate); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: 1px; }
+  .badge.on { background: #d8fff1; color: #006b3a; }
+  .badge.off { background: #fff3c2; color: #7a5600; }
+  .notice { background: #fff8db; border: 1px solid #ffe27a; border-radius: 12px; padding: 12px 14px; font-size: 13px; margin: 16px 0 0;
+    display: flex; justify-content: space-between; gap: 10px; align-items: center; color: #4a3b00; }
+  .qr-box { display: block; width: 208px; height: 208px; margin: 8px auto 12px; padding: 10px; background: #fff; border-radius: 16px; border: 1px solid #e3e6e0; }
+  .secret { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; text-align: center; word-break: break-all; background: var(--fog);
+    border-radius: 10px; padding: 10px; margin: 0 0 16px; user-select: all; }
+  .codes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; list-style: none; padding: 0; margin: 12px 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; }
+  .codes li { background: var(--fog); border-radius: 8px; padding: 8px; text-align: center; }
+  .steps-list { padding-left: 20px; margin: 0 0 12px; font-size: 14px; color: var(--charcoal); line-height: 1.5; }
+  .sync-chip { align-items: center; gap: 8px; border: 1.5px solid #d5d9d2; background: #fff; border-radius: 999px; padding: 7px 14px 7px 11px;
+    font: 600 13px Inter, sans-serif; color: var(--obsidian); cursor: pointer; margin: -4px 0 12px; transition: border-color .15s, filter .15s; }
+  html.live #sync-status { display: inline-flex !important; }
+  .sync-chip:hover { border-color: var(--spruce); }
+  .sync-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pebble); flex: none; }
+  .sync-chip.on .dot { background: var(--mint); box-shadow: 0 0 0 3px rgba(46,230,166,.25); }
+  .sync-chip.cta { background: linear-gradient(180deg, #1f4a00, var(--forest)); color: #fff; border-color: transparent; box-shadow: 0 4px 12px rgba(22,51,0,.22); }
+  .sync-chip.cta:hover { filter: brightness(1.15); }
+  .sync-chip.cta .dot { background: var(--lime); }
+  @media (prefers-reduced-motion: reduce) { .btn-primary .spinner { animation-duration: 2s; } }
+
   /* Camera button: phones only (iOS and Android shells), on tabbed screens */
   .cam-fab {
     display: none; position: absolute; right: 18px; bottom: 92px; z-index: 9;
@@ -583,8 +664,7 @@
   .device .tabs.hide ~ .cam-fab { display: none; }
 
   /* ---- Live web app: full screen, no preview frame ---- */
-  .live-only { display: none !important; }
-  html.live .live-only { display: revert !important; }
+  html:not(.live) .live-only { display: none !important; }
   html.live .intro, html.live .chrome, html.live .statusbar, html.live .island,
   html.live .flash-veil, html.live .preview-only { display: none !important; }
   html.live body { background: var(--paper); }
@@ -665,7 +745,7 @@
           </span>
         </div>
         <button class="biz" onclick="show('account-setup')"><span class="dot"></span> <span id="biz-label">Field &amp; Co. · United States</span></button>
-        <button class="textlink live-only" id="sync-status" onclick="show('account')" style="font-size:13px;margin:-6px 0 8px"></button>
+        <button class="sync-chip live-only" id="sync-status" onclick="show('account')"><span class="dot"></span><span id="sync-status-text">Sign up free to back up and sync</span></button>
         <div class="auto-panel" id="auto-panel" hidden></div>
         <div id="home-business">
         <button class="hero" onclick="showFiltered('open')" style="display:block;width:100%;text-align:left;border:0;cursor:pointer;font:inherit">
@@ -795,26 +875,133 @@
 
       <section class="screen no-tabs" id="account">
         <button class="back" onclick="show('settings')">Back</button>
-        <h2 class="title" style="margin-bottom:8px">Account and sync</h2>
-        <div id="acct-out">
-          <p class="note">Create a free account to back up your books and use them on your phone and your computer.</p>
-          <div class="seg lime" id="acct-mode">
-            <button class="on" data-mode="signup">Sign up</button>
-            <button data-mode="login">Sign in</button>
+        <div class="auth-wrap">
+
+          <div class="auth-card acct-view" data-view="auth">
+            <img class="auth-logo" src="icon.svg" alt="">
+            <h2 class="auth-title" id="auth-title">Welcome back</h2>
+            <p class="auth-sub" id="auth-sub">Sign in to back up your books and use them on every device.</p>
+            <div class="auth-tabs" role="tablist">
+              <button role="tab" id="tab-signin" onclick="setAcctView('signin')">Sign in</button>
+              <button role="tab" id="tab-signup" onclick="setAcctView('signup')">Create account</button>
+            </div>
+            <label class="auth-label" for="auth-email">Email</label>
+            <input class="auth-input" id="auth-email" type="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="you@business.com">
+            <div class="auth-row"><label class="auth-label" for="auth-pass">Password</label><button class="auth-link" id="auth-forgot" onclick="setAcctView('forgot')">Forgot password?</button></div>
+            <div class="pw-wrap"><input class="auth-input" id="auth-pass" type="password" autocomplete="current-password"><button class="pw-toggle" type="button" onclick="togglePw('auth-pass', this)">Show</button></div>
+            <p class="auth-hint" id="auth-hint">At least 10 characters. Passwords found in known data breaches are refused.</p>
+            <div id="auth-code-wrap" hidden>
+              <label class="auth-label" for="auth-code">Authenticator code</label>
+              <input class="auth-input code" id="auth-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or backup code">
+            </div>
+            <button class="btn-primary" id="auth-go" onclick="submitAuth()"><span class="spinner"></span><span class="btn-label">Sign in</span></button>
+            <p class="auth-msg" id="auth-msg" role="alert"></p>
+            <p class="auth-foot">🔒 Encrypted connection · hashed passwords · optional 2-step sign-in</p>
           </div>
-          <div class="field"><label for="acct-email">Email</label><input id="acct-email" type="email" autocomplete="email" inputmode="email"></div>
-          <div class="field"><label for="acct-pass">Password</label><input id="acct-pass" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></div>
-          <button class="pill" style="width:100%" id="acct-go" onclick="submitAccount()">Create account</button>
-          <p class="note" id="acct-msg" role="status"></p>
-          <p class="note">Keep your password somewhere safe. Password reset by email is coming soon.</p>
-        </div>
-        <div id="acct-in" hidden>
-          <div class="card"><h3 id="acct-email-shown"></h3><p id="acct-sync"></p></div>
-          <div class="dv-actions">
-            <button class="pill" onclick="syncNow(true)">Sync now</button>
-            <button class="pill-outline" onclick="signOut()">Sign out</button>
+
+          <div class="auth-card acct-view" data-view="forgot">
+            <img class="auth-logo" src="icon.svg" alt="">
+            <h2 class="auth-title">Reset your password</h2>
+            <p class="auth-sub">Enter your account email and we will send a link that works once and expires in 30 minutes.</p>
+            <label class="auth-label" for="forgot-email">Email</label>
+            <input class="auth-input" id="forgot-email" type="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false">
+            <button class="btn-primary" id="forgot-go" onclick="submitForgot()"><span class="spinner"></span><span class="btn-label">Email me a reset link</span></button>
+            <p class="auth-msg" id="forgot-msg" role="alert"></p>
+            <div class="auth-divider">or</div>
+            <button class="btn-secondary" onclick="setAcctView('reset-app')">Reset with my authenticator app</button>
+            <p class="auth-center"><button class="auth-link" onclick="setAcctView('signin')">Back to sign in</button></p>
           </div>
-          <button class="textlink" onclick="deleteAccount()">Delete account</button>
+
+          <div class="auth-card acct-view" data-view="reset-app">
+            <img class="auth-logo" src="icon.svg" alt="">
+            <h2 class="auth-title">Reset with your app</h2>
+            <p class="auth-sub">Open the authenticator app you scanned the Simple Accountz QR code into. A backup code also works.</p>
+            <label class="auth-label" for="ra-email">Email</label>
+            <input class="auth-input" id="ra-email" type="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false">
+            <label class="auth-label" for="ra-code">Authenticator code</label>
+            <input class="auth-input code" id="ra-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or backup code">
+            <label class="auth-label" for="ra-pass">New password</label>
+            <div class="pw-wrap"><input class="auth-input" id="ra-pass" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePw('ra-pass', this)">Show</button></div>
+            <p class="auth-hint">At least 10 characters. You will be signed out everywhere else.</p>
+            <button class="btn-primary" id="ra-go" onclick="submitResetApp()"><span class="spinner"></span><span class="btn-label">Set new password</span></button>
+            <p class="auth-msg" id="ra-msg" role="alert"></p>
+            <p class="auth-center"><button class="auth-link" onclick="setAcctView('signin')">Back to sign in</button></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="reset-link">
+            <img class="auth-logo" src="icon.svg" alt="">
+            <h2 class="auth-title">Choose a new password</h2>
+            <p class="auth-sub">You opened a reset link from your email. Pick a new password to finish.</p>
+            <label class="auth-label" for="rl-pass">New password</label>
+            <div class="pw-wrap"><input class="auth-input" id="rl-pass" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePw('rl-pass', this)">Show</button></div>
+            <p class="auth-hint">At least 10 characters. You will be signed out everywhere else.</p>
+            <div id="rl-code-wrap" hidden>
+              <label class="auth-label" for="rl-code">Authenticator code</label>
+              <input class="auth-input code" id="rl-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or backup code">
+            </div>
+            <button class="btn-primary" id="rl-go" onclick="submitResetLink()"><span class="spinner"></span><span class="btn-label">Save new password</span></button>
+            <p class="auth-msg" id="rl-msg" role="alert"></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="home">
+            <div class="acct-head"><div class="avatar" id="acct-avatar">S</div><div><b id="acct-email-shown"></b><span id="acct-sync"></span></div></div>
+            <div class="notice" id="acct-verify" hidden><span id="acct-verify-text">Confirm your email so you can reset your password by email.</span><button class="btn-small" onclick="resendVerify()">Resend</button></div>
+            <div class="acct-actions">
+              <button class="btn-primary" onclick="syncNow(true)"><span class="spinner"></span><span class="btn-label">Sync now</span></button>
+              <button class="btn-secondary" onclick="signOut()">Sign out</button>
+            </div>
+            <div class="acct-section">Security</div>
+            <div class="acct-item"><div><b>2-step sign-in <span class="badge off" id="totp-badge">Off</span></b><span id="totp-sub">Use an authenticator app for codes, and to reset a forgotten password.</span></div><button class="btn-small" id="totp-btn" onclick="toggleTotp()">Turn on</button></div>
+            <div class="acct-item"><div><b>Password</b><span>Changing it signs you out on other devices.</span></div><button class="btn-small" onclick="askConfirm('change')">Change</button></div>
+            <div class="acct-item"><div><b>Delete account</b><span>Removes your account and its cloud copy for good.</span></div><button class="btn-small danger" onclick="askConfirm('delete')">Delete</button></div>
+            <p class="auth-msg" id="acct-msg" role="alert"></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="totp-setup">
+            <h2 class="auth-title">Set up your authenticator</h2>
+            <ol class="steps-list">
+              <li>Open Google Authenticator, Microsoft Authenticator, Authy, or 1Password.</li>
+              <li>Scan this QR code, or type the key below.</li>
+              <li>Enter the 6-digit code the app shows.</li>
+            </ol>
+            <img class="qr-box" id="totp-qr" alt="QR code for your authenticator app">
+            <p class="secret" id="totp-secret"></p>
+            <label class="auth-label" for="totp-code">6-digit code</label>
+            <input class="auth-input code" id="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+            <button class="btn-primary" id="totp-go" onclick="enableTotp()"><span class="spinner"></span><span class="btn-label">Turn on 2-step sign-in</span></button>
+            <p class="auth-msg" id="totp-msg" role="alert"></p>
+            <p class="auth-center"><button class="auth-link" onclick="setAcctView('home')">Cancel</button></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="recovery">
+            <h2 class="auth-title">Save your backup codes</h2>
+            <p class="auth-sub">If you lose your phone, each code signs you in or resets your password once. They are shown only now.</p>
+            <ul class="codes" id="recovery-list"></ul>
+            <div class="acct-actions">
+              <button class="btn-secondary" onclick="copyRecovery()">Copy codes</button>
+              <button class="btn-primary" onclick="setAcctView('home')"><span class="spinner"></span><span class="btn-label">I saved them</span></button>
+            </div>
+            <p class="auth-msg good" id="recovery-msg" role="status"></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="confirm">
+            <h2 class="auth-title" id="cf-title">Confirm it is you</h2>
+            <p class="auth-sub" id="cf-sub">Enter your password to continue.</p>
+            <label class="auth-label" for="cf-pass">Current password</label>
+            <div class="pw-wrap"><input class="auth-input" id="cf-pass" type="password" autocomplete="current-password"><button class="pw-toggle" type="button" onclick="togglePw('cf-pass', this)">Show</button></div>
+            <div id="cf-new-wrap" hidden>
+              <label class="auth-label" for="cf-new">New password</label>
+              <div class="pw-wrap"><input class="auth-input" id="cf-new" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePw('cf-new', this)">Show</button></div>
+            </div>
+            <div id="cf-code-wrap" hidden>
+              <label class="auth-label" for="cf-code">Authenticator code</label>
+              <input class="auth-input code" id="cf-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or backup code">
+            </div>
+            <button class="btn-primary" id="cf-go" onclick="submitConfirm()"><span class="spinner"></span><span class="btn-label">Continue</span></button>
+            <p class="auth-msg" id="cf-msg" role="alert"></p>
+            <p class="auth-center"><button class="auth-link" onclick="setAcctView('home')">Cancel</button></p>
+          </div>
+
         </div>
       </section>
 
@@ -1108,7 +1295,7 @@
         <button class="set-row" id="auto-row" onclick="toggleAuto()"><span class="name">Assistant works automatically</span><span class="switch" id="auto-switch" style="grid-row:1 / span 2;grid-column:2"></span><span class="sub" id="auto-sub">On · matches deposits, files expenses, starts monthly drafts</span></button>
         <button class="set-row" onclick="show('files')"><span class="name">Files</span><span class="sub">Scan an invoice or upload</span></button>
         <button class="preview-only set-row biz-only" onclick="show('business-profile')"><span class="name">Business profile</span><span class="sub">Field &amp; Co. · tax ID on file</span></button>
-        <button class="set-row" id="platform-row" onclick="show('platform')" hidden><span class="name">Creator console</span><span class="sub" id="platform-sub">Spencer only</span></button>
+        <button class="preview-only set-row" id="platform-row" onclick="show('platform')" hidden><span class="name">Creator console</span><span class="sub" id="platform-sub">Spencer only</span></button>
         <button class="set-row" onclick="show('region')"><span class="name">Country and currency</span><span class="sub" id="region-sub">United States · USD</span></button>
         <button class="set-row" onclick="show('banks')"><span class="name">Banks and cards</span><span class="sub" id="banks-sub">Business checking and credit</span></button>
         <button class="preview-only set-row biz-only" onclick="show('payments')"><span class="name">Get paid</span><span class="sub">Stripe connected · PayPal off</span></button>
@@ -3368,20 +3555,16 @@
       navigator.serviceWorker.register("sw.js").catch(() => {});
     }
     loadSync();
-    document.getElementById("acct-mode").addEventListener("click", (event) => {
-      const button = event.target.closest("button");
-      if (!button) return;
-      accountMode = button.dataset.mode;
-      renderAccount();
-    });
+    handleEmailLink();
     window.addEventListener("online", () => syncNow(false));
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") syncNow(false);
     });
-    if (sync.token) setTimeout(() => syncNow(false), 0);
+    if (sync.signedIn) setTimeout(() => { refreshProfile(); syncNow(false); }, 0);
   }
 
   function applyBooksState(saved) {
+    deletedIds = saved.deleted || {};
     docs = SA.refreshStatuses(saved.docs, SA.LEDGER_TODAY);
     businessTransactions = saved.business;
     personalTransactions = saved.personal;
@@ -3405,7 +3588,7 @@
     const business = accountKind === "business" ? transactions : businessTransactions;
     const personal = accountKind === "personal" ? transactions : personalTransactions;
     const text = SA.serializeBooks({
-      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip
+      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip, deleted: deletedIds
     });
     try {
       localStorage.setItem(SA.BOOKS_KEY, text);
@@ -3417,7 +3600,7 @@
       lastSavedText = text;
       if (changed && !applyingRemote) {
         editCount += 1;
-        if (sync.token) {
+        if (sync.signedIn) {
           sync.dirty = true;
           saveSync();
           scheduleSync();
@@ -3427,9 +3610,15 @@
   }
 
   // ---- Accounts and cloud sync ----
-  const API_BASE = window.SA_API || "https://api-production-87c2c165.up.railway.app";
-  const SYNC_KEY = "simpleaccountz.sync.v1";
-  let sync = { token: "", email: "", version: 0, dirty: false };
+  // The session lives in an HttpOnly cookie on api.simpleaccountz.com, so this
+  // page never sees or stores it. Only the sign-in state is kept here.
+  const API_BASE = window.SA_API || "https://api.simpleaccountz.com";
+  const SYNC_KEY = "simpleaccountz.sync.v2";
+  function blankSync() {
+    return { signedIn: false, email: "", version: 0, dirty: false, emailVerified: false, totpEnabled: false, mailEnabled: false, recoveryLeft: 0 };
+  }
+  let sync = blankSync();
+  let deletedIds = {};
   let lastSavedText = null;
   let applyingRemote = false;
   let editCount = 0;
@@ -3438,29 +3627,46 @@
   let syncTimer = null;
   let syncNote = "";
   let lastSyncedAt = null;
-  let accountMode = "signup";
+  let acctView = "signin";
+  let resetToken = "";
+  let needCode = false;
+  let confirmAction = "";
+  let shownRecovery = [];
 
   function loadSync() {
     try {
+      localStorage.removeItem("simpleaccountz.sync.v1");
       const raw = JSON.parse(localStorage.getItem(SYNC_KEY) || "null");
-      if (raw && typeof raw.token === "string" && /^[a-f0-9]{64}$/.test(raw.token)) {
-        sync = { token: raw.token, email: String(raw.email || ""), version: Number(raw.version) || 0, dirty: !!raw.dirty };
+      if (raw && raw.signedIn === true) {
+        sync = Object.assign(blankSync(), {
+          signedIn: true, email: String(raw.email || ""), version: Number(raw.version) || 0, dirty: !!raw.dirty,
+          emailVerified: !!raw.emailVerified, totpEnabled: !!raw.totpEnabled, mailEnabled: !!raw.mailEnabled
+        });
       }
     } catch (error) {}
   }
 
   function saveSync() {
     try {
-      if (sync.token) localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+      if (sync.signedIn) localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
       else localStorage.removeItem(SYNC_KEY);
     } catch (error) {}
+  }
+
+  function applyProfile(profile) {
+    if (!profile) return;
+    sync.email = profile.email || sync.email;
+    sync.emailVerified = !!profile.emailVerified;
+    sync.totpEnabled = !!profile.totpEnabled;
+    sync.mailEnabled = !!profile.mailEnabled;
+    sync.recoveryLeft = profile.recoveryLeft || 0;
   }
 
   function currentBooks() {
     const business = accountKind === "business" ? transactions : businessTransactions;
     const personal = accountKind === "personal" ? transactions : personalTransactions;
     return JSON.parse(SA.serializeBooks({
-      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip
+      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip, deleted: deletedIds
     }));
   }
 
@@ -3475,13 +3681,17 @@
   }
 
   function api(method, path, body) {
-    const headers = { "Content-Type": "application/json" };
-    if (sync.token) headers.Authorization = "Bearer " + sync.token;
     return fetch(API_BASE + path, {
       method,
-      headers,
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", "X-SA": "1" },
       body: body === undefined ? undefined : JSON.stringify(body)
     }).then((response) => response.json().catch(() => null).then((data) => ({ status: response.status, body: data })));
+  }
+
+  async function call(method, path, body) {
+    try { return await api(method, path, body); } catch (error) { return { status: 0, body: null }; }
   }
 
   function scheduleSync() {
@@ -3490,13 +3700,20 @@
   }
 
   function signedOutByServer() {
-    sync = { token: "", email: "", version: 0, dirty: false };
+    sync = blankSync();
     saveSync();
+    acctView = "signin";
     syncNote = "You were signed out. Sign in again to keep syncing. Your books are still on this device.";
   }
 
+  async function refreshProfile() {
+    const me = await call("GET", "/api/me");
+    if (me.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (me.status === 200) { applyProfile(me.body); saveSync(); renderAccount(); }
+  }
+
   async function syncNow(manual) {
-    if (!LIVE || !sync.token) return;
+    if (!LIVE || !sync.signedIn) return;
     if (syncBusy) { syncAgain = true; return; }
     if (navigator.onLine === false) {
       syncNote = "Offline. Changes will sync when you are back online.";
@@ -3504,7 +3721,7 @@
       return;
     }
     syncBusy = true;
-    syncNote = manual ? "Syncing…" : syncNote;
+    if (manual) syncNote = "";
     renderAccount();
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -3553,48 +3770,271 @@
     }
   }
 
-  async function submitAccount() {
-    const msg = document.getElementById("acct-msg");
-    const email = document.getElementById("acct-email").value.trim();
-    const password = document.getElementById("acct-pass").value;
-    if (!email || password.length < 8) {
-      msg.textContent = "Enter your email and a password of at least 8 characters.";
+  // ---- Account screens ----
+  const AUTH_ERRORS = {
+    bad_login: "That email and password don't match.",
+    bad_code: "That code didn't work. Codes change every 30 seconds, or use a backup code.",
+    weak_password: "Use at least 10 characters, and don't build it from your email name.",
+    breached_password: "That password has appeared in a known data breach. Please choose a different one.",
+    email_taken: "That email already has an account. Sign in instead.",
+    bad_email: "Check the email address.",
+    slow_down: "Too many attempts. Wait 15 minutes, then try again.",
+    bad_link: "This link has expired or was already used. Ask for a new one.",
+    already_on: "2-step sign-in is already on.",
+    no_setup: "Start the setup again.",
+    forbidden: "This request was blocked for your safety. Reload the page and try again.",
+    too_large: "That is too large to send."
+  };
+
+  function el(id) { return document.getElementById(id); }
+
+  function authError(result) {
+    if (!result || result.status === 0) return "Can't reach the server. Check your connection and try again.";
+    return (result.body && AUTH_ERRORS[result.body.error]) || "Something went wrong. Please try again.";
+  }
+
+  function setMsg(id, text, good) {
+    const node = el(id);
+    if (!node) return;
+    node.textContent = text || "";
+    node.classList.toggle("good", !!good);
+  }
+
+  function setBusy(id, on) {
+    const button = el(id);
+    if (!button) return;
+    button.disabled = on;
+    button.classList.toggle("loading", on);
+  }
+
+  function togglePw(id, button) {
+    const input = el(id);
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.textContent = show ? "Hide" : "Show";
+  }
+
+  function setAcctView(view) {
+    acctView = view;
+    needCode = false;
+    ["auth-msg", "forgot-msg", "ra-msg", "rl-msg", "acct-msg", "totp-msg", "cf-msg"].forEach((id) => setMsg(id, ""));
+    if (view === "forgot") el("forgot-email").value = el("auth-email").value;
+    if (view === "reset-app") el("ra-email").value = el("auth-email").value || el("forgot-email").value;
+    renderAccount();
+  }
+
+  async function finishSignIn(profile, message) {
+    const hadData = SA.hasBooksData(currentBooks());
+    sync = Object.assign(blankSync(), { signedIn: true, dirty: hadData });
+    applyProfile(profile);
+    saveSync();
+    ["auth-pass", "auth-code", "ra-pass", "ra-code", "rl-pass", "rl-code"].forEach((id) => { if (el(id)) el(id).value = ""; });
+    needCode = false;
+    resetToken = "";
+    acctView = "home";
+    show("account");
+    renderAccount();
+    showPull(message);
+    await syncNow(true);
+  }
+
+  async function submitAuth() {
+    const signup = acctView === "signup";
+    const email = el("auth-email").value.trim();
+    const password = el("auth-pass").value;
+    if (!email || !password) { setMsg("auth-msg", "Enter your email and password."); return; }
+    if (signup && password.length < 10) { setMsg("auth-msg", AUTH_ERRORS.weak_password); return; }
+    setBusy("auth-go", true);
+    setMsg("auth-msg", "");
+    const body = signup ? { email, password } : { email, password };
+    if (!signup && needCode) body.code = el("auth-code").value.trim();
+    const result = await call("POST", signup ? "/api/signup" : "/api/login", body);
+    setBusy("auth-go", false);
+    if (result.status === 200 || result.status === 201) {
+      await finishSignIn(result.body, signup
+        ? (result.body.mailEnabled ? "Account created. Check your inbox to confirm your email." : "Account created. Your books are backed up.")
+        : "Signed in. Your books are synced.");
       return;
     }
-    const button = document.getElementById("acct-go");
-    button.disabled = true;
-    msg.textContent = accountMode === "signup" ? "Creating your account…" : "Signing in…";
+    if (result.body && result.body.error === "code_required") {
+      needCode = true;
+      renderAccount();
+      setMsg("auth-msg", "Enter the 6-digit code from your authenticator app, or a backup code.", true);
+      el("auth-code").focus();
+      return;
+    }
+    setMsg("auth-msg", authError(result));
+  }
+
+  async function submitForgot() {
+    const email = el("forgot-email").value.trim();
+    if (!email) { setMsg("forgot-msg", "Enter the email for your account."); return; }
+    setBusy("forgot-go", true);
+    const result = await call("POST", "/api/password/forgot", { email });
+    setBusy("forgot-go", false);
+    if (result.status !== 200) { setMsg("forgot-msg", authError(result)); return; }
+    setMsg("forgot-msg", result.body.mailEnabled
+      ? "If that email has an account, a reset link is on its way. Check your inbox and spam folder."
+      : "Email reset is not switched on yet. Use your authenticator app instead.", result.body.mailEnabled);
+  }
+
+  async function submitResetApp() {
+    const email = el("ra-email").value.trim();
+    const code = el("ra-code").value.trim();
+    const newPassword = el("ra-pass").value;
+    if (!email || !code || !newPassword) { setMsg("ra-msg", "Fill in your email, the code, and a new password."); return; }
+    setBusy("ra-go", true);
+    const result = await call("POST", "/api/password/reset-app", { email, code, newPassword });
+    setBusy("ra-go", false);
+    if (result.status === 200) { await finishSignIn(result.body, "Password changed. You're signed in."); return; }
+    setMsg("ra-msg", result.body && result.body.error === "bad_code"
+      ? "That email and code don't match an account with 2-step sign-in. Check both and try again."
+      : authError(result));
+  }
+
+  async function submitResetLink() {
+    const newPassword = el("rl-pass").value;
+    if (!newPassword) { setMsg("rl-msg", "Choose a new password."); return; }
+    setBusy("rl-go", true);
+    const body = { token: resetToken, newPassword };
+    if (needCode) body.code = el("rl-code").value.trim();
+    const result = await call("POST", "/api/password/reset", body);
+    setBusy("rl-go", false);
+    if (result.status === 200) { await finishSignIn(result.body, "Password changed. You're signed in."); return; }
+    if (result.body && result.body.error === "code_required") {
+      needCode = true;
+      renderAccount();
+      setMsg("rl-msg", "This account uses 2-step sign-in. Enter your authenticator code too.", true);
+      return;
+    }
+    setMsg("rl-msg", authError(result));
+  }
+
+  function handleEmailLink() {
+    if (location.hash === "#signin") {
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (error) {}
+      setTimeout(() => { show("account"); renderAccount(); }, 0);
+      return;
+    }
+    const match = /^#(reset|verify)=([a-f0-9]{64})$/.exec(location.hash || "");
+    if (!match) return;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (error) {}
+    if (match[1] === "reset") {
+      resetToken = match[2];
+      acctView = "reset-link";
+      setTimeout(() => { show("account"); renderAccount(); }, 0);
+      return;
+    }
+    call("POST", "/api/email/verify", { token: match[2] }).then((result) => {
+      if (result.status === 200) {
+        if (sync.signedIn) { sync.emailVerified = true; saveSync(); }
+        showPull("Your email is confirmed. Thank you.");
+      } else {
+        showPull(authError(result));
+      }
+      renderAccount();
+    });
+  }
+
+  async function resendVerify() {
+    const result = await call("POST", "/api/email/resend", {});
+    if (result.status === 401) { signedOutByServer(); renderAccount(); return; }
+    setMsg("acct-msg", result.status === 200
+      ? (result.body.mailEnabled ? "Confirmation email sent. Check your inbox." : "Email is not switched on yet.")
+      : authError(result), result.status === 200 && result.body.mailEnabled);
+  }
+
+  function toggleTotp() {
+    askConfirm(sync.totpEnabled ? "totp-off" : "totp-setup");
+  }
+
+  function askConfirm(action) {
+    confirmAction = action;
+    const copy = {
+      change: ["Change your password", "Enter your current password and a new one.", "Change password"],
+      "totp-setup": ["Turn on 2-step sign-in", "Enter your password to start.", "Continue"],
+      "totp-off": ["Turn off 2-step sign-in", "Enter your password and a code from your app.", "Turn off"],
+      delete: ["Delete your account", "This removes your account and its cloud copy. It cannot be undone. Books on this device stay until you erase them.", "Delete account"]
+    }[action];
+    el("cf-title").textContent = copy[0];
+    el("cf-sub").textContent = copy[1];
+    el("cf-go").querySelector(".btn-label").textContent = copy[2];
+    el("cf-new-wrap").hidden = action !== "change";
+    el("cf-code-wrap").hidden = !(sync.totpEnabled && action !== "totp-setup");
+    ["cf-pass", "cf-new", "cf-code"].forEach((id) => { el(id).value = ""; });
+    setAcctView("confirm");
+  }
+
+  async function submitConfirm() {
+    const password = el("cf-pass").value;
+    const code = el("cf-code").value.trim();
+    if (!password) { setMsg("cf-msg", "Enter your current password."); return; }
+    setBusy("cf-go", true);
     let result;
-    try {
-      result = await api("POST", accountMode === "signup" ? "/api/signup" : "/api/login", { email, password });
-    } catch (error) {
-      result = { status: 0, body: null };
-    }
-    button.disabled = false;
-    if ((result.status === 200 || result.status === 201) && result.body && result.body.token) {
-      sync = { token: result.body.token, email: result.body.email, version: 0, dirty: SA.hasBooksData(currentBooks()) };
-      saveSync();
-      document.getElementById("acct-pass").value = "";
-      msg.textContent = "";
-      await syncNow(true);
-      showPull(accountMode === "signup" ? "Account created. Your books are backed up." : "Signed in. Your books are synced.");
+    if (confirmAction === "change") result = await call("POST", "/api/password/change", { password, newPassword: el("cf-new").value, code });
+    if (confirmAction === "totp-setup") result = await call("POST", "/api/totp/setup", { password });
+    if (confirmAction === "totp-off") result = await call("POST", "/api/totp/disable", { password, code });
+    if (confirmAction === "delete") result = await call("POST", "/api/account/delete", { password, code });
+    setBusy("cf-go", false);
+    if (!result || result.status !== 200) {
+      if (result && result.status === 401 && result.body && result.body.error === "signed_out") { signedOutByServer(); renderAccount(); return; }
+      setMsg("cf-msg", result && result.body && result.body.error === "code_required"
+        ? "Enter a code from your authenticator app." : authError(result));
       return;
     }
-    const errors = {
-      email_taken: "That email already has an account. Tap Sign in instead.",
-      bad_login: "That email and password do not match.",
-      weak_password: "Use a password of at least 8 characters.",
-      bad_email: "Check the email address.",
-      slow_down: "Too many tries. Wait 15 minutes and try again."
-    };
-    msg.textContent = (result.body && errors[result.body.error]) || "Could not reach the server. Check your connection and try again.";
+    if (confirmAction === "totp-setup") {
+      el("totp-qr").src = "data:image/svg+xml;base64," + btoa(result.body.qr || "");
+      el("totp-secret").textContent = String(result.body.secret || "").replace(/(.{4})/g, "$1 ").trim();
+      el("totp-code").value = "";
+      setAcctView("totp-setup");
+      return;
+    }
+    if (confirmAction === "delete") {
+      sync = blankSync();
+      saveSync();
+      setAcctView("signin");
+      showPull("Your account and its cloud copy were deleted.");
+      return;
+    }
+    applyProfile(result.body);
+    saveSync();
+    setAcctView("home");
+    setMsg("acct-msg", confirmAction === "change"
+      ? "Password changed. Other devices were signed out." : "2-step sign-in is off.", true);
+  }
+
+  async function enableTotp() {
+    const code = el("totp-code").value.trim();
+    if (!/^\d{6}$/.test(code)) { setMsg("totp-msg", "Enter the 6-digit code from your app."); return; }
+    setBusy("totp-go", true);
+    const result = await call("POST", "/api/totp/enable", { code });
+    setBusy("totp-go", false);
+    if (result.status !== 200) { setMsg("totp-msg", authError(result)); return; }
+    applyProfile(result.body);
+    saveSync();
+    shownRecovery = result.body.recoveryCodes || [];
+    const list = el("recovery-list");
+    list.innerHTML = "";
+    shownRecovery.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      list.appendChild(li);
+    });
+    setAcctView("recovery");
+  }
+
+  function copyRecovery() {
+    const text = "Simple Accountz backup codes for " + sync.email + "\n" + shownRecovery.join("\n");
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => setMsg("recovery-msg", "Copied. Keep them somewhere safe.", true)).catch(() => {});
+    }
   }
 
   async function signOut() {
     if (sync.dirty) await syncNow(true);
     const unsynced = sync.dirty ? " Some recent changes have not synced yet and will be lost." : "";
     if (!window.confirm("Sign out? Your books stay in your account and are removed from this device." + unsynced)) return;
-    try { await api("POST", "/api/logout", {}); } catch (error) {}
+    await call("POST", "/api/logout", {});
     try {
       localStorage.removeItem(SYNC_KEY);
       localStorage.removeItem(SA.BOOKS_KEY);
@@ -3602,46 +4042,56 @@
     location.reload();
   }
 
-  async function deleteAccount() {
-    const password = window.prompt("Type your password to delete your account and its cloud copy. This cannot be undone. Books on this device stay until you erase them.");
-    if (!password) return;
-    let result;
-    try { result = await api("DELETE", "/api/account", { password }); } catch (error) { result = { status: 0 }; }
-    if (result.status === 200) {
-      sync = { token: "", email: "", version: 0, dirty: false };
-      saveSync();
-      syncNote = "Your account and its cloud copy were deleted.";
-      renderAccount();
-      return;
-    }
-    syncNote = result.status === 401 ? "That password is not right. The account was not deleted." : "Could not reach the server. The account was not deleted.";
-    renderAccount();
-  }
-
   function renderAccount() {
     if (!LIVE) return;
-    const signedIn = Boolean(sync.token);
-    const out = document.getElementById("acct-out");
-    const inside = document.getElementById("acct-in");
-    if (!out || !inside) return;
-    out.hidden = signedIn;
-    inside.hidden = !signedIn;
-    document.querySelectorAll("#acct-mode button").forEach((button) => {
-      button.classList.toggle("on", button.dataset.mode === accountMode);
-    });
-    document.getElementById("acct-go").textContent = accountMode === "signup" ? "Create account" : "Sign in";
-    document.getElementById("acct-pass").autocomplete = accountMode === "signup" ? "new-password" : "current-password";
+    const signedIn = sync.signedIn;
+    let view = acctView;
+    if (signedIn && (view === "signin" || view === "signup" || view === "forgot" || view === "reset-app")) view = "home";
+    if (!signedIn && (view === "home" || view === "totp-setup" || view === "recovery" || view === "confirm")) view = "signin";
+    const card = view === "signin" || view === "signup" ? "auth" : view;
+    document.querySelectorAll("#account .acct-view").forEach((node) => { node.hidden = node.dataset.view !== card; });
+    const signup = view === "signup";
+    el("tab-signin").classList.toggle("on", !signup);
+    el("tab-signup").classList.toggle("on", signup);
+    el("tab-signin").setAttribute("aria-selected", String(!signup));
+    el("tab-signup").setAttribute("aria-selected", String(signup));
+    el("auth-title").textContent = signup ? "Create your account" : "Welcome back";
+    el("auth-sub").textContent = signup
+      ? "Free. Back up your books and use them on your phone and computer."
+      : "Sign in to back up your books and use them on every device.";
+    el("auth-go").querySelector(".btn-label").textContent = signup ? "Create account" : "Sign in";
+    el("auth-pass").autocomplete = signup ? "new-password" : "current-password";
+    el("auth-hint").hidden = !signup;
+    el("auth-forgot").hidden = signup;
+    el("auth-code-wrap").hidden = signup || !needCode;
+    el("rl-code-wrap").hidden = !needCode;
+
     let status;
-    if (!signedIn) status = syncNote || "Not signed in. Sign up to back up and sync.";
+    if (!signedIn) status = syncNote || "Not signed in";
     else if (syncNote) status = syncNote;
     else if (syncBusy) status = "Syncing…";
-    else if (sync.dirty) status = "Changes waiting to sync.";
-    else status = lastSyncedAt ? "Synced at " + lastSyncedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Synced.";
-    document.getElementById("acct-email-shown").textContent = sync.email;
-    document.getElementById("acct-sync").textContent = status;
-    document.getElementById("acct-sub").textContent = signedIn ? sync.email + " · " + status : "Not signed in · sign up to back up and sync";
-    const home = document.getElementById("sync-status");
-    if (home) home.textContent = signedIn ? "☁ " + status : "☁ Sign up free to back up and sync your books";
+    else if (sync.dirty) status = "Changes waiting to sync";
+    else status = lastSyncedAt ? "Synced at " + lastSyncedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Synced";
+    el("acct-email-shown").textContent = sync.email;
+    el("acct-avatar").textContent = (sync.email || "S").charAt(0).toUpperCase();
+    el("acct-sync").textContent = status;
+    el("acct-verify").hidden = !signedIn || sync.emailVerified;
+    el("acct-verify-text").textContent = sync.mailEnabled
+      ? "Confirm your email so you can reset your password by email."
+      : "Email confirmation turns on soon. Set up 2-step sign-in so you can always get back in.";
+    el("totp-badge").textContent = sync.totpEnabled ? "On" : "Off";
+    el("totp-badge").className = "badge " + (sync.totpEnabled ? "on" : "off");
+    el("totp-btn").textContent = sync.totpEnabled ? "Turn off" : "Turn on";
+    el("totp-sub").textContent = sync.totpEnabled
+      ? "Codes from your app protect sign-in. " + sync.recoveryLeft + " backup codes left."
+      : "Use an authenticator app for codes, and to reset a forgotten password.";
+    el("acct-sub").textContent = signedIn ? sync.email + " · " + status : "Not signed in · sign up to back up and sync";
+    const chip = el("sync-status");
+    if (chip) {
+      chip.classList.toggle("on", signedIn && !syncNote);
+      chip.classList.toggle("cta", !signedIn);
+      el("sync-status-text").textContent = signedIn ? status : "Sign up free to back up and sync";
+    }
   }
 
   let liveShell = "";
@@ -3784,6 +4234,7 @@
     const doc = docs.find(item => item.id === viewingDocId);
     if (!doc || doc.stored !== "draft") return;
     if (!window.confirm("Delete draft " + (doc.number || "") + "?")) return;
+    deletedIds = Object.assign({}, deletedIds, { [doc.id]: Date.now() });
     docs = docs.filter(item => item.id !== doc.id);
     renderAll();
     show("documents");

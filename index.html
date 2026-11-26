@@ -6,6 +6,8 @@
 <title>Simple Accountz · Invoices and bookkeeping that do themselves</title>
 <meta name="description" content="Send invoices, snap receipts, and let the assistant match payments and file expenses for you. Works on your phone and computer. Free to start.">
 <meta name="theme-color" content="#163300">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
+<meta name="referrer" content="no-referrer">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -118,7 +120,7 @@
 <header class="nav">
   <div class="wrap">
     <a class="brand" href="./"><img src="icon.svg" alt=""> Simple Accountz</a>
-    <a class="btn primary small" href="app.html">Open the app</a>
+    <span style="display:flex;gap:8px;align-items:center"><a class="btn ghost small" href="app.html#signin">Sign in</a><a class="btn primary small" href="app.html">Open the app</a></span>
   </div>
 </header>
 

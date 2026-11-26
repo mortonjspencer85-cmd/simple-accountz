@@ -1344,7 +1344,8 @@ function emptyBooks() {
     uploads: [],
     autoMode: true,
     autoHandled: [],
-    autoSkip: []
+    autoSkip: [],
+    deleted: {}
   };
 }
 
@@ -1361,7 +1362,8 @@ function serializeBooks(state) {
     uploads: Array.isArray(s.uploads) ? s.uploads : [],
     autoMode: s.autoMode !== false,
     autoHandled: Array.isArray(s.autoHandled) ? s.autoHandled : [],
-    autoSkip: Array.isArray(s.autoSkip) ? s.autoSkip : []
+    autoSkip: Array.isArray(s.autoSkip) ? s.autoSkip : [],
+    deleted: cleanDeleted(s.deleted)
   });
 }
 
@@ -1382,7 +1384,8 @@ function restoreBooks(text) {
     uploads: arr(raw.uploads),
     autoMode: raw.autoMode !== false,
     autoHandled: Array.isArray(raw.autoHandled) ? raw.autoHandled.filter((item) => typeof item === "string") : [],
-    autoSkip: Array.isArray(raw.autoSkip) ? raw.autoSkip.filter((item) => typeof item === "string") : []
+    autoSkip: Array.isArray(raw.autoSkip) ? raw.autoSkip.filter((item) => typeof item === "string") : [],
+    deleted: cleanDeleted(raw.deleted)
   };
 }
 
@@ -1426,17 +1429,40 @@ function unionStrings(a, b) {
 
 // Both devices changed the books. Keep everything from both; where the same
 // record changed on both, this device's copy wins because it is the newer edit.
+// Deleted record ids and when they were deleted. Every device keeps the list,
+// so a record deleted on one device is not brought back by another.
+function cleanDeleted(value) {
+  const out = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+  const keys = Object.keys(value).filter((key) => key.length <= 120 && Number.isFinite(value[key]));
+  keys.sort((a, b) => value[b] - value[a]).slice(0, 20000).forEach((key) => { out[key] = value[key]; });
+  return out;
+}
+
+function mergeDeleted(a, b) {
+  const out = Object.assign({}, cleanDeleted(a));
+  const other = cleanDeleted(b);
+  Object.keys(other).forEach((key) => { out[key] = Math.max(out[key] || 0, other[key]); });
+  return out;
+}
+
+function withoutDeleted(list, deleted) {
+  return (Array.isArray(list) ? list : []).filter((item) => !item || !Object.prototype.hasOwnProperty.call(deleted, item.id));
+}
+
 function mergeBooks(local, server) {
   const mine = restoreBooks(JSON.stringify(local || emptyBooks()));
   const theirs = restoreBooks(JSON.stringify(server || emptyBooks()));
+  const deleted = mergeDeleted(mine.deleted, theirs.deleted);
   return {
     version: 1,
     businessName: mine.businessName || theirs.businessName,
     accountKind: mine.accountKind,
-    docs: unionById(mine.docs, theirs.docs),
-    business: unionById(mine.business, theirs.business),
-    personal: unionById(mine.personal, theirs.personal),
-    uploads: unionById(mine.uploads, theirs.uploads),
+    docs: withoutDeleted(unionById(mine.docs, theirs.docs), deleted),
+    business: withoutDeleted(unionById(mine.business, theirs.business), deleted),
+    personal: withoutDeleted(unionById(mine.personal, theirs.personal), deleted),
+    uploads: withoutDeleted(unionById(mine.uploads, theirs.uploads), deleted),
+    deleted,
     autoMode: mine.autoMode,
     autoHandled: unionStrings(mine.autoHandled, theirs.autoHandled),
     autoSkip: unionStrings(mine.autoSkip, theirs.autoSkip)
@@ -1601,6 +1627,7 @@ const SA = {
   uniqueId,
   planSync,
   mergeBooks,
+  mergeDeleted,
   guessCategory,
   autopilot,
   csvCell,
