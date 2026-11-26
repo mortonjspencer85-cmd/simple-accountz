@@ -6,7 +6,7 @@
 <title>Simple Accountz</title>
 <meta name="description" content="Invoices, expenses, receipt photos, and an assistant that does the bookkeeping for you.">
 <meta name="theme-color" content="#163300">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -651,6 +651,37 @@
   .sync-chip.cta .dot { background: var(--lime); }
   @media (prefers-reduced-motion: reduce) { .btn-primary .spinner { animation-duration: 2s; } }
 
+  /* ---- Camera ---- */
+  .cam { position: absolute; inset: 0; z-index: 40; background: #000; display: none; overflow: hidden; }
+  .cam.on { display: block; }
+  .cam video { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .12s ease; }
+  .cam-guide { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .cam-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px;
+    padding: calc(12px + env(safe-area-inset-top)) 14px 14px; background: linear-gradient(rgba(0,0,0,.6), transparent); }
+  .cam-hint { flex: 1; text-align: center; color: #fff; font-size: 13px; font-weight: 600; text-shadow: 0 1px 6px #000; }
+  .cam-chip { border: 0; background: rgba(0,0,0,.45); color: #fff; border-radius: 999px; padding: 9px 14px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .cam-chip.on { background: var(--lime); color: var(--forest); }
+  .cam-chip:disabled { opacity: .35; }
+  .cam-bottom { position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 14px 18px calc(18px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.72) 40%); }
+  .cam-zoom { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 12px; font-weight: 700; }
+  .cam-zoom input { flex: 1; accent-color: var(--lime); height: 28px; }
+  .cam-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .shutter { width: 74px; height: 74px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); cursor: pointer; }
+  .shutter:active { transform: scale(.94); }
+  .shutter.armed { border-color: var(--lime); background: rgba(180,255,106,.35); }
+  .cam-auto { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: #fff; font-size: 13px; font-weight: 600; }
+  .cam-auto input { accent-color: var(--lime); width: 18px; height: 18px; }
+  .cam-busy { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 28px;
+    background: rgba(0,0,0,.8); color: #fff; font-size: 15px; font-weight: 600; }
+  .cam-busy.on { display: grid; }
+  .cam-busy .bar { width: 200px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); margin: 14px auto 0; overflow: hidden; }
+  .cam-busy .bar i { display: block; height: 100%; width: 0; background: var(--lime); transition: width .2s ease; }
+  .scan-note { background: linear-gradient(135deg, #e4ffd1, #d8fff1); border-radius: 12px; padding: 10px 12px;
+    font-size: 13px; color: var(--forest); font-weight: 600; margin: 0 0 12px; }
+
   /* Camera button: phones only (iOS and Android shells), on tabbed screens */
   .cam-fab {
     display: none; position: absolute; right: 18px; bottom: 92px; z-index: 9;
@@ -740,6 +771,26 @@
   <div class="device-wrap">
     <div class="device shell-ios" id="device">
       <div class="flash-veil" id="flash-veil"></div>
+
+      <div class="cam" id="cam">
+        <video id="cam-video" playsinline autoplay muted></video>
+        <canvas class="cam-guide" id="cam-guide"></canvas>
+        <div class="cam-top">
+          <button class="cam-chip" onclick="closeCamera()">Cancel</button>
+          <span class="cam-hint" id="cam-hint">Point at the page</span>
+          <button class="cam-chip" id="cam-torch" onclick="toggleTorch()" hidden>Flash</button>
+        </div>
+        <div class="cam-bottom">
+          <div class="cam-zoom"><span id="cam-zoom-label">1.0x</span><input id="cam-zoom" type="range" min="1" max="6" step="0.1" value="1" aria-label="Zoom"></div>
+          <div class="cam-row">
+            <button class="cam-chip" onclick="pickFromLibrary()">Photos</button>
+            <button class="shutter" id="cam-shot" onclick="shoot(false)" aria-label="Take photo"></button>
+            <button class="cam-chip" id="cam-flip" onclick="flipCamera()">Flip</button>
+          </div>
+          <label class="cam-auto"><input type="checkbox" id="cam-auto" checked onchange="setAutoScan(this.checked)"> Scan and fill in automatically</label>
+        </div>
+        <div class="cam-busy" id="cam-busy"><div><span id="cam-busy-text">Reading the page…</span><div class="bar"><i id="cam-busy-bar"></i></div></div></div>
+      </div>
       <div class="chrome" id="chrome"><span id="chrome-label">Simple Accountz</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></div>
       <div class="island"></div>
       <div class="statusbar"><span>9:41</span><span id="status-shell">iOS</span></div>
@@ -1201,7 +1252,8 @@
       <section class="screen no-tabs" id="invoice-review">
         <button class="back" onclick="backFromInvoice()">Back</button>
         <h2 class="title">Scanned invoice</h2>
-        <p class="note" id="invoice-note">Check the client and the total. This preview does not read the print. Nothing is sent.</p>
+        <p class="scan-note" id="invoice-scan-note" hidden></p>
+        <p class="note" id="invoice-note">Check the client and the total. Nothing is sent.</p>
         <img class="receipt-shot" id="invoice-photo" alt="Scanned invoice" hidden>
         <div class="card" id="invoice-card" style="background:var(--linen)">
           <h3>Sample invoice</h3>
@@ -1236,6 +1288,7 @@
       <section class="screen no-tabs" id="expense">
         <button class="back" onclick="backFromReceipt()">Back</button>
         <h2 class="title">Receipt</h2>
+        <p class="scan-note" id="receipt-scan-note" hidden></p>
         <p class="note" id="expense-note">Check the photo, then save. Nothing is filed until then.</p>
         <img class="receipt-shot" id="receipt-photo" alt="Receipt photo" hidden>
         <div class="card" id="receipt-card" style="background:var(--linen)">
@@ -3106,6 +3159,472 @@
     draft.currency = businessCurrency;
   }
 
+  // ---- Camera ----
+  // One camera for receipts and paper invoices: live zoom, flash, front/back,
+  // and it watches for the page in the frame, straightens it, and reads the
+  // fields off it so the form fills itself in.
+  const cam = {
+    mode: "receipt", stream: null, track: null, raf: 0, timer: 0,
+    zoom: 1, nativeZoom: null, digital: 1, torch: false, facing: "environment",
+    auto: true, steady: 0, last: null, shooting: false
+  };
+  let detectCanvas = null;
+
+  function camEl(id) { return document.getElementById(id); }
+
+  function openCamera(mode) {
+    cam.mode = mode;
+    cam.steady = 0;
+    cam.last = null;
+    cam.shooting = false;
+    cam.auto = camEl("cam-auto").checked;
+    camEl("cam").classList.add("on");
+    camEl("cam-hint").textContent = mode === "invoice" ? "Point at the paper invoice" : "Point at the receipt";
+    setBusy(false);
+    startCamStream();
+  }
+
+  function closeCamera() {
+    camEl("cam").classList.remove("on");
+    setBusy(false);
+    if (cam.raf) cancelAnimationFrame(cam.raf);
+    cam.raf = 0;
+    if (cam.timer) clearTimeout(cam.timer);
+    cam.timer = 0;
+    stopStream();
+  }
+
+  function stopStream() {
+    if (cam.stream) cam.stream.getTracks().forEach((track) => track.stop());
+    cam.stream = null;
+    cam.track = null;
+    const video = camEl("cam-video");
+    if (video) video.srcObject = null;
+  }
+
+  async function startCamStream() {
+    stopStream();
+    const video = camEl("cam-video");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      camEl("cam-hint").textContent = "No camera here. Tap Photos to choose a picture.";
+      return;
+    }
+    try {
+      cam.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: cam.facing }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+        audio: false
+      });
+    } catch (error) {
+      camEl("cam-hint").textContent = "The camera is blocked. Allow it in your settings, or tap Photos.";
+      return;
+    }
+    video.srcObject = cam.stream;
+    cam.track = cam.stream.getVideoTracks()[0];
+    const able = cam.track && cam.track.getCapabilities ? cam.track.getCapabilities() : {};
+    cam.nativeZoom = able && able.zoom ? able.zoom : null;
+    const slider = camEl("cam-zoom");
+    slider.min = "1";
+    slider.max = String(cam.nativeZoom ? Math.min(8, cam.nativeZoom.max / (cam.nativeZoom.min || 1)) : 6);
+    slider.value = "1";
+    applyZoom(1);
+    camEl("cam-torch").hidden = !(able && able.torch);
+    cam.torch = false;
+    camEl("cam-torch").classList.remove("on");
+    try { await video.play(); } catch (error) {}
+    camEl("cam-hint").textContent = cam.auto
+      ? "Hold still over the page and it shoots itself"
+      : "Line up the page and tap the button";
+    scheduleDetect();
+  }
+
+  // Native zoom where the camera offers it, otherwise crop the frame.
+  function applyZoom(value) {
+    cam.zoom = Math.max(1, Number(value) || 1);
+    camEl("cam-zoom-label").textContent = cam.zoom.toFixed(1) + "x";
+    if (cam.nativeZoom && cam.track) {
+      const min = cam.nativeZoom.min || 1;
+      const want = Math.min(cam.nativeZoom.max, min * cam.zoom);
+      cam.digital = 1;
+      camEl("cam-video").style.transform = "";
+      cam.track.applyConstraints({ advanced: [{ zoom: want }] }).catch(() => {
+        cam.nativeZoom = null;
+        applyZoom(cam.zoom);
+      });
+      return;
+    }
+    cam.digital = cam.zoom;
+    camEl("cam-video").style.transform = "scale(" + cam.zoom + ")";
+  }
+
+  function toggleTorch() {
+    if (!cam.track) return;
+    cam.torch = !cam.torch;
+    camEl("cam-torch").classList.toggle("on", cam.torch);
+    cam.track.applyConstraints({ advanced: [{ torch: cam.torch }] }).catch(() => {
+      cam.torch = false;
+      camEl("cam-torch").classList.remove("on");
+    });
+  }
+
+  function flipCamera() {
+    cam.facing = cam.facing === "environment" ? "user" : "environment";
+    startCamStream();
+  }
+
+  function setAutoScan(on) {
+    cam.auto = !!on;
+    cam.steady = 0;
+    camEl("cam-hint").textContent = on ? "Hold still over the page and it shoots itself" : "Line up the page and tap the button";
+    if (!on) drawGuide(null);
+  }
+
+  function pickFromLibrary() {
+    const input = document.getElementById(cam.mode === "invoice" ? "invoice-library" : "receipt-library");
+    if (input) input.click();
+  }
+
+  // The part of the camera picture that is actually on screen, with zoom.
+  function visibleCrop(video, boxW, boxH) {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    const scale = Math.max(boxW / vw, boxH / vh) * cam.digital;
+    const sw = Math.min(vw, boxW / scale);
+    const sh = Math.min(vh, boxH / scale);
+    return { sx: (vw - sw) / 2, sy: (vh - sh) / 2, sw, sh };
+  }
+
+  function scheduleDetect() {
+    if (cam.timer) clearTimeout(cam.timer);
+    cam.timer = setTimeout(() => {
+      cam.raf = requestAnimationFrame(() => { detectOnce(); scheduleDetect(); });
+    }, 140);
+  }
+
+  function detectOnce() {
+    const overlay = camEl("cam");
+    const video = camEl("cam-video");
+    if (!overlay.classList.contains("on") || !cam.stream || cam.shooting || !video.videoWidth) return;
+    const box = overlay.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    const width = 160;
+    const height = Math.max(40, Math.round(width * box.height / box.width));
+    if (!detectCanvas) detectCanvas = document.createElement("canvas");
+    detectCanvas.width = width;
+    detectCanvas.height = height;
+    const ctx = detectCanvas.getContext("2d", { willReadFrequently: true });
+    const crop = visibleCrop(video, box.width, box.height);
+    if (!crop) return;
+    ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
+    const pixels = ctx.getImageData(0, 0, width, height).data;
+    const gray = new Uint8Array(width * height);
+    for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+      gray[i] = (pixels[p] * 77 + pixels[p + 1] * 150 + pixels[p + 2] * 29) >> 8;
+    }
+    const quad = SA.findDocumentQuad(gray, width, height);
+    drawGuide(quad, width, height);
+    if (!cam.auto) return;
+    if (quad && cam.last && SA.quadIsSteady(quad, cam.last, 0.015 * Math.max(width, height) / 100)) cam.steady += 1;
+    else cam.steady = quad ? 1 : 0;
+    cam.last = quad;
+    camEl("cam-shot").classList.toggle("armed", cam.steady >= 2);
+    if (quad) camEl("cam-hint").textContent = cam.steady >= 2 ? "Hold it…" : "Page found. Hold still.";
+    else camEl("cam-hint").textContent = "Move so the whole page is in view";
+    if (cam.steady >= 4) shoot(true);
+  }
+
+  function drawGuide(quad, width, height) {
+    const overlay = camEl("cam");
+    const canvas = camEl("cam-guide");
+    const box = overlay.getBoundingClientRect();
+    if (canvas.width !== Math.round(box.width) || canvas.height !== Math.round(box.height)) {
+      canvas.width = Math.round(box.width);
+      canvas.height = Math.round(box.height);
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!quad) return;
+    const kx = canvas.width / width;
+    const ky = canvas.height / height;
+    ctx.beginPath();
+    quad.corners.forEach((corner, i) => {
+      const x = corner.x * kx;
+      const y = corner.y * ky;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = "rgba(180,255,106,0.14)";
+    ctx.fill();
+    ctx.strokeStyle = cam.steady >= 2 ? "#b4ff6a" : "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = ctx.strokeStyle;
+    quad.corners.forEach((corner) => {
+      ctx.beginPath();
+      ctx.arc(corner.x * kx, corner.y * ky, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function setBusy(on, text, progress) {
+    const busy = camEl("cam-busy");
+    busy.classList.toggle("on", !!on);
+    if (text) camEl("cam-busy-text").textContent = text;
+    camEl("cam-busy-bar").style.width = Math.round((progress || 0) * 100) + "%";
+  }
+
+  async function shoot(automatic) {
+    if (cam.shooting) return;
+    const video = camEl("cam-video");
+    if (!cam.stream || !video.videoWidth) {
+      pickFromLibrary();
+      return;
+    }
+    cam.shooting = true;
+    if (cam.timer) clearTimeout(cam.timer);
+    try {
+      const box = camEl("cam").getBoundingClientRect();
+      const crop = visibleCrop(video, box.width, box.height);
+      const full = document.createElement("canvas");
+      const scale = Math.min(1, 2000 / Math.max(crop.sw, crop.sh));
+      full.width = Math.round(crop.sw * scale);
+      full.height = Math.round(crop.sh * scale);
+      full.getContext("2d").drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, full.width, full.height);
+      const quad = automatic ? cam.last : null;
+      const shot = straighten(full, quad, 160);
+      setBusy(true, "Tidying the picture…", 0.15);
+      const dataUrl = shot.toDataURL("image/jpeg", 0.85);
+      stopStream();
+      await handleShot(dataUrl, shot);
+    } catch (error) {
+      showPull("The photo did not work. Try again.");
+    } finally {
+      cam.shooting = false;
+    }
+  }
+
+  // Pulls a slanted page square. Without a detected page the picture is kept as it is.
+  function straighten(source, quad, detectWidth) {
+    if (!quad) return source;
+    const kx = source.width / detectWidth;
+    const ky = source.height / Math.round(detectWidth * source.height / source.width);
+    const corners = quad.corners.map((corner) => ({ x: corner.x * kx, y: corner.y * ky }));
+    const size = SA.straightenedSize(corners, 1500);
+    if (!size) return source;
+    const to = [{ x: 0, y: 0 }, { x: size.width, y: 0 }, { x: size.width, y: size.height }, { x: 0, y: size.height }];
+    const home = SA.solveHomography(to, corners);
+    if (!home) return source;
+    const src = source.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, source.width, source.height);
+    const out = document.createElement("canvas");
+    out.width = size.width;
+    out.height = size.height;
+    const ctx = out.getContext("2d");
+    const target = ctx.createImageData(size.width, size.height);
+    const sw = source.width;
+    const sh = source.height;
+    for (let y = 0; y < size.height; y++) {
+      for (let x = 0; x < size.width; x++) {
+        const point = SA.applyHomography(home, x + 0.5, y + 0.5);
+        const to4 = (y * size.width + x) * 4;
+        const fx = point.x - 0.5;
+        const fy = point.y - 0.5;
+        const x0 = Math.floor(fx);
+        const y0 = Math.floor(fy);
+        if (x0 < 0 || y0 < 0 || x0 + 1 >= sw || y0 + 1 >= sh) {
+          target.data[to4] = target.data[to4 + 1] = target.data[to4 + 2] = 255;
+          target.data[to4 + 3] = 255;
+          continue;
+        }
+        const ax = fx - x0;
+        const ay = fy - y0;
+        const i00 = (y0 * sw + x0) * 4;
+        const i10 = i00 + 4;
+        const i01 = i00 + sw * 4;
+        const i11 = i01 + 4;
+        for (let c = 0; c < 3; c++) {
+          const top = src.data[i00 + c] + (src.data[i10 + c] - src.data[i00 + c]) * ax;
+          const bottom = src.data[i01 + c] + (src.data[i11 + c] - src.data[i01 + c]) * ax;
+          target.data[to4 + c] = top + (bottom - top) * ay;
+        }
+        target.data[to4 + 3] = 255;
+      }
+    }
+    ctx.putImageData(target, 0, 0);
+    return out;
+  }
+
+  // High-contrast grey copy: what the reader sees best.
+  function forReading(canvas) {
+    const width = Math.min(1400, canvas.width);
+    const height = Math.round(canvas.height * width / canvas.width);
+    const out = document.createElement("canvas");
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(canvas, 0, 0, width, height);
+    const image = ctx.getImageData(0, 0, width, height);
+    const data = image.data;
+    const hist = new Array(256).fill(0);
+    for (let i = 0; i < data.length; i += 4) {
+      const grey = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+      data[i] = data[i + 1] = data[i + 2] = grey;
+      hist[grey] += 1;
+    }
+    const total = width * height;
+    let low = 0;
+    let high = 255;
+    let seen = 0;
+    for (let i = 0; i < 256; i++) { seen += hist[i]; if (seen > total * 0.03) { low = i; break; } }
+    seen = 0;
+    for (let i = 255; i >= 0; i--) { seen += hist[i]; if (seen > total * 0.03) { high = i; break; } }
+    const span = Math.max(1, high - low);
+    for (let i = 0; i < data.length; i += 4) {
+      const value = Math.max(0, Math.min(255, Math.round((data[i] - low) * 255 / span)));
+      data[i] = data[i + 1] = data[i + 2] = value;
+    }
+    ctx.putImageData(image, 0, 0);
+    return out;
+  }
+
+  async function handleShot(dataUrl, canvas) {
+    const mode = cam.mode;
+    let scan = null;
+    if (cam.auto) {
+      try {
+        setBusy(true, "Reading the page…", 0.2);
+        const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9), (p) => setBusy(true, "Reading the page…", 0.2 + p * 0.75));
+        scan = mode === "invoice"
+          ? SA.parseInvoiceText(text, SA.LEDGER_TODAY, countryCode !== "US")
+          : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US");
+      } catch (error) {
+        scan = null;
+      }
+    }
+    setBusy(false);
+    camEl("cam").classList.remove("on");
+    if (mode === "invoice") acceptInvoicePhoto(dataUrl, scan);
+    else acceptReceiptPhoto(dataUrl, scan);
+  }
+
+  // ---- Reading the text (runs on the device, nothing is uploaded) ----
+  let ocrWorker = null;
+  let ocrLoading = null;
+
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[data-src="' + src + '"]')) return resolve();
+      const tag = document.createElement("script");
+      tag.src = src;
+      tag.dataset.src = src;
+      tag.onload = () => resolve();
+      tag.onerror = () => reject(new Error("load"));
+      document.head.appendChild(tag);
+    });
+  }
+
+  async function readText(dataUrl, onProgress) {
+    if (!window.Tesseract) {
+      if (!ocrLoading) ocrLoading = loadScriptOnce("ocr/tesseract.min.js");
+      await ocrLoading;
+    }
+    if (!ocrWorker) {
+      ocrWorker = await window.Tesseract.createWorker("eng", 1, {
+        workerPath: "ocr/worker.min.js",
+        corePath: "ocr/",
+        langPath: "ocr/",
+        gzip: true,
+        logger: (message) => {
+          if (message && message.status === "recognizing text" && onProgress) onProgress(message.progress || 0);
+        }
+      });
+    }
+    const result = await ocrWorker.recognize(dataUrl);
+    return (result && result.data && result.data.text) || "";
+  }
+
+  function listWords(words) {
+    if (words.length < 2) return words.join("");
+    return words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
+  }
+
+  // Puts what was read into the form, leaving anything it is unsure of blank.
+  function applyScanToReceipt(scan) {
+    const note = document.getElementById("receipt-scan-note");
+    if (!scan || !scan.fields) {
+      if (note) { note.textContent = "Could not read this one. Type the details in."; note.hidden = false; }
+      return;
+    }
+    const filled = [];
+    if (scan.merchant) { document.getElementById("expense-merchant").value = scan.merchant; filled.push("merchant"); }
+    if (scan.totalMinor > 0) {
+      document.getElementById("expense-total").value = SA.formatMoney(scan.totalMinor, businessCurrency);
+      filled.push("total");
+    }
+    if (scan.date) {
+      const field = document.getElementById("expense-date");
+      field.value = shortDate(scan.date);
+      field.dataset.iso = scan.date;
+      filled.push("date");
+    }
+    if (scan.category) document.getElementById("expense-category").value = scan.category;
+    if (note) {
+      note.textContent = filled.length
+        ? "Filled in the " + listWords(filled) + " from the photo. Check it before saving."
+        : "Could not read this one. Type the details in.";
+      note.hidden = false;
+    }
+  }
+
+  function applyScanToInvoice(scan) {
+    const note = document.getElementById("invoice-scan-note");
+    if (!scan || !scan.fields) {
+      if (note) { note.textContent = "Could not read this one. Type the details in."; note.hidden = false; }
+      return;
+    }
+    const filled = [];
+    if (scan.client) { document.getElementById("invoice-client").value = scan.client; filled.push("client"); }
+    if (scan.totalMinor > 0) {
+      document.getElementById("invoice-total").value = SA.formatMoney(scan.totalMinor, businessCurrency);
+      filled.push("total");
+    }
+    if (note) {
+      note.textContent = filled.length
+        ? "Filled in the " + listWords(filled) + " from the photo. Check it before saving."
+        : "Could not read this one. Type the details in.";
+      note.hidden = false;
+    }
+  }
+
+  function bindCamera() {
+    const slider = document.getElementById("cam-zoom");
+    if (!slider) return;
+    slider.addEventListener("input", () => applyZoom(slider.value));
+    const overlay = document.getElementById("cam");
+    let pinchFrom = 0;
+    let zoomFrom = 1;
+    const spread = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    overlay.addEventListener("touchstart", (event) => {
+      if (event.touches.length !== 2) return;
+      pinchFrom = spread(event.touches);
+      zoomFrom = cam.zoom;
+    }, { passive: true });
+    overlay.addEventListener("touchmove", (event) => {
+      if (event.touches.length !== 2 || !pinchFrom) return;
+      event.preventDefault();
+      const next = Math.max(1, Math.min(Number(slider.max), zoomFrom * spread(event.touches) / pinchFrom));
+      slider.value = String(next);
+      applyZoom(next);
+    }, { passive: false });
+    overlay.addEventListener("touchend", () => { pinchFrom = 0; }, { passive: true });
+    // Tap the preview to focus there, where the camera allows it.
+    overlay.addEventListener("click", (event) => {
+      if (!cam.track || event.target.closest("button, input, label")) return;
+      const box = overlay.getBoundingClientRect();
+      const point = { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height };
+      cam.track.applyConstraints({ advanced: [{ pointsOfInterest: [point], focusMode: "continuous" }] }).catch(() => {});
+    });
+  }
+
   function closeReceiptCamera() {
     if (receiptStream) {
       receiptStream.getTracks().forEach((track) => track.stop());
@@ -3122,6 +3641,9 @@
   function beginReceipt() {
     editingExpenseId = null;
     receiptPhoto = null;
+    const note = document.getElementById("receipt-scan-note");
+    if (note) note.hidden = true;
+    if (LIVE) { openCamera("receipt"); return; }
     show("receipt-scan");
     startReceiptCamera();
   }
@@ -3175,7 +3697,7 @@
     });
   }
 
-  function acceptReceiptPhoto(dataUrl) {
+  function acceptReceiptPhoto(dataUrl, scan) {
     shrinkReceiptPhoto(dataUrl).then((shrunk) => {
       const staged = SA.stageReceiptPhoto(shrunk);
       if (!staged.ok) {
@@ -3192,6 +3714,7 @@
       fillReceiptForm("photo");
       document.getElementById("expense-save").textContent = "Save expense";
       show("expense");
+      applyScanToReceipt(scan);
     });
   }
 
@@ -3351,6 +3874,9 @@
     const note = document.getElementById("invoice-camera-note");
     note.hidden = false;
     note.textContent = "Allow the camera, or take a photo with the button below.";
+    const scanNote = document.getElementById("invoice-scan-note");
+    if (scanNote) scanNote.hidden = true;
+    if (LIVE) { openCamera("invoice"); return; }
     show("invoice-scan");
     startCamera("invoice-scan", "invoice-video", "invoice-camera-note");
   }
@@ -3369,7 +3895,7 @@
     document.getElementById("invoice-camera-file").click();
   }
 
-  function acceptInvoicePhoto(dataUrl) {
+  function acceptInvoicePhoto(dataUrl, scan) {
     shrinkReceiptPhoto(dataUrl).then((shrunk) => {
       const staged = SA.stageInvoiceScan(shrunk);
       if (!staged.ok) {
@@ -3386,6 +3912,7 @@
       fillInvoiceForm("photo");
       document.getElementById("invoice-save").textContent = "Save draft";
       show("invoice-review");
+      applyScanToInvoice(scan);
     });
   }
 
@@ -3433,7 +3960,7 @@
       card.hidden = false;
       card.querySelector("h3").textContent = "Sample invoice";
       card.querySelector("p").textContent = "North dock · $320.00. Save keeps it as a draft.";
-      document.getElementById("invoice-note").textContent = "Sample invoice. Save keeps a draft. It is not sent. This preview does not read the print.";
+      document.getElementById("invoice-note").textContent = "Sample invoice. Save keeps a draft. It is not sent.";
       return;
     }
     client.value = "";
@@ -3441,7 +3968,7 @@
     img.hidden = false;
     img.src = invoiceScan.photo;
     card.hidden = true;
-    document.getElementById("invoice-note").textContent = "Check the client and the total against the photo. This preview does not read the print. Nothing is sent.";
+    document.getElementById("invoice-note").textContent = "Check the client and the total against the photo. Saving keeps a draft; it is not sent. Nothing is sent.";
   }
 
   function backFromInvoice() {
@@ -4770,6 +5297,7 @@
     renderInvoiceLocale();
   });
   wrapFooters();
+  bindCamera();
   bindPull("home");
   if (LIVE) startLive();
   renderAll();

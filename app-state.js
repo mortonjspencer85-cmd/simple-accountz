@@ -1926,6 +1926,331 @@ function mergeBooks(local, server) {
   };
 }
 
+// ---- Document scanning ----
+// Finds the sheet of paper in a camera frame, straightens it, and reads the
+// fields off it. Everything here works on plain arrays, so it can be tested
+// without a camera and runs the same in a browser and in the store apps.
+
+// Splits light paper from a darker background. Otsu's method: the cut that
+// leaves the two sides as tight as possible.
+function otsuThreshold(gray) {
+  const hist = new Array(256).fill(0);
+  for (let i = 0; i < gray.length; i++) hist[gray[i]] += 1;
+  const total = gray.length;
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0;
+  let weightB = 0;
+  let best = 0;
+  let cut = 128;
+  for (let t = 0; t < 256; t++) {
+    weightB += hist[t];
+    if (!weightB) continue;
+    const weightF = total - weightB;
+    if (!weightF) break;
+    sumB += t * hist[t];
+    const between = weightB * weightF * Math.pow(sumB / weightB - (sum - sumB) / weightF, 2);
+    if (between > best) { best = between; cut = t; }
+  }
+  return cut;
+}
+
+// The four corners of the page, as a quadrilateral, or null when the frame does
+// not hold one clearly. gray is one brightness value (0-255) per pixel.
+function findDocumentQuad(gray, width, height) {
+  if (!gray || gray.length !== width * height || width < 16 || height < 16) return null;
+  const cut = otsuThreshold(gray);
+  // Paper must be clearly brighter than what it sits on.
+  let light = 0;
+  let lightSum = 0;
+  let darkSum = 0;
+  let dark = 0;
+  for (let i = 0; i < gray.length; i++) {
+    if (gray[i] > cut) { light += 1; lightSum += gray[i]; } else { dark += 1; darkSum += gray[i]; }
+  }
+  if (!light || !dark) return null;
+  if (lightSum / light - darkSum / dark < 28) return null;
+  const share = light / gray.length;
+  if (share < 0.12 || share > 0.97) return null;
+
+  // The extreme points of the bright area give the corners, which works even
+  // when the page is held at an angle.
+  let tl = null, tr = null, br = null, bl = null;
+  let minSum = Infinity, maxSum = -Infinity, minDiff = Infinity, maxDiff = -Infinity;
+  let minX = width, maxX = -1, minY = height, maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (gray[y * width + x] <= cut) continue;
+      const sum = x + y;
+      const diff = x - y;
+      if (sum < minSum) { minSum = sum; tl = { x, y }; }
+      if (sum > maxSum) { maxSum = sum; br = { x, y }; }
+      if (diff > maxDiff) { maxDiff = diff; tr = { x, y }; }
+      if (diff < minDiff) { minDiff = diff; bl = { x, y }; }
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (!tl || !tr || !br || !bl) return null;
+  const corners = [tl, tr, br, bl];
+  const area = Math.abs(quadArea(corners));
+  const box = (maxX - minX + 1) * (maxY - minY + 1);
+  // Reject blobs that are not solid and rectangular enough to be a page.
+  if (area < box * 0.6) return null;
+  if (area < gray.length * 0.10) return null;
+  const sides = [0, 1, 2, 3].map((i) => Math.hypot(corners[(i + 1) % 4].x - corners[i].x, corners[(i + 1) % 4].y - corners[i].y));
+  if (Math.min.apply(null, sides) < Math.min(width, height) * 0.12) return null;
+  // A page is solid: nearly every pixel inside the outline is light. Stripes and
+  // clutter can stretch a quadrilateral across the frame but stay patchy inside.
+  let inside = 0;
+  let bright = 0;
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      if (!pointInQuad(x, y, corners)) continue;
+      inside += 1;
+      if (gray[y * width + x] > cut) bright += 1;
+    }
+  }
+  if (!inside || bright / inside < 0.82) return null;
+  return { corners, area, fill: area / gray.length, solid: bright / inside, threshold: cut };
+}
+
+function pointInQuad(px, py, corners) {
+  let hit = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    const a = corners[i];
+    const b = corners[j];
+    if ((a.y > py) !== (b.y > py) && px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x) hit = !hit;
+  }
+  return hit;
+}
+
+function quadArea(corners) {
+  let total = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i];
+    const b = corners[(i + 1) % 4];
+    total += a.x * b.y - b.x * a.y;
+  }
+  return total / 2;
+}
+
+// True when two readings of the page sit in almost the same place, which means
+// the hand has stopped moving and the shot is worth taking.
+function quadIsSteady(a, b, tolerance) {
+  if (!a || !b) return false;
+  const limit = tolerance == null ? 0.02 : tolerance;
+  return a.corners.every((corner, i) =>
+    Math.hypot(corner.x - b.corners[i].x, corner.y - b.corners[i].y) <= limit * 100);
+}
+
+// The transform that pulls a slanted page into a straight rectangle.
+function solveHomography(from, to) {
+  const rows = [];
+  for (let i = 0; i < 4; i++) {
+    const s = from[i];
+    const d = to[i];
+    rows.push([s.x, s.y, 1, 0, 0, 0, -s.x * d.x, -s.y * d.x, d.x]);
+    rows.push([0, 0, 0, s.x, s.y, 1, -s.x * d.y, -s.y * d.y, d.y]);
+  }
+  for (let col = 0; col < 8; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < 8; r++) if (Math.abs(rows[r][col]) > Math.abs(rows[pivot][col])) pivot = r;
+    if (Math.abs(rows[pivot][col]) < 1e-9) return null;
+    const swap = rows[col];
+    rows[col] = rows[pivot];
+    rows[pivot] = swap;
+    for (let r = 0; r < 8; r++) {
+      if (r === col) continue;
+      const factor = rows[r][col] / rows[col][col];
+      for (let c = col; c < 9; c++) rows[r][c] -= factor * rows[col][c];
+    }
+  }
+  const h = rows.map((row, i) => row[8] / row[i]);
+  return h.concat([1]);
+}
+
+function applyHomography(h, x, y) {
+  const w = h[6] * x + h[7] * y + h[8];
+  if (!w) return { x: 0, y: 0 };
+  return { x: (h[0] * x + h[1] * y + h[2]) / w, y: (h[3] * x + h[4] * y + h[5]) / w };
+}
+
+// How big the straightened page should be, keeping the paper's real proportions.
+function straightenedSize(corners, maxWidth) {
+  const side = (a, b) => Math.hypot(corners[b].x - corners[a].x, corners[b].y - corners[a].y);
+  const width = Math.max(side(0, 1), side(3, 2));
+  const height = Math.max(side(0, 3), side(1, 2));
+  if (!width || !height) return null;
+  const limit = maxWidth || 1600;
+  const scale = Math.min(1, limit / width);
+  return { width: Math.max(8, Math.round(width * scale)), height: Math.max(8, Math.round(height * scale)) };
+}
+
+// ---- Reading the text off a scan ----
+// Money written any of the usual ways: $1,234.56 · 1 234,56 · 1234.56 · 1234
+function parseMoneyToken(text) {
+  const raw = String(text || "").trim().replace(/[^\d.,-]/g, "");
+  if (!/\d/.test(raw)) return null;
+  const negative = /^-/.test(raw);
+  let body = raw.replace(/-/g, "");
+  const lastDot = body.lastIndexOf(".");
+  const lastComma = body.lastIndexOf(",");
+  const mark = Math.max(lastDot, lastComma);
+  let cents = "";
+  if (mark !== -1 && /^\d{1,2}$/.test(body.slice(mark + 1))) {
+    cents = body.slice(mark + 1).padEnd(2, "0");
+    body = body.slice(0, mark);
+  }
+  const whole = body.replace(/[.,\s]/g, "");
+  if (!/^\d+$/.test(whole)) return null;
+  const minor = Number(whole) * 100 + Number(cents || "0");
+  if (!Number.isSafeInteger(minor) || minor > 1e11) return null;
+  return negative ? -minor : minor;
+}
+
+const MONEY_RE = /(?:[$£€¥]\s?)?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/g;
+
+function findMoney(line) {
+  const out = [];
+  String(line || "").replace(MONEY_RE, (match, offset) => {
+    if (!/\d/.test(match)) return match;
+    const minor = parseMoneyToken(match);
+    if (minor != null && minor > 0) out.push({ minor, raw: match.trim(), at: offset });
+    return match;
+  });
+  return out;
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+// A date in any common layout, turned into 2026-11-26. Ambiguous day/month pairs
+// use the order the business's country writes them in.
+function parseLooseDate(text, today, dayFirst) {
+  const value = String(text || "");
+  const iso = /(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(value);
+  const pick = (y, m, d) => {
+    if (m < 1 || m > 12 || d < 1 || d > 31) return "";
+    const out = y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    return out;
+  };
+  if (iso) return pick(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const named = new RegExp("(\\d{1,2})?\\s*(" + MONTHS.join("|") + ")[a-z]*\\.?,?\\s*(\\d{1,2})?,?\\s*(20\\d{2})", "i").exec(value);
+  if (named) {
+    const month = MONTHS.indexOf(named[2].toLowerCase()) + 1;
+    const day = Number(named[1] || named[3] || 1);
+    return pick(Number(named[4]), month, day);
+  }
+  const slash = /(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/.exec(value);
+  if (slash) {
+    let year = Number(slash[3]);
+    if (year < 100) year += 2000;
+    let a = Number(slash[1]);
+    let b = Number(slash[2]);
+    // 13 or more can only be the day, whatever the local habit is.
+    const monthFirst = b > 12 ? true : (a > 12 ? false : !dayFirst);
+    return monthFirst ? pick(year, a, b) : pick(year, b, a);
+  }
+  return "";
+}
+
+const TOTAL_WORDS = /\b(grand\s*total|balance\s*due|amount\s*due|total\s*due|total)\b/i;
+const SKIP_TOTAL = /\b(sub\s*-?total|tax|vat|gst|tip|change|cash|tendered|discount)\b/i;
+const NOT_A_NAME = /^[\s\d\W]*$/;
+
+function cleanLines(text) {
+  return String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
+// Pulls merchant, total, and date off a shop receipt.
+function parseReceiptText(text, today, dayFirst) {
+  const lines = cleanLines(text);
+  const found = { merchant: "", totalMinor: 0, date: "", category: "", fields: 0 };
+  if (!lines.length) return found;
+
+  let best = null;
+  lines.forEach((line, index) => {
+    if (!TOTAL_WORDS.test(line) || SKIP_TOTAL.test(line)) return;
+    const money = findMoney(line);
+    if (!money.length) return;
+    const amount = money[money.length - 1];
+    const grand = /grand\s*total|balance\s*due|amount\s*due|total\s*due/i.test(line);
+    const score = (grand ? 1000000 : 0) + index + amount.minor / 1e9;
+    if (!best || score > best.score) best = { minor: amount.minor, score };
+  });
+  if (!best) {
+    // No labelled total: the largest amount on the receipt is the usual answer.
+    const all = lines.reduce((list, line) => list.concat(findMoney(line)), []);
+    if (all.length) best = { minor: all.reduce((top, item) => Math.max(top, item.minor), 0) };
+  }
+  if (best && best.minor > 0) { found.totalMinor = best.minor; found.fields += 1; }
+
+  for (let i = 0; i < lines.length && !found.date; i++) {
+    const date = parseLooseDate(lines[i], today, dayFirst);
+    if (date) { found.date = date; found.fields += 1; }
+  }
+
+  const header = lines.slice(0, 6).find((line) =>
+    line.length >= 3 && line.length <= 40 && !NOT_A_NAME.test(line) && !TOTAL_WORDS.test(line)
+    && !/receipt|invoice|order|www\.|http|@|tel|phone|\d{3}-\d{4}/i.test(line));
+  if (header) {
+    found.merchant = header.replace(/[*#|]+/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
+    found.fields += 1;
+    found.category = guessCategory(found.merchant);
+  }
+  return found;
+}
+
+// Pulls client, number, total, and due date off a paper invoice.
+function parseInvoiceText(text, today, dayFirst) {
+  const lines = cleanLines(text);
+  const found = { client: "", number: "", totalMinor: 0, due: "", email: "", phone: "", fields: 0 };
+  if (!lines.length) return found;
+  const all = lines.join("\n");
+
+  const number = /\b(?:invoice|inv)\s*(?:number|no\.?|#)?\s*[:#]?\s*([A-Z]{0,4}-?\d{2,8})\b/i.exec(all);
+  if (number) { found.number = number[1].toUpperCase().slice(0, 20); found.fields += 1; }
+
+  const email = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.exec(all);
+  if (email) { found.email = email[0].toLowerCase(); found.fields += 1; }
+
+  const phone = /(\+?\d[\d\s().-]{7,17}\d)/.exec(all.replace(/\b(?:invoice|inv|no|#)\s*[:#]?\s*\d+/gi, ""));
+  if (phone) {
+    const clean = cleanPhone(phone[1]);
+    if (clean) { found.phone = clean; found.fields += 1; }
+  }
+
+  let best = null;
+  lines.forEach((line, index) => {
+    if (!TOTAL_WORDS.test(line) || SKIP_TOTAL.test(line)) return;
+    const money = findMoney(line);
+    if (!money.length) return;
+    const grand = /balance\s*due|amount\s*due|total\s*due|grand\s*total/i.test(line);
+    const score = (grand ? 1000000 : 0) + index;
+    if (!best || score > best.score) best = { minor: money[money.length - 1].minor, score };
+  });
+  if (best && best.minor > 0) { found.totalMinor = best.minor; found.fields += 1; }
+
+  const dueLine = lines.find((line) => /\bdue\b/i.test(line) && parseLooseDate(line, today, dayFirst));
+  if (dueLine) { found.due = parseLooseDate(dueLine, today, dayFirst); found.fields += 1; }
+
+  const billIndex = lines.findIndex((line) => /\b(bill\s*to|invoice\s*to|sold\s*to|customer)\b/i.test(line));
+  if (billIndex !== -1) {
+    const sameLine = lines[billIndex].replace(/.*\b(?:bill\s*to|invoice\s*to|sold\s*to|customer)\b\s*:?\s*/i, "").trim();
+    const next = lines.slice(billIndex + 1).find((line) => !NOT_A_NAME.test(line));
+    const name = sameLine && !NOT_A_NAME.test(sameLine) ? sameLine : next;
+    if (name) { found.client = name.slice(0, 60); found.fields += 1; }
+  }
+  if (!found.client) {
+    const header = lines.slice(0, 4).find((line) =>
+      line.length >= 3 && line.length <= 40 && !NOT_A_NAME.test(line) && !/invoice|receipt|statement/i.test(line));
+    if (header) { found.client = header.slice(0, 60); found.fields += 1; }
+  }
+  return found;
+}
+
 // ---- Activity feed and notifications ----
 // Every change worth telling the owner about becomes one entry. The feed lives
 // in the books, so it syncs: something recorded on a phone shows on the laptop.
@@ -2173,6 +2498,18 @@ const SA = {
   restoreBooks,
   hasBooksData,
   uniqueId,
+  otsuThreshold,
+  findDocumentQuad,
+  quadArea,
+  quadIsSteady,
+  solveHomography,
+  applyHomography,
+  straightenedSize,
+  parseMoneyToken,
+  findMoney,
+  parseLooseDate,
+  parseReceiptText,
+  parseInvoiceText,
   ACTIVITY_MAX,
   ACTIVITY_KINDS,
   cleanActivity,
