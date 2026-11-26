@@ -1479,12 +1479,18 @@
         <button class="back" onclick="show('money')">Back</button>
         <div class="top"><h2 class="title">Accounts</h2></div>
         <p class="note" id="banks-note">Link business checking and business credit. You sign in at the bank. Simple Accountz stores the connection, the balance, and transactions. It never stores your password, and it cannot move money out.</p>
+        <p class="scan-note live-only" id="bank-state" hidden></p>
         <div id="banklist"></div>
+        <div id="bank-links"></div>
+        <div class="dv-actions live-only" id="bank-actions" hidden>
+          <button class="pill-outline" onclick="syncBanks(true)">Check for new activity</button>
+          <button class="pill-outline" onclick="finishBank(true)">I finished at my bank</button>
+        </div>
         <div style="height:88px"></div>
         <div class="sticky">
           <span class="note">Read only</span>
           <button class="pill preview-only" onclick="openSheet('link')">Link account</button>
-          <p class="note live-only">Bank and card linking is coming soon. Add expenses with a receipt photo for now.</p>
+          <button class="pill live-only" id="bank-connect" onclick="connectBank()">Connect a bank or card</button>
         </div>
       </section>
 
@@ -4196,9 +4202,12 @@
     handleEmailLink();
     window.addEventListener("online", () => syncNow(false));
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") syncNow(false);
+      if (document.visibilityState !== "visible") return;
+      syncNow(false);
+      if (bankPending()) finishBank(false);
+      else syncBanks(false);
     });
-    if (sync.signedIn) setTimeout(() => { refreshProfile(); syncNow(false); }, 0);
+    if (sync.signedIn) setTimeout(() => { refreshProfile(); syncNow(false); loadBanks().then(() => syncBanks(false)); }, 0);
   }
 
   function applyBooksState(saved) {
@@ -4469,6 +4478,153 @@
   // notifications, and sync all work already:
   //   SA_BANK_EVENTS([{ id, kind: "check_cleared"|"deposit"|"bill_paid"|"payment_cleared",
   //                     amountMinor, currency, name, date, reference }])
+  // ---- Bank and card linking ----
+  // Accounts are read through the server, which talks to the bank provider.
+  // The app never sees a bank password or an access token, and nothing here
+  // can move money: it reads cleared activity and turns it into plain words.
+  const BANK_PENDING_KEY = "simpleaccountz.banklink.v1";
+  let bankState = { configured: false, items: [], loaded: false };
+
+  function bankPending(value) {
+    try {
+      if (value === undefined) return localStorage.getItem(BANK_PENDING_KEY) || "";
+      if (value) localStorage.setItem(BANK_PENDING_KEY, value);
+      else localStorage.removeItem(BANK_PENDING_KEY);
+    } catch (error) {}
+    return value || "";
+  }
+
+  async function loadBanks() {
+    if (!LIVE || !sync.signedIn) { bankState = { configured: false, items: [], loaded: true }; renderBankLinks(); return; }
+    const got = await call("GET", "/api/bank/accounts");
+    if (got.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (got.status === 200 && got.body) bankState = { configured: !!got.body.configured, items: got.body.items || [], loaded: true };
+    renderBankLinks();
+  }
+
+  async function connectBank() {
+    if (!sync.signedIn) {
+      showPull("Create a free account first, so your bank stays linked to you.");
+      show("account");
+      return;
+    }
+    setBankState("Opening your bank…");
+    const made = await call("POST", "/api/bank/link", { returnTo: location.href.split("#")[0] });
+    if (made.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (made.status === 200 && made.body && made.body.configured === false) {
+      setBankState("Bank linking is not switched on yet for this app.");
+      return;
+    }
+    if (made.status !== 200 || !made.body || !made.body.url) {
+      setBankState("Could not reach your bank just now. Try again in a minute.");
+      return;
+    }
+    bankPending(made.body.linkToken);
+    setBankState("Finish signing in at your bank, then come back here.");
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (window.SA_NATIVE && plugins && plugins.Browser) plugins.Browser.open({ url: made.body.url }).catch(() => { window.location.href = made.body.url; });
+    else if (!window.open(made.body.url, "_blank", "noopener")) window.location.href = made.body.url;
+  }
+
+  // Runs when they come back from the bank, and from the fallback button.
+  async function finishBank(manual) {
+    const linkToken = bankPending();
+    if (!linkToken) {
+      if (manual) setBankState("Tap Connect a bank or card to start.");
+      return;
+    }
+    setBankState("Checking with your bank…");
+    const done = await call("POST", "/api/bank/finish", { linkToken });
+    if (done.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (done.status === 200 && done.body && done.body.linked) {
+      bankPending("");
+      await loadBanks();
+      setBankState("");
+      showPull(((done.body.item && done.body.item.institution) || "Your bank") + " is linked. Checking for activity…");
+      await syncBanks(false);
+      return;
+    }
+    if (done.status === 200) {
+      setBankState(manual ? "Your bank has not finished yet. Try again in a moment." : "");
+      return;
+    }
+    setBankState("Could not reach your bank just now. Try again in a minute.");
+  }
+
+  // Pulls cleared activity and turns it into feed entries and notifications.
+  async function syncBanks(manual) {
+    if (!LIVE || !sync.signedIn || !bankState.configured || !bankState.items.length) return;
+    if (manual) setBankState("Checking for new activity…");
+    const got = await call("POST", "/api/bank/sync", {});
+    if (got.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (got.status !== 200 || !got.body) { setBankState("Could not reach your bank just now."); return; }
+    if (got.body.items) bankState.items = got.body.items;
+    const added = window.SA_BANK_EVENTS(got.body.events || []);
+    renderBankLinks();
+    setBankState(got.body.skipped ? "Just checked. Try again in a moment." : (added || !manual ? "" : "Nothing new since last time."));
+    if (added) showPull(added === 1 ? "1 new thing from your bank." : added + " new things from your bank.");
+  }
+
+  async function unlinkBank(itemId, name) {
+    if (!window.confirm("Unlink " + name + "? Simple Accountz stops reading it. Nothing already in your books changes.")) return;
+    const gone = await call("POST", "/api/bank/unlink", { itemId });
+    if (gone.status === 200 && gone.body) {
+      bankState.items = gone.body.items || [];
+      renderBankLinks();
+      showPull(name + " is unlinked.");
+    }
+  }
+
+  function setBankState(text) {
+    const node = document.getElementById("bank-state");
+    if (!node) return;
+    node.textContent = text || "";
+    node.hidden = !text;
+  }
+
+  function renderBankLinks() {
+    if (!LIVE) return;
+    const list = document.getElementById("bank-links");
+    const actions = document.getElementById("bank-actions");
+    const connect = document.getElementById("bank-connect");
+    const note = document.getElementById("banks-note");
+    if (!list) return;
+    list.innerHTML = "";
+    if (connect) {
+      connect.textContent = bankState.items.length ? "Connect another" : "Connect a bank or card";
+      connect.hidden = bankState.loaded && !bankState.configured && sync.signedIn;
+    }
+    if (actions) actions.hidden = !bankState.items.length;
+    if (note) {
+      note.textContent = !sync.signedIn
+        ? "Create a free account to link a bank or card. You sign in at your bank; Simple Accountz never sees your bank password and can only read."
+        : (bankState.loaded && !bankState.configured
+          ? "Bank linking is not switched on for this app yet. You can still add expenses with a receipt photo."
+          : "You sign in at your bank. Simple Accountz never sees your bank password, and it can only read: it cannot move money.");
+    }
+    bankState.items.forEach((item) => {
+      const head = document.createElement("div");
+      head.className = "acct-section";
+      head.textContent = item.institution || "Bank";
+      list.appendChild(head);
+      (item.accounts || []).forEach((account) => {
+        const row = document.createElement("div");
+        row.className = "doc";
+        row.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+        row.querySelector(".name").textContent = account.name;
+        row.querySelector(".amt").textContent = account.balanceMinor == null
+          ? "" : SA.formatMoney(account.balanceMinor, account.currency || businessCurrency);
+        row.querySelector(".sub").textContent = [account.type, account.mask ? "•••• " + account.mask : ""].filter(Boolean).join(" · ");
+        list.appendChild(row);
+      });
+      const off = document.createElement("button");
+      off.className = "textlink";
+      off.textContent = "Unlink " + (item.institution || "this bank");
+      off.onclick = () => unlinkBank(item.itemId, item.institution || "this bank");
+      list.appendChild(off);
+    });
+  }
+
   window.SA_BANK_EVENTS = function (events) {
     if (!LIVE) return 0;
     const before = SA.cleanActivity(activityLog).length;
@@ -4714,6 +4870,8 @@
     renderAccount();
     showPull(message);
     await syncNow(true);
+    await loadBanks();
+    await syncBanks(false);
   }
 
   async function submitAuth() {
@@ -5255,6 +5413,7 @@
     renderAccount();
     renderActivity();
     renderNotifyRow();
+    renderBankLinks();
     scheduleDailySummary();
   }
 
