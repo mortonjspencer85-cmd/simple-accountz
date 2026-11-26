@@ -16,7 +16,10 @@
   (function () {
     var q = location.search;
     var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-    window.SA_LIVE = /[?&]live\b/.test(q) || (location.protocol.indexOf("http") === 0 && !local && !/[?&]preview\b/.test(q));
+    // Inside the App Store / Google Play app (Capacitor), the page is always the live app.
+    window.SA_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if (window.SA_NATIVE) document.documentElement.classList.add("native");
+    window.SA_LIVE = window.SA_NATIVE || /[?&]live\b/.test(q) || (location.protocol.indexOf("http") === 0 && !local && !/[?&]preview\b/.test(q));
     if (window.SA_LIVE) document.documentElement.classList.add("live");
   })();
 </script>
@@ -660,7 +663,8 @@
   .cam-fab svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.9; }
   .cam-fab:hover { transform: translateY(-2px); }
   .cam-fab:active { transform: scale(0.94); }
-  .device.shell-ios .cam-fab, .device.shell-android .cam-fab { display: grid; }
+  /* Same camera button on iOS, Android, Windows, and PC (desktops use the webcam or a photo file). */
+  .device .cam-fab { display: grid; }
   .device .tabs.hide ~ .cam-fab { display: none; }
 
   /* ---- Live web app: full screen, no preview frame ---- */
@@ -1019,7 +1023,7 @@
           <button class="pill" id="dv-send" onclick="sendDocLive()">Send</button>
           <button class="pill-outline" id="dv-remind" onclick="remindLive()">Send reminder</button>
           <button class="pill-outline" id="dv-paid" onclick="markPaidLive()">Mark paid</button>
-          <button class="pill-outline" onclick="window.print()">Print or PDF</button>
+          <button class="pill-outline" onclick="printDoc()">Print or PDF</button>
           <button class="textlink" id="dv-delete" onclick="deleteDraftLive()">Delete draft</button>
         </div>
         <p class="note" id="dv-note"></p>
@@ -1305,6 +1309,7 @@
         <button class="preview-only set-row biz-only"><span class="name">Templates</span><span class="sub">Ledger · 64 original layouts</span></button>
         <button class="preview-only set-row biz-only"><span class="name">Team</span><span class="sub">Just you</span></button>
         <button class="preview-only set-row" onclick="show('security')"><span class="name">Sign-in and recovery</span><span class="sub" id="security-sub">Two-factor off</span></button>
+        <a class="set-row live-only" href="https://simpleaccountz.com/privacy.html" target="_blank" rel="noopener" style="text-decoration:none"><span class="name">Privacy, terms, and support</span><span class="sub">simpleaccountz.com</span></a>
         <button class="set-row live-only" onclick="eraseBooks()"><span class="name">Erase data on this device</span><span class="sub">Removes every invoice, expense, and file saved here</span></button>
         <button class="set-row"><span class="name">Your language</span><span class="sub">English · does not change the customer invoice</span></button>
         <button class="preview-only set-row"><span class="name">Support</span><span class="sub">Chat and email</span></button>
@@ -2955,17 +2960,47 @@
     const period = which === "tax" ? taxPeriod : reportPeriod;
     const book = SA.exportBooks(docs, transactions, period, SA.LEDGER_TODAY, businessCurrency, countryCode);
     if (!book.ok) return;
-    const blob = new Blob([book.csv], { type: "text/csv;charset=utf-8" });
+    saveFile(book.filename, "text/csv", book.csv);
+    const note = document.getElementById(which === "tax" ? "tax-export-note" : "report-export-note");
+    if (note) note.textContent = (window.SA_NATIVE ? "Shared " : "Saved ") + book.filename + ". Give it to your preparer. This does not file the return.";
+  }
+
+  // One way to hand a file to the person on every platform: a download in a
+  // browser, the system share sheet (Files, Drive, Mail…) in the store apps.
+  async function saveFile(filename, mime, text) {
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (window.SA_NATIVE && plugins && plugins.Filesystem && plugins.Share) {
+      try {
+        const written = await plugins.Filesystem.writeFile({ path: filename, data: text, directory: "CACHE", encoding: "utf8" });
+        await plugins.Share.share({ title: filename, files: [written.uri], dialogTitle: "Save or send " + filename });
+        return true;
+      } catch (error) {
+        showPull("Could not open the share sheet. Try again.");
+        return false;
+      }
+    }
+    const blob = new Blob([text], { type: mime + ";charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = book.filename;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    const note = document.getElementById(which === "tax" ? "tax-export-note" : "report-export-note");
-    if (note) note.textContent = "Saved " + book.filename + ". Give it to your preparer. This does not file the return.";
+    return true;
+  }
+
+  // Print on a computer; on a phone app, share the invoice (the share sheet offers Print and Save as PDF).
+  function printDoc() {
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (window.SA_NATIVE && plugins && plugins.Share) {
+      const doc = docs.find(item => item.id === viewingDocId);
+      if (!doc) return;
+      plugins.Share.share({ title: bizName() + " invoice " + (doc.number || ""), text: SA.invoiceText(doc, bizName()) }).catch(() => {});
+      return;
+    }
+    window.print();
   }
 
   function renderAssistantIntro() {
@@ -3543,16 +3578,48 @@
     return businessName || "My business";
   }
 
+  // ?demo: made-up books for screenshots and App Review. Never saved or synced.
+  const DEMO = /[?&]demo(&|=|$)/.test(location.search);
+
+  function demoBooks(today) {
+    let list = [];
+    const add = (fields, sentDaysAgo, paid) => {
+      const made = SA.createInvoice(list, Object.assign({ currency: "USD", taxName: "Sales tax" }, fields), SA.shiftDate(today, -(sentDaysAgo || 0) - 1));
+      list = made.docs;
+      if (sentDaysAgo != null) list = SA.markSent(list, made.doc.id, SA.shiftDate(today, -sentDaysAgo)).docs;
+      return made.doc.id;
+    };
+    add({ name: "Oak Street HOA", email: "board@example.com", description: "Deck staining", qtyBps: 10000, rateMinor: 185000, due: SA.shiftDate(today, -12) }, 26);
+    add({ name: "Maria Chen", description: "Interior paint, two rooms", qtyBps: 10000, rateMinor: 243000, taxBps: 800, due: SA.shiftDate(today, 12) }, 2);
+    const paidId = add({ name: "Bea's Bakery", description: "Shelving install", qtyBps: 40000, rateMinor: 16000, due: SA.shiftDate(today, 3) }, 9);
+    add({ name: "Harbor Rentals", description: "Fence repair", qtyBps: 60000, rateMinor: 9500 });
+    let business = [];
+    const paid = SA.recordCustomerPayment(list, business, paidId, SA.shiftDate(today, -4));
+    list = paid.docs;
+    business = paid.transactions;
+    [["Harbor Lumber", 18640, "Materials", -3], ["Fuel", 6412, "Travel", -5], ["Paint store", 16948, "", -6]].forEach((row) => {
+      business = SA.addExpense(business, { date: SA.shiftDate(today, row[3]), name: row[0], amountMinor: row[1], currency: "USD", accountId: "card", category: row[2] }).transactions;
+    });
+    return Object.assign(SA.emptyBooks(), { businessName: "Pine & Harbor Carpentry", docs: SA.refreshStatuses(list, today), business });
+  }
+
   function startLive() {
     SA.LEDGER_TODAY = SA.todayIso();
     let saved = SA.emptyBooks();
     try { saved = SA.restoreBooks(localStorage.getItem(SA.BOOKS_KEY)); } catch (error) { saved = SA.emptyBooks(); }
+    if (DEMO) saved = demoBooks(SA.LEDGER_TODAY);
     applyBooksState(saved);
     const hint = document.getElementById("draft-hint");
     if (hint) hint.textContent = "Save invoice keeps it on this device. Send it from the invoice screen.";
     window.addEventListener("resize", fitLiveShell);
-    if ("serviceWorker" in navigator) {
+    if ("serviceWorker" in navigator && !window.SA_NATIVE) {
       navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+    bindNativeBack();
+    if (DEMO) {
+      const screen = /[?&]screen=([a-z-]+)/.exec(location.search);
+      if (screen && document.getElementById(screen[1])) setTimeout(() => show(screen[1]), 0);
+      return;
     }
     loadSync();
     handleEmailLink();
@@ -3584,7 +3651,7 @@
   }
 
   function saveBooks() {
-    if (!LIVE) return;
+    if (!LIVE || DEMO) return;
     const business = accountKind === "business" ? transactions : businessTransactions;
     const personal = accountKind === "personal" ? transactions : personalTransactions;
     const text = SA.serializeBooks({
@@ -3615,7 +3682,7 @@
   const API_BASE = window.SA_API || "https://api.simpleaccountz.com";
   const SYNC_KEY = "simpleaccountz.sync.v2";
   function blankSync() {
-    return { signedIn: false, email: "", version: 0, dirty: false, emailVerified: false, totpEnabled: false, mailEnabled: false, recoveryLeft: 0 };
+    return { signedIn: false, email: "", version: 0, dirty: false, emailVerified: false, totpEnabled: false, mailEnabled: false, recoveryLeft: 0, token: "" };
   }
   let sync = blankSync();
   let deletedIds = {};
@@ -3640,8 +3707,11 @@
       if (raw && raw.signedIn === true) {
         sync = Object.assign(blankSync(), {
           signedIn: true, email: String(raw.email || ""), version: Number(raw.version) || 0, dirty: !!raw.dirty,
-          emailVerified: !!raw.emailVerified, totpEnabled: !!raw.totpEnabled, mailEnabled: !!raw.mailEnabled
+          emailVerified: !!raw.emailVerified, totpEnabled: !!raw.totpEnabled, mailEnabled: !!raw.mailEnabled,
+          // Store apps only: the session key lives in the app's private storage. Browsers use the HttpOnly cookie.
+          token: window.SA_NATIVE && /^[a-f0-9]{64}$/.test(String(raw.token || "")) ? raw.token : ""
         });
+        if (window.SA_NATIVE && !sync.token) sync = blankSync();
       }
     } catch (error) {}
   }
@@ -3681,11 +3751,16 @@
   }
 
   function api(method, path, body) {
+    const headers = { "Content-Type": "application/json", "X-SA": "1" };
+    if (window.SA_NATIVE) {
+      headers["X-SA-Client"] = "native";
+      if (sync.token) headers.Authorization = "Bearer " + sync.token;
+    }
     return fetch(API_BASE + path, {
       method,
-      credentials: "include",
+      credentials: window.SA_NATIVE ? "omit" : "include",
       cache: "no-store",
-      headers: { "Content-Type": "application/json", "X-SA": "1" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body)
     }).then((response) => response.json().catch(() => null).then((data) => ({ status: response.status, body: data })));
   }
@@ -3826,6 +3901,7 @@
   async function finishSignIn(profile, message) {
     const hadData = SA.hasBooksData(currentBooks());
     sync = Object.assign(blankSync(), { signedIn: true, dirty: hadData });
+    if (window.SA_NATIVE && profile && /^[a-f0-9]{64}$/.test(String(profile.token || ""))) sync.token = profile.token;
     applyProfile(profile);
     saveSync();
     ["auth-pass", "auth-code", "ra-pass", "ra-code", "rl-pass", "rl-code"].forEach((id) => { if (el(id)) el(id).value = ""; });
@@ -3839,6 +3915,7 @@
   }
 
   async function submitAuth() {
+    if (DEMO) { setMsg("auth-msg", "This is the demo. Open simpleaccountz.com/app to sign up."); return; }
     const signup = acctView === "signup";
     const email = el("auth-email").value.trim();
     const password = el("auth-pass").value;
@@ -4090,7 +4167,7 @@
     if (chip) {
       chip.classList.toggle("on", signedIn && !syncNote);
       chip.classList.toggle("cta", !signedIn);
-      el("sync-status-text").textContent = signedIn ? status : "Sign up free to back up and sync";
+      el("sync-status-text").textContent = DEMO ? "Demo with sample data · nothing is saved" : (signedIn ? status : "Sign up free to back up and sync");
     }
   }
 
@@ -4108,14 +4185,41 @@
   }
 
   function eraseBooks() {
-    if (!window.confirm("Erase every invoice, expense, and file saved on this device?")) return;
+    const question = sync.signedIn
+      ? "Erase the books saved on this device? Your account keeps its copy, and it will download again. To remove everything, delete your account in Account and sync."
+      : "Erase every invoice, expense, and file saved on this device? This cannot be undone.";
+    if (!window.confirm(question)) return;
     try { localStorage.removeItem(SA.BOOKS_KEY); } catch (error) {}
+    if (sync.signedIn) {
+      // Forget the last synced version so the next sync downloads the account copy again.
+      sync.version = 0;
+      sync.dirty = false;
+      saveSync();
+    }
     location.reload();
+  }
+
+  // Android back button: step back through the app instead of closing it.
+  function bindNativeBack() {
+    const app = window.SA_NATIVE && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (!app || !app.addListener) return;
+    app.addListener("backButton", () => {
+      const overlay = document.getElementById("overlay");
+      if (overlay && overlay.classList.contains("on")) { closeSheet(); return; }
+      const current = document.querySelector(".screen.on");
+      if (current && current.id !== "home") { show("home"); return; }
+      app.exitApp();
+    });
   }
 
   function shareLive(subject, body, email) {
     if (email) {
       window.location.href = SA.mailtoLink(email, subject, body);
+      return;
+    }
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (window.SA_NATIVE && plugins && plugins.Share) {
+      plugins.Share.share({ title: subject, text: body }).catch(() => {});
       return;
     }
     if (navigator.share) {
