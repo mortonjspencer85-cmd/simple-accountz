@@ -871,7 +871,8 @@ function csvCell(value) {
 function exportBooks(docs, transactions, period, today, currency, country) {
   const packet = taxPacket(transactions, period, today, currency, country);
   if (!packet) return { ok: false, error: "bad_period" };
-  const lines = ["date,kind,name,category,currency,amount_minor,tax_minor"];
+  const lines = ["date,kind,name,category,currency,amount,tax"];
+  const amount = (minor) => decimalAmount(minor, currency);
   const ledger = transactions.filter((tx) =>
     tx.currency === currency
     && tx.date >= packet.start
@@ -885,8 +886,8 @@ function exportBooks(docs, transactions, period, today, currency, country) {
       csvCell(tx.name),
       csvCell(tx.category || ""),
       currency,
-      tx.amountMinor,
-      tx.kind === "out" ? 0 : allocatedTax(tx)
+      amount(tx.amountMinor),
+      amount(tx.kind === "out" ? 0 : allocatedTax(tx))
     ].join(","));
   });
   (docs || []).filter((doc) =>
@@ -904,18 +905,246 @@ function exportBooks(docs, transactions, period, today, currency, country) {
       csvCell(doc.name),
       csvCell(doc.number || ""),
       currency,
-      issuedTotal(doc),
-      calc.ok ? calc.taxMinor : 0
+      amount(issuedTotal(doc)),
+      amount(calc.ok ? calc.taxMinor : 0)
     ].join(","));
   });
-  lines.push(["", "summary", "income", "", currency, packet.incomeMinor, packet.taxCollectedMinor].join(","));
-  lines.push(["", "summary", "expenses", "", currency, packet.expenseMinor, 0].join(","));
-  lines.push(["", "summary", "tax_collected", packet.taxName, currency, packet.taxCollectedMinor, packet.taxCollectedMinor].join(","));
+  lines.push(["", "summary", "income", "", currency, amount(packet.incomeMinor), amount(packet.taxCollectedMinor)].join(","));
+  lines.push(["", "summary", "expenses", "", currency, amount(packet.expenseMinor), amount(0)].join(","));
+  lines.push(["", "summary", "tax_collected", csvCell(packet.taxName), currency, amount(packet.taxCollectedMinor), amount(packet.taxCollectedMinor)].join(","));
   return {
     ok: true,
     filesReturn: false,
     filename: "simple-accountz-books-" + packet.start + "-to-" + packet.end + ".csv",
-    csv: lines.join("\n"),
+    // The byte order mark makes Excel read accents and currency signs correctly.
+    csv: "﻿" + lines.join("\r\n") + "\r\n",
+    start: packet.start,
+    end: packet.end,
+    packet
+  };
+}
+
+// ---- Spreadsheets ----
+// A real .xlsx, written here so it needs no library and works offline. Excel,
+// Google Sheets, Apple Numbers, and LibreOffice all open it; amounts are real
+// numbers, so SUM and pivot tables work. Text cells are inline strings, which
+// a spreadsheet never runs as a formula.
+
+// Plain "1850.00" from 185000 minor units, exact (no floating point).
+function decimalAmount(minor, currency) {
+  const code = CURRENCIES[currency] ? currency : "USD";
+  const exponent = CURRENCIES[code].exponent;
+  const negative = minor < 0;
+  const digits = String(Math.abs(Math.round(minor))).padStart(exponent + 1, "0");
+  const whole = digits.slice(0, digits.length - exponent);
+  return (negative ? "-" : "") + (exponent ? whole + "." + digits.slice(digits.length - exponent) : whole);
+}
+
+let CRC_TABLE = null;
+function crc32(binary) {
+  if (!CRC_TABLE) {
+    CRC_TABLE = new Int32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      CRC_TABLE[i] = c;
+    }
+  }
+  let crc = -1;
+  for (let i = 0; i < binary.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ binary.charCodeAt(i)) & 255];
+  return (crc ^ -1) >>> 0;
+}
+
+// Text to one-byte-per-character UTF-8, the form the zip and base64 helpers use.
+function utf8Binary(text) {
+  const bytes = new TextEncoder().encode(String(text));
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return out;
+}
+
+function le(value, bytes) {
+  let out = "";
+  let n = value >>> 0;
+  for (let i = 0; i < bytes; i++) {
+    out += String.fromCharCode(n & 255);
+    n = n >>> 8;
+  }
+  return out;
+}
+
+// Zip with stored (uncompressed) entries: smaller code, and every reader accepts it.
+function zipArchive(entries) {
+  let files = "";
+  let central = "";
+  let count = 0;
+  entries.forEach((entry) => {
+    const name = utf8Binary(entry.name);
+    const body = entry.binary ? entry.data : utf8Binary(entry.data);
+    const crc = crc32(body);
+    const head = "\x14\x00\x00\x00\x00\x00\x00\x00\x00\x00" + le(crc, 4) + le(body.length, 4) + le(body.length, 4) + le(name.length, 2) + le(0, 2);
+    central += "PK\x01\x02\x14\x00" + head + le(0, 2) + le(0, 2) + le(0, 2) + le(0, 4) + le(files.length, 4) + name;
+    files += "PK\x03\x04" + head + name + body;
+    count += 1;
+  });
+  return files + central + "PK\x05\x06" + le(0, 2) + le(0, 2) + le(count, 2) + le(count, 2) + le(central.length, 4) + le(files.length, 4) + le(0, 2);
+}
+
+function xmlEscape(text) {
+  return String(text == null ? "" : text)
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function columnName(index) {
+  let name = "";
+  let n = index;
+  while (n >= 0) {
+    name = String.fromCharCode(65 + (n % 26)) + name;
+    n = Math.floor(n / 26) - 1;
+  }
+  return name;
+}
+
+// A cell is a plain string, or { n: "1850.00" } for a number, with s = style.
+function sheetXml(rows) {
+  let body = "";
+  rows.forEach((row, r) => {
+    let cells = "";
+    (row || []).forEach((cell, c) => {
+      if (cell == null || cell === "") return;
+      const ref = columnName(c) + (r + 1);
+      const style = cell && cell.s ? ' s="' + cell.s + '"' : "";
+      if (cell && cell.n != null) cells += '<c r="' + ref + '"' + style + '><v>' + xmlEscape(cell.n) + "</v></c>";
+      else cells += '<c r="' + ref + '"' + style + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(cell.t != null ? cell.t : cell) + "</t></is></c>";
+    });
+    if (cells) body += '<row r="' + (r + 1) + '">' + cells + "</row>";
+  });
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+    + body + "</sheetData></worksheet>";
+}
+
+function safeSheetName(name, fallback) {
+  const clean = String(name || "").replace(/[\\\/\*\?\[\]:]/g, " ").trim().slice(0, 31);
+  return clean || fallback;
+}
+
+// sheets: [{ name, rows }]. Styles: 1 bold, 2 money, 3 bold money, 4 title.
+function buildWorkbook(sheets) {
+  const used = [];
+  const named = sheets.map((sheet, i) => {
+    let name = safeSheetName(sheet.name, "Sheet" + (i + 1));
+    while (used.indexOf(name.toLowerCase()) !== -1) name = safeSheetName(name.slice(0, 28) + "-" + (i + 1), "Sheet" + (i + 1));
+    used.push(name.toLowerCase());
+    return { name, rows: sheet.rows || [] };
+  });
+  const entries = [
+    { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+      + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      + '<Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + named.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("")
+      + "</Types>" },
+    { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+      + "</Relationships>" },
+    { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+      + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+      + named.map((sheet, i) => '<sheet name="' + xmlEscape(sheet.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join("")
+      + "</sheets></workbook>" },
+    { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + named.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join("")
+      + '<Relationship Id="rId' + (named.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+      + "</Relationships>" },
+    { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+      + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      + '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts>'
+      + '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font>'
+      + '<font><b/><sz val="11"/><name val="Calibri"/></font>'
+      + '<font><b/><sz val="14"/><name val="Calibri"/></font></fonts>'
+      + '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
+      + '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+      + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+      + '<cellXfs count="5">'
+      + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+      + '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+      + '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+      + '<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>'
+      + '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+      + "</cellXfs></styleSheet>" }
+  ];
+  named.forEach((sheet, i) => entries.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(sheet.rows) }));
+  return zipArchive(entries);
+}
+
+// The workbook an accountant or a tax preparer can use: a summary plus one
+// sheet each for payments in, expenses, and invoices.
+function exportWorkbook(docs, transactions, period, today, currency, country, businessName) {
+  const packet = taxPacket(transactions, period, today, currency, country);
+  if (!packet) return { ok: false, error: "bad_period" };
+  const money = (minor) => ({ n: decimalAmount(minor, currency), s: 2 });
+  const head = (labels) => labels.map((label) => ({ t: label, s: 1 }));
+  const inPeriod = (tx) => tx.currency === currency && tx.date >= packet.start && tx.date <= packet.end;
+  const byDate = (a, b) => (a.date === b.date ? (a.id < b.id ? -1 : 1) : (a.date < b.date ? -1 : 1));
+
+  const summary = [
+    [{ t: (businessName || "Simple Accountz") + " · books", s: 4 }],
+    ["Period", packet.start + " to " + packet.end],
+    ["Currency", currency],
+    [],
+    head(["", "Amount"]),
+    [{ t: "Money in", s: 1 }, money(packet.incomeMinor)],
+    [{ t: "Money out", s: 1 }, money(packet.expenseMinor)],
+    [{ t: "Profit", s: 1 }, Object.assign(money(packet.incomeMinor - packet.expenseMinor), { s: 3 })],
+    [{ t: packet.taxName + " collected", s: 1 }, money(packet.taxCollectedMinor)],
+    [],
+    [{ t: "Expenses by category", s: 1 }]
+  ];
+  packet.categories.forEach((row) => summary.push([row.category, money(row.amountMinor)]));
+  summary.push([], ["Simple Accountz keeps records. It does not file tax returns."]);
+
+  const paymentsIn = transactions.filter((tx) => inPeriod(tx) && (tx.kind === "in" || tx.kind === "refund")).sort(byDate);
+  const payments = [head(["Date", "Name", "Kind", "Currency", "Amount", packet.taxName + " in it"])];
+  paymentsIn.forEach((tx) => payments.push([
+    tx.date, tx.name || "", tx.kind === "refund" ? "Refund" : "Payment", currency,
+    money(tx.kind === "refund" ? -tx.amountMinor : tx.amountMinor), money(allocatedTax(tx))
+  ]));
+  payments.push([{ t: "Total", s: 1 }, "", "", "", Object.assign(money(packet.incomeMinor), { s: 3 }), Object.assign(money(packet.taxCollectedMinor), { s: 3 })]);
+
+  const spent = transactions.filter((tx) => inPeriod(tx) && tx.kind === "out").sort(byDate);
+  const expenses = [head(["Date", "Merchant", "Category", "Currency", "Amount"])];
+  spent.forEach((tx) => expenses.push([tx.date, tx.name || "", tx.category || "Uncategorized", currency, money(tx.amountMinor)]));
+  expenses.push([{ t: "Total", s: 1 }, "", "", "", Object.assign(money(packet.expenseMinor), { s: 3 })]);
+
+  const sent = (docs || []).filter((doc) => doc && doc.type === "invoice" && doc.currency === currency
+    && doc.sentOn && doc.sentOn >= packet.start && doc.sentOn <= packet.end)
+    .sort((a, b) => (a.sentOn < b.sentOn ? -1 : 1));
+  const invoices = [head(["Number", "Client", "Sent", "Due", "Status", "Currency", "Total", packet.taxName, "Paid", "Balance"])];
+  sent.forEach((doc) => {
+    const calc = calculateDocument(doc);
+    const total = issuedTotal(doc);
+    const balance = balanceOf(doc);
+    invoices.push([
+      doc.number || "", doc.name || "", doc.sentOn, doc.due || "", doc.display || "", currency,
+      money(total), money(calc.ok ? calc.taxMinor : 0), money(total - balance), money(balance)
+    ]);
+  });
+
+  return {
+    ok: true,
+    filename: "simple-accountz-books-" + packet.start + "-to-" + packet.end + ".xlsx",
+    mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    data: buildWorkbook([
+      { name: "Summary", rows: summary },
+      { name: "Payments in", rows: payments },
+      { name: "Expenses", rows: expenses },
+      { name: "Invoices", rows: invoices }
+    ]),
     start: packet.start,
     end: packet.end,
     packet
@@ -1568,7 +1797,8 @@ function emptyBooks() {
     autoMode: true,
     autoHandled: [],
     autoSkip: [],
-    deleted: {}
+    deleted: {},
+    activity: []
   };
 }
 
@@ -1586,7 +1816,8 @@ function serializeBooks(state) {
     autoMode: s.autoMode !== false,
     autoHandled: Array.isArray(s.autoHandled) ? s.autoHandled : [],
     autoSkip: Array.isArray(s.autoSkip) ? s.autoSkip : [],
-    deleted: cleanDeleted(s.deleted)
+    deleted: cleanDeleted(s.deleted),
+    activity: cleanActivity(s.activity)
   });
 }
 
@@ -1608,7 +1839,8 @@ function restoreBooks(text) {
     autoMode: raw.autoMode !== false,
     autoHandled: Array.isArray(raw.autoHandled) ? raw.autoHandled.filter((item) => typeof item === "string") : [],
     autoSkip: Array.isArray(raw.autoSkip) ? raw.autoSkip.filter((item) => typeof item === "string") : [],
-    deleted: cleanDeleted(raw.deleted)
+    deleted: cleanDeleted(raw.deleted),
+    activity: cleanActivity(raw.activity)
   };
 }
 
@@ -1688,8 +1920,101 @@ function mergeBooks(local, server) {
     deleted,
     autoMode: mine.autoMode,
     autoHandled: unionStrings(mine.autoHandled, theirs.autoHandled),
-    autoSkip: unionStrings(mine.autoSkip, theirs.autoSkip)
+    autoSkip: unionStrings(mine.autoSkip, theirs.autoSkip),
+    // Newest first, both devices' entries kept, capped.
+    activity: unionById(mine.activity, theirs.activity).sort((a, b) => (a.at < b.at ? 1 : (a.at > b.at ? -1 : 0))).slice(0, ACTIVITY_MAX)
   };
+}
+
+// ---- Activity feed and notifications ----
+// Every change worth telling the owner about becomes one entry. The feed lives
+// in the books, so it syncs: something recorded on a phone shows on the laptop.
+// Each device remembers which entries it has already shown, so nothing is
+// announced twice.
+const ACTIVITY_MAX = 60;
+const ACTIVITY_KINDS = [
+  "sent", "paid", "overdue", "match", "sort", "recur", "late_fee", "reminded",
+  // Bank feed. Nothing produces these yet: they arrive once a bank provider is
+  // connected and its events are handed to applyBankEvents.
+  "check_cleared", "deposit", "bill_paid", "payment_cleared"
+];
+const BANK_KINDS = ["check_cleared", "deposit", "bill_paid", "payment_cleared"];
+
+function cleanActivity(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = {};
+  return value.filter((item) => {
+    if (!item || typeof item !== "object") return false;
+    if (typeof item.id !== "string" || item.id.length > 120 || seen[item.id]) return false;
+    if (typeof item.text !== "string" || typeof item.at !== "string") return false;
+    if (ACTIVITY_KINDS.indexOf(item.kind) === -1) return false;
+    seen[item.id] = true;
+    return true;
+  }).map((item) => ({
+    id: item.id,
+    at: item.at.slice(0, 25),
+    kind: item.kind,
+    text: item.text.slice(0, 200),
+    docId: typeof item.docId === "string" ? item.docId.slice(0, 120) : undefined
+  })).slice(0, ACTIVITY_MAX);
+}
+
+// Adds entries, newest first, ignoring ids already in the feed.
+function addActivity(activity, entries) {
+  const list = cleanActivity(activity);
+  const have = {};
+  list.forEach((item) => { have[item.id] = true; });
+  const fresh = cleanActivity(entries).filter((item) => !have[item.id]);
+  if (!fresh.length) return list;
+  return fresh.concat(list).sort((a, b) => (a.at < b.at ? 1 : (a.at > b.at ? -1 : 0))).slice(0, ACTIVITY_MAX);
+}
+
+function activityEntry(kind, text, at, extra) {
+  return Object.assign({ id: uniqueId(kind), at: at || new Date().toISOString(), kind, text }, extra || {});
+}
+
+// Invoices that have just passed their due date and have not been announced yet.
+function overdueActivity(docs, today, activity) {
+  const day = today || todayIso();
+  const told = {};
+  cleanActivity(activity).forEach((item) => { if (item.kind === "overdue" && item.docId) told[item.docId] = true; });
+  return (docs || []).filter((doc) => isOpenInvoice(doc) && doc.due && doc.due < day && !told[doc.id]).map((doc) =>
+    activityEntry("overdue", (doc.number || "An invoice") + " for " + doc.name + " is overdue: "
+      + formatMoney(balanceOf(doc), doc.currency) + ", due " + prettyDate(doc.due) + ".",
+      day + "T09:00:00.000Z", { docId: doc.id }));
+}
+
+// What this device has not shown a notification for yet. Entries older than a
+// day are skipped, so installing the app does not replay the whole history.
+function unseenActivity(activity, seenIds, nowMs) {
+  const seen = Array.isArray(seenIds) ? seenIds : [];
+  const cutoff = new Date((nowMs || Date.now()) - 36 * 60 * 60 * 1000).toISOString();
+  return cleanActivity(activity).filter((item) => item.at >= cutoff && seen.indexOf(item.id) === -1);
+}
+
+// ---- Bank feed plumbing ----
+// A connected bank provider hands over events like these; nothing produces them
+// yet. Each event: { kind, amountMinor, currency, name, date, reference }.
+function bankEventText(event) {
+  const amount = formatMoney(Math.abs(Number(event.amountMinor) || 0), event.currency || "USD");
+  const who = String(event.name || "").trim();
+  const when = /^\d{4}-\d{2}-\d{2}$/.test(String(event.date || "")) ? " on " + prettyDate(event.date) : "";
+  const ref = event.reference ? " (" + String(event.reference).slice(0, 40) + ")" : "";
+  if (event.kind === "check_cleared") return "Check" + ref + " for " + amount + " cleared" + when + ".";
+  if (event.kind === "deposit") return amount + " was deposited" + (who ? " from " + who : "") + when + ".";
+  if (event.kind === "bill_paid") return "A bill of " + amount + (who ? " to " + who : "") + " was paid" + when + ".";
+  return amount + (who ? " from " + who : "") + " cleared your account" + when + ".";
+}
+
+function applyBankEvents(activity, events, nowIso) {
+  const fresh = (Array.isArray(events) ? events : []).filter((event) =>
+    event && BANK_KINDS.indexOf(event.kind) !== -1 && Number.isFinite(Number(event.amountMinor))
+  ).map((event) => Object.assign(
+    activityEntry(event.kind, bankEventText(event), /^\d{4}-\d{2}-\d{2}/.test(String(event.at || "")) ? event.at : (nowIso || new Date().toISOString())),
+    // A provider id keeps the same event from being added twice.
+    event.id ? { id: "bank-" + String(event.id).slice(0, 100) } : {}
+  ));
+  return addActivity(activity, fresh);
 }
 
 // A new expense goes on the card linked to the account you are in, so a
@@ -1848,6 +2173,15 @@ const SA = {
   restoreBooks,
   hasBooksData,
   uniqueId,
+  ACTIVITY_MAX,
+  ACTIVITY_KINDS,
+  cleanActivity,
+  addActivity,
+  activityEntry,
+  overdueActivity,
+  unseenActivity,
+  applyBankEvents,
+  bankEventText,
   cleanPhone,
   formatPhone,
   smsLink,
@@ -1926,6 +2260,12 @@ const SA = {
   confirmWeeklyNote,
   taxPacket,
   exportBooks,
+  exportWorkbook,
+  decimalAmount,
+  crc32,
+  zipArchive,
+  buildWorkbook,
+  utf8Binary,
   platformRevenue,
   subscriptionCharges,
   DEMO_AUTH_CODE,
