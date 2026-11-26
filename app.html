@@ -1,0 +1,3667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simple Accountz</title>
+<meta name="description" content="Invoices, expenses, receipt photos, and an assistant that does the bookkeeping for you.">
+<meta name="theme-color" content="#163300">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script>
+  (function () {
+    var q = location.search;
+    var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    window.SA_LIVE = /[?&]live\b/.test(q) || (location.protocol.indexOf("http") === 0 && !local && !/[?&]preview\b/.test(q));
+    if (window.SA_LIVE) document.documentElement.classList.add("live");
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --forest: #163300;
+    --lime: #b4ff6a;
+    --spruce: #00894a;
+    --linen: #e4ffd1;
+    --blue: #0057ff;
+    --sky: #dbe7ff;
+    --coral: #ff5a4e;
+    --sun: #ffd23f;
+    --violet: #7b3fe4;
+    --mint: #2ee6a6;
+    --obsidian: #0e0f0c;
+    --charcoal: #454745;
+    --slate: #6a6c6a;
+    --pebble: #868685;
+    --fog: #e8ebe6;
+    --paper: #ffffff;
+    --sent-bg: #dbe7ff;
+    --overdue-bg: #ffe1dc;
+    --overdue-fg: #c0160c;
+    --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    background:
+      radial-gradient(880px 420px at 8% -8%, rgba(159, 232, 112, 0.55), transparent 58%),
+      radial-gradient(720px 480px at 100% 0%, rgba(22, 51, 0, 0.1), transparent 46%),
+      var(--fog);
+    color: var(--charcoal);
+    letter-spacing: -0.006em;
+  }
+
+  .stage {
+    min-height: 100%;
+    display: grid;
+    grid-template-columns: minmax(260px, 380px) 1fr;
+    gap: 40px;
+    align-items: center;
+    padding: 40px 48px;
+  }
+
+  .intro h1 {
+    font-weight: 900;
+    font-size: 52px;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--obsidian);
+    margin: 0 0 16px;
+  }
+  .intro p { font-size: 16px; line-height: 1.5; margin: 0 0 12px; max-width: 36ch; }
+  .intro .path {
+    font-size: 13px;
+    color: var(--slate);
+    background: var(--paper);
+    border-radius: 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(14, 15, 12, 0.12);
+  }
+  .legend { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--paper); border-radius: 999px; padding: 6px 10px 6px 6px;
+    font-size: 12px; font-weight: 600; color: var(--forest);
+    border: 1px solid rgba(14, 15, 12, 0.12);
+  }
+  .swatch i { width: 14px; height: 14px; border-radius: 999px; display: block; }
+
+  .device-wrap { display: flex; justify-content: center; }
+  .device {
+    width: 390px;
+    height: 844px;
+    background: var(--paper);
+    border-radius: 44px;
+    border: 10px solid var(--obsidian);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(14, 15, 12, 0.18);
+  }
+
+  .screen {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+    overflow: auto;
+    padding: 54px 16px 108px;
+  }
+  .screen.on { display: block; }
+  .screen.no-tabs { padding-bottom: 28px; }
+  .screen.sheet-open { overflow: hidden; }
+
+  .statusbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 44px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 22px 6px; font-size: 12px; font-weight: 600; color: var(--forest);
+    z-index: 5; pointer-events: none;
+  }
+  .island {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    width: 108px; height: 28px; background: var(--obsidian); border-radius: 999px; z-index: 6;
+  }
+
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 16px;
+  }
+  .word {
+    font-weight: 900; font-size: 20px; letter-spacing: -0.04em;
+    color: var(--obsidian); line-height: 1;
+  }
+  .bubble { border-radius: 16px; padding: 12px 14px; margin: 8px 0; font-size: 15px; line-height: 1.4; white-space: pre-wrap; }
+  .bubble.user { background: var(--forest); color: var(--paper); margin-left: 48px; }
+  .bubble.ai { background: var(--fog); color: var(--charcoal); margin-right: 24px; }
+  .suggest { width: 100%; text-align: left; background: var(--paper); border: 1px solid var(--forest);
+    border-radius: 999px; padding: 10px 14px; margin-bottom: 8px; font-weight: 600; color: var(--forest); font-size: 14px; }
+  .title {
+    font-weight: 700; font-size: 22px; letter-spacing: -0.02em;
+    color: var(--obsidian); margin: 0;
+  }
+  .back {
+    border: 0; background: transparent; color: var(--forest);
+    font: 600 16px/1 Inter, sans-serif; padding: 8px 0; cursor: pointer;
+  }
+
+  .pill, .pill-outline, .textlink, .seg button, .tab, .row, .plan, .choice {
+    font-family: inherit; cursor: pointer;
+  }
+  .pill {
+    background: var(--lime); color: var(--forest); border: 0; border-radius: 999px;
+    font-weight: 600; font-size: 16px; padding: 12px 20px; letter-spacing: -0.006em;
+  }
+  .pill.small { font-size: 14px; padding: 8px 14px; }
+  .pill-outline {
+    background: var(--paper); color: var(--forest); border: 1px solid var(--forest);
+    border-radius: 999px; font-weight: 600; font-size: 16px; padding: 11px 18px;
+  }
+  .pill-outline.small { font-size: 14px; padding: 8px 14px; }
+  .textlink {
+    background: none; border: 0; color: var(--forest); font-weight: 600;
+    font-size: 16px; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0;
+  }
+  .ghost {
+    border: 0; background: transparent; color: var(--forest); font-weight: 600; font-size: 16px;
+    padding: 8px 0; cursor: pointer;
+  }
+
+  .biz {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--forest); border-radius: 999px; padding: 6px 12px;
+    font-size: 14px; font-weight: 600; color: var(--forest); background: var(--paper);
+    margin-bottom: 14px;
+  }
+  .biz span.dot { width: 8px; height: 8px; border-radius: 999px; background: var(--spruce); }
+
+  .hero {
+    background: var(--forest); color: var(--paper); border-radius: 28px;
+    padding: 24px; margin-bottom: 20px; position: relative; overflow: hidden;
+  }
+  .hero::after, .flash-veil {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(159, 232, 112, 0.78) 50%, transparent 70%);
+    transform: translateX(-130%);
+    pointer-events: none;
+  }
+  .hero::after { animation: lime-sweep 1.25s 0.12s ease both; }
+  .flash-veil { z-index: 30; }
+  .device.flashing .flash-veil { animation: lime-sweep 0.9s ease; }
+  .warn {
+    background: var(--linen);
+    color: var(--forest);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 8px 0 0;
+  }
+  .dash .card, .doc, .choice, .plan, .suggest {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .dash .card:hover, .doc:hover, .choice:hover, .plan:hover, .suggest:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(22, 51, 0, 0.12);
+  }
+  .dash .card.hit { animation: card-flash 0.45s ease; }
+  @keyframes lime-sweep {
+    from { transform: translateX(-130%); }
+    to { transform: translateX(130%); }
+  }
+  @keyframes card-flash {
+    0% { background: var(--lime); }
+    100% { background: var(--fog); }
+  }
+  .chrome { display: none; }
+  .device.shell-android { border-radius: 32px; }
+  .device.shell-android .island {
+    width: 14px; height: 14px; top: 14px; border-radius: 999px;
+  }
+  .device.shell-windows, .device.shell-pc {
+    width: min(960px, 100%);
+    height: 720px;
+    border-radius: 18px;
+    border-width: 1px;
+  }
+  .device.shell-windows .island, .device.shell-pc .island { display: none; }
+  .device.shell-windows .chrome, .device.shell-pc .chrome {
+    display: flex; align-items: center; justify-content: space-between;
+    position: absolute; top: 0; left: 0; right: 0; height: 40px; z-index: 7;
+    padding: 0 14px; font-weight: 700; font-size: 13px;
+  }
+  .device.shell-windows .chrome { background: var(--forest); color: var(--paper); }
+  .device.shell-pc .chrome { background: var(--paper); color: var(--forest); border-bottom: 1px solid var(--fog); }
+  .chrome .url {
+    background: var(--fog); color: var(--charcoal); border-radius: 999px;
+    padding: 4px 12px; font-weight: 600; font-size: 12px;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 10px; height: 10px; border-radius: 999px; background: var(--lime); display: block; }
+  .device.shell-windows .statusbar, .device.shell-pc .statusbar { display: none; }
+  .device.shell-windows .tabs, .device.shell-pc .tabs {
+    left: 10px; top: 52px; bottom: 12px; width: 108px; height: auto;
+    flex-direction: column; border-radius: 24px; padding: 8px;
+  }
+  .device.shell-windows .tab, .device.shell-pc .tab { width: 100%; height: 64px; flex: none; }
+  .device.shell-windows .screen, .device.shell-pc .screen {
+    left: 128px; top: 40px; padding-top: 16px; padding-bottom: 20px;
+  }
+  .device.shell-windows .screen.has-footer, .device.shell-pc .screen.has-footer { top: 40px; }
+  .hero .kicker {
+    color: var(--linen); font-size: 12px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .hero .amount {
+    font-weight: 900; font-size: 48px; letter-spacing: -0.04em;
+    line-height: 0.9; color: var(--paper); margin: 0 0 14px;
+  }
+  .hero .meta { display: flex; gap: 16px; font-size: 13px; color: var(--linen); }
+  .hero .meta b { display: block; color: var(--paper); font-weight: 600; font-size: 15px; }
+
+  .section-label {
+    font-size: 13px; font-weight: 600; color: var(--slate); margin: 8px 0;
+  }
+
+  .doc, .set-row, .exp {
+    width: 100%; text-align: left; background: var(--paper); border: 0;
+    border-bottom: 1px solid var(--fog); padding: 14px 0;
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+  }
+  .doc .name, .set-row .name, .exp .name { font-weight: 600; color: var(--obsidian); font-size: 16px; }
+  .doc .sub, .set-row .sub, .exp .sub { grid-column: 1; color: var(--slate); font-size: 13px; }
+  .doc .amt, .exp .amt { font-weight: 600; color: var(--charcoal); font-size: 16px; }
+  .exp.has-photo { grid-template-columns: auto 1fr auto; }
+  .exp .thumb {
+    width: 44px; height: 44px; object-fit: cover; border-radius: 10px;
+    grid-row: 1 / span 2; grid-column: 1; background: var(--linen);
+    display: grid; place-items: center; color: var(--forest); font-size: 10px; font-weight: 700;
+  }
+  .exp.has-photo .name, .exp.has-photo .sub { grid-column: 2; }
+  .exp.has-photo .amt { grid-column: 3; }
+  .finder {
+    background: var(--obsidian); color: var(--paper); border-radius: 28px;
+    min-height: 300px; overflow: hidden; display: grid; place-items: center;
+  }
+  .finder video { width: 100%; height: 320px; object-fit: cover; background: var(--obsidian); }
+  .finder .note { color: var(--linen); padding: 16px; text-align: center; }
+  .receipt-shot {
+    width: 100%; max-height: 280px; object-fit: cover; border-radius: 28px;
+    display: block; background: var(--obsidian);
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; border-radius: 999px;
+    padding: 4px 10px; font-size: 12px; font-weight: 600; letter-spacing: -0.003em;
+  }
+  .chip.draft, .chip.void, .chip.closed { background: var(--fog); color: var(--charcoal); }
+  .chip.void, .chip.closed { box-shadow: inset 0 0 0 1px var(--charcoal); }
+  .chip.closed { box-shadow: inset 0 0 0 1px var(--forest); }
+  .chip.sent { background: var(--sent-bg); color: var(--blue); }
+  .chip.viewed { background: var(--linen); color: var(--spruce); }
+  .chip.partial, .chip.signed { background: var(--linen); color: var(--forest); }
+  .chip.paid { background: var(--spruce); color: var(--paper); }
+  .chip.overdue { background: var(--overdue-bg); color: var(--overdue-fg); }
+
+  .search, .field input, .field textarea {
+    width: 100%; border: 1px solid var(--pebble); border-radius: 10px;
+    padding: 12px 14px; font: 400 16px/1.4 Inter, sans-serif; color: var(--charcoal);
+    background: var(--paper);
+  }
+  .search { margin-bottom: 12px; }
+  .search:focus, .field input:focus, .field textarea:focus {
+    outline: none; border-color: var(--forest);
+  }
+  .seg {
+    display: flex; background: var(--fog); border-radius: 999px; padding: 4px; margin-bottom: 8px;
+  }
+  .seg button {
+    flex: 1; border: 0; background: transparent; border-radius: 999px;
+    padding: 8px 6px; font-weight: 600; font-size: 13px; color: var(--charcoal);
+  }
+  .seg button.on { background: var(--forest); color: var(--paper); }
+  .seg.lime button.on { background: var(--lime); color: var(--charcoal); }
+
+  .tabs {
+    position: absolute; left: 12px; right: 12px; bottom: 14px;
+    height: 64px; background: var(--paper);
+    border: 1px solid rgba(14, 15, 12, 0.12);
+    border-radius: 999px; display: flex; align-items: center; padding: 6px;
+    z-index: 8;
+  }
+  .tabs.hide { display: none; }
+  .tab {
+    flex: 1; border: 0; background: transparent; border-radius: 999px; height: 52px;
+    color: var(--slate); font-size: 10px; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  }
+  .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .tab.on { background: var(--forest); color: var(--paper); }
+
+  .sticky {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 7;
+    background: var(--paper); border-top: 1px solid var(--fog);
+    padding: 12px 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .sticky .total { font-weight: 700; font-size: 22px; color: var(--obsidian); letter-spacing: -0.02em; }
+  .sticky .total small { display: block; font-weight: 500; font-size: 12px; color: var(--slate); letter-spacing: 0; }
+
+  .card {
+    background: var(--fog); border-radius: 10px; padding: 16px; margin-bottom: 10px;
+  }
+  .card h3 { margin: 0 0 4px; font-size: 16px; color: var(--obsidian); }
+  .card p { margin: 0; font-size: 14px; color: var(--slate); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--slate); margin-bottom: 6px; }
+  .line {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: 15px; padding: 8px 0; border-bottom: 1px solid rgba(14,15,12,0.08);
+  }
+  .line b { color: var(--obsidian); font-weight: 600; }
+
+  .overlay {
+    display: none; position: absolute; inset: 0; background: rgba(14, 15, 12, 0.4); z-index: 20;
+  }
+  .overlay.on { display: block; }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper);
+    border-radius: 28px 28px 0 0; padding: 12px 16px 28px;
+  }
+  .grab { width: 40px; height: 4px; border-radius: 999px; background: var(--fog); margin: 4px auto 14px; }
+  .choice {
+    width: 100%; text-align: left; background: var(--fog); border: 0; border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 8px; color: var(--obsidian); font-weight: 600; font-size: 16px;
+  }
+  .choice span { display: block; font-weight: 400; color: var(--slate); font-size: 13px; margin-top: 2px; }
+
+  .paper-doc {
+    background: var(--paper); border-radius: 10px; box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(14, 15, 12, 0.12); overflow: hidden; margin-bottom: 16px;
+  }
+  .paper-doc header {
+    background: var(--forest); color: var(--paper); padding: 20px 16px 16px;
+  }
+  .paper-doc header strong {
+    font-weight: 900; letter-spacing: -0.04em; font-size: 22px;
+  }
+  .paper-doc header p { margin: 4px 0 0; color: var(--linen); font-size: 13px; }
+  .paper-doc .body { padding: 16px; font-size: 14px; }
+  .paper-doc .tot { display: flex; justify-content: space-between; font-weight: 700; font-size: 18px; color: var(--obsidian); margin-top: 8px; }
+
+  .bars { display: flex; align-items: flex-end; gap: 10px; height: 120px; margin: 12px 0; }
+  .bars div { flex: 1; background: var(--forest); border-radius: 8px 8px 0 0; }
+  .bars div.alt { background: var(--spruce); }
+  .bars + .axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--slate); }
+
+  .plans { display: flex; flex-direction: column; gap: 8px; }
+  .plan {
+    text-align: left; background: var(--paper); border: 1px solid var(--pebble);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .plan.on { border: 1px solid var(--forest); border-radius: 28px; }
+  .plan b { display: block; color: var(--obsidian); font-size: 16px; }
+  .plan em { font-style: normal; font-weight: 700; }
+
+  .note { font-size: 13px; color: var(--slate); line-height: 1.45; }
+
+  .toggle {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid var(--fog); font-weight: 600; color: var(--obsidian);
+  }
+  .switch {
+    width: 44px; height: 28px; border-radius: 999px; background: var(--forest); position: relative;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; right: 3px; width: 22px; height: 22px;
+    background: var(--paper); border-radius: 999px;
+  }
+  .switch.off { background: var(--pebble); }
+  .switch.off::after { right: auto; left: 3px; }
+
+  .dash { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+  .dash .card { width: 100%; text-align: left; border: 0; cursor: pointer; margin: 0; font: inherit; color: inherit; }
+  .dash .card strong { display: block; color: var(--obsidian); font-size: 18px; letter-spacing: -0.03em; }
+  .screen.has-footer { overflow: hidden; padding-bottom: 12px; }
+  .screen.has-footer.on { display: flex; flex-direction: column; }
+  .scroller { flex: 1; overflow: auto; min-height: 0; }
+  .screen.has-footer .sticky { position: relative; flex: none; }
+  .mode { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .audit { font-size: 13px; color: var(--charcoal); background: var(--linen); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+  .qr { width: 188px; height: 188px; background: var(--paper); border-radius: 10px; border: 1px solid rgba(14, 15, 12, 0.12); display: block; margin: 8px 0 12px; }
+  .pull { height: 0; overflow: hidden; text-align: center; font-size: 12px; font-weight: 700; color: var(--forest); background: var(--linen); }
+  .pull.show { height: auto; padding: 8px 12px; }
+  .methods { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+  .methods span { border: 1px solid var(--forest); border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 600; color: var(--forest); }
+
+  @media (max-width: 860px) {
+    .stage { grid-template-columns: 1fr; padding: 20px 12px 32px; }
+    .intro h1 { font-size: 40px; }
+    .device.shell-ios, .device.shell-android { transform: scale(0.92); transform-origin: top center; }
+    .device.shell-windows, .device.shell-pc { width: 100%; height: 680px; }
+  }
+  /* ---- Pop layer: brighter color and smoother motion ---- */
+  body {
+    background:
+      radial-gradient(900px 480px at 6% -10%, rgba(180, 255, 106, 0.75), transparent 60%),
+      radial-gradient(760px 520px at 100% 0%, rgba(123, 63, 228, 0.22), transparent 50%),
+      radial-gradient(700px 500px at 90% 100%, rgba(0, 87, 255, 0.16), transparent 55%),
+      var(--fog);
+  }
+  .intro h1 {
+    background: linear-gradient(100deg, var(--forest) 10%, var(--spruce) 45%, var(--violet) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .swatch { box-shadow: 0 2px 8px rgba(14, 15, 12, 0.06); }
+  .device { box-shadow: 0 30px 80px rgba(22, 51, 0, 0.28), 0 0 0 1px rgba(180, 255, 106, 0.4); }
+  .screen {
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  }
+  .screen.on, .screen.has-footer.on { animation: screen-in 0.26s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes screen-in {
+    from { opacity: 0; transform: translate3d(0, 10px, 0); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .hero {
+    background:
+      radial-gradient(240px 180px at 100% 0%, rgba(180, 255, 106, 0.45), transparent 70%),
+      radial-gradient(260px 200px at 0% 100%, rgba(46, 230, 166, 0.35), transparent 70%),
+      linear-gradient(135deg, #0f2a00 0%, var(--forest) 40%, #006b3a 100%);
+    box-shadow: 0 14px 34px rgba(0, 137, 74, 0.35);
+  }
+  .hero .amount { color: var(--lime); text-shadow: 0 2px 18px rgba(180, 255, 106, 0.35); }
+
+  .pill {
+    background: linear-gradient(135deg, #d4ff8f, var(--lime) 55%, #8ef04a);
+    box-shadow: 0 6px 16px rgba(120, 220, 60, 0.45);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+  }
+  .pill:hover { filter: brightness(1.05); box-shadow: 0 8px 22px rgba(120, 220, 60, 0.55); }
+  .pill:active, .pill-outline:active, .choice:active, .tab:active, .suggest:active, .dash .card:active {
+    transform: scale(0.97);
+  }
+  .pill-outline, .suggest { transition: background 0.15s ease, transform 0.14s ease; }
+  .pill-outline:hover, .suggest:hover { background: var(--linen); }
+
+  .dash .card { color: var(--obsidian); }
+  .dash .card:nth-child(4n+1) { background: linear-gradient(135deg, #ffe1dc, #ffc6bd); }
+  .dash .card:nth-child(4n+2) { background: linear-gradient(135deg, #fff3c2, #ffe27a); }
+  .dash .card:nth-child(4n+3) { background: linear-gradient(135deg, #e4ffd1, #c4ff94); }
+  .dash .card:nth-child(4n+4) { background: linear-gradient(135deg, #dbe7ff, #bcd2ff); }
+  .dash .card p { color: var(--charcoal); }
+  .dash .card:hover { box-shadow: 0 10px 24px rgba(14, 15, 12, 0.14); }
+  @keyframes card-flash {
+    0% { filter: brightness(1.25) saturate(1.4); transform: scale(1.03); }
+    100% { filter: none; transform: none; }
+  }
+
+  .card { background: linear-gradient(135deg, #f3f6f1, var(--fog)); }
+  .chip.paid { background: linear-gradient(135deg, var(--mint), var(--spruce)); }
+  .chip.sent { color: var(--blue); }
+  .chip.viewed { background: #efe6ff; color: var(--violet); }
+  .chip.partial, .chip.signed { background: #fff3c2; color: #7a5600; }
+  .chip.overdue { box-shadow: inset 0 0 0 1px rgba(255, 90, 78, 0.5); }
+
+  .tabs {
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6); backdrop-filter: blur(14px) saturate(1.6);
+    box-shadow: 0 10px 28px rgba(14, 15, 12, 0.14);
+  }
+  .tab { transition: background 0.2s ease, color 0.2s ease, transform 0.14s ease; }
+  .tab:hover { color: var(--forest); }
+  .tab.on {
+    background: linear-gradient(135deg, var(--forest), var(--spruce));
+    color: var(--lime); box-shadow: 0 6px 14px rgba(0, 137, 74, 0.35);
+  }
+  .seg button { transition: background 0.2s ease, color 0.2s ease; }
+  .seg button.on { background: linear-gradient(135deg, var(--forest), var(--spruce)); }
+
+  .bars div { background: linear-gradient(180deg, var(--mint), var(--spruce)); transform-origin: bottom; animation: bar-rise 0.5s cubic-bezier(.2, .8, .2, 1) both; }
+  .bars div.alt { background: linear-gradient(180deg, #9b6bff, var(--violet)); }
+  .bars div:nth-child(2) { animation-delay: 0.05s; }
+  .bars div:nth-child(3) { animation-delay: 0.1s; }
+  .bars div:nth-child(4) { animation-delay: 0.15s; }
+  .bars div:nth-child(5) { animation-delay: 0.2s; }
+  @keyframes bar-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+  .overlay.on { animation: fade-in 0.2s ease both; }
+  .overlay.on .sheet { animation: sheet-up 0.28s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheet-up { from { transform: translate3d(0, 40px, 0); opacity: 0.6; } to { transform: none; opacity: 1; } }
+
+  .bubble.user { background: linear-gradient(135deg, var(--forest), var(--spruce)); }
+  .bubble.ai { background: linear-gradient(135deg, #f1ecff, #e6f0ff); }
+  .paper-doc header { background: linear-gradient(135deg, var(--forest), #006b3a); }
+  .search:focus, .field input:focus, .field textarea:focus {
+    border-color: var(--spruce); box-shadow: 0 0 0 3px rgba(180, 255, 106, 0.55);
+  }
+  .switch { background: linear-gradient(135deg, var(--spruce), var(--mint)); transition: background 0.2s ease; }
+  .switch::after { transition: left 0.2s ease, right 0.2s ease; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+  .warn { background: linear-gradient(135deg, #fff3c2, var(--linen)); border-left: 4px solid var(--sun); }
+  .biz span.dot { background: var(--mint); box-shadow: 0 0 0 3px rgba(46, 230, 166, 0.3); }
+  .dots i:nth-child(1) { background: var(--coral); }
+  .dots i:nth-child(2) { background: var(--sun); }
+  .dots i:nth-child(3) { background: var(--mint); }
+  .doc, .exp, .set-row { transition: background 0.15s ease; }
+  .doc:hover, .exp:hover, .set-row:hover { background: #fafff5; }
+
+  /* Automatic assistant panel on Home */
+  .auto-panel {
+    border-radius: 20px; padding: 14px; margin: 0 0 14px;
+    background: linear-gradient(135deg, #f1ecff 0%, #e6f0ff 55%, #e4ffd1 100%);
+    box-shadow: inset 0 0 0 1px rgba(123, 63, 228, 0.18);
+    animation: screen-in 0.3s cubic-bezier(.2, .8, .2, 1) both;
+  }
+  .auto-head { font-weight: 900; font-size: 15px; letter-spacing: -0.02em; color: var(--violet); margin-bottom: 4px; }
+  .auto-head::before { content: "✦ "; }
+  .auto-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate); margin: 10px 0 4px; }
+  .auto-row { font-size: 13px; line-height: 1.4; color: var(--obsidian); padding: 6px 0; }
+  .auto-row.done::before { content: "✓ "; color: var(--spruce); font-weight: 900; }
+  .auto-row.wait { display: flex; gap: 10px; align-items: center; justify-content: space-between; border-top: 1px solid rgba(14, 15, 12, 0.08); }
+  .auto-row.wait .pill { flex: none; }
+  .auto-panel .textlink { font-size: 13px; padding: 2px 0; }
+
+  /* Camera button: phones only (iOS and Android shells), on tabbed screens */
+  .cam-fab {
+    display: none; position: absolute; right: 18px; bottom: 92px; z-index: 9;
+    width: 60px; height: 60px; border-radius: 999px; border: 0; cursor: pointer;
+    place-items: center; color: var(--forest);
+    background: linear-gradient(135deg, #d4ff8f, var(--lime) 55%, #8ef04a);
+    box-shadow: 0 10px 24px rgba(120, 220, 60, 0.55), 0 0 0 4px rgba(255, 255, 255, 0.9);
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+  }
+  .cam-fab svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+  .cam-fab:hover { transform: translateY(-2px); }
+  .cam-fab:active { transform: scale(0.94); }
+  .device.shell-ios .cam-fab, .device.shell-android .cam-fab { display: grid; }
+  .device .tabs.hide ~ .cam-fab { display: none; }
+
+  /* ---- Live web app: full screen, no preview frame ---- */
+  .live-only { display: none !important; }
+  html.live .live-only { display: revert !important; }
+  html.live .intro, html.live .chrome, html.live .statusbar, html.live .island,
+  html.live .flash-veil, html.live .preview-only { display: none !important; }
+  html.live body { background: var(--paper); }
+  html.live .stage { display: block; padding: 0; min-height: 100vh; }
+  html.live .device-wrap { display: block; }
+  html.live .device, html.live .device.shell-ios, html.live .device.shell-pc {
+    width: 100%; height: 100vh; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; transform: none;
+  }
+  html.live .screen { padding-top: calc(16px + env(safe-area-inset-top)); }
+  html.live .tabs { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  html.live .cam-fab { bottom: calc(90px + env(safe-area-inset-bottom)); }
+  html.live .device.shell-pc .screen {
+    top: 0; left: 132px; padding-top: 24px;
+    padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2));
+  }
+  html.live .device.shell-pc .tabs { top: 12px; }
+  .dv-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .empty-state { text-align: center; padding: 28px 12px; color: var(--slate); }
+  .empty-state b { display: block; color: var(--obsidian); font-size: 17px; margin-bottom: 6px; }
+  @media print {
+    html.live .tabs, html.live .cam-fab, html.live .back, html.live .dv-actions, html.live #dv-note { display: none !important; }
+    html.live .device { height: auto; overflow: visible; }
+    html.live .screen { position: static; overflow: visible; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cam-fab { transition: none; }
+    .hero::after, .device.flashing .flash-veil, .dash .card.hit,
+    .screen.on, .overlay.on, .overlay.on .sheet, .bars div { animation: none; }
+    .dash .card, .doc, .choice, .plan, .suggest, .pill, .tab, .seg button, .switch::after { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="intro">
+    <h1>Simple Accountz</h1>
+    <p>Clickable preview. Invoices, linked accounts, and an assistant that figures a late fee, repeats a month, splits a deposit, and writes the weekly note. Reports export a tax packet. Spencer’s console shows platform revenue. Add expense takes a picture of a receipt. Open a personal account or a business account. A business links business checking and business credit. Scan a paper invoice or upload a file. A lime flash marks the open. Nothing is sent until you confirm.</p>
+    <p class="path">Design preview with sample data. The live app is at simpleaccountz.com/app.</p>
+    <div class="legend">
+      <span class="swatch"><i style="background:#163300"></i>Forest Ink</span>
+      <span class="swatch"><i style="background:#9fe870"></i>Lime Voltage</span>
+      <span class="swatch"><i style="background:#e8ebe6"></i>Fog</span>
+    </div>
+    <p class="note" style="margin-top:16px">Sample data. Field &amp; Co. is a normal business. Spencer’s console is the creator view. One lime button per screen.</p>
+    <div class="mode" id="shells">
+      <button class="pill small" data-shell="ios" onclick="setShell('ios')">iOS</button>
+      <button class="pill-outline small" data-shell="android" onclick="setShell('android')">Android</button>
+      <button class="pill-outline small" data-shell="windows" onclick="setShell('windows')">Windows</button>
+      <button class="pill-outline small" data-shell="pc" onclick="setShell('pc')">PC</button>
+    </div>
+    <p class="note" id="shell-note">Same features on iOS, Android, Windows, and PC.</p>
+    <div class="mode" id="account-mode">
+      <button class="pill small" id="kind-business" onclick="chooseKind('business')">Business account</button>
+      <button class="pill-outline small" id="kind-personal" onclick="chooseKind('personal')">Personal account</button>
+    </div>
+    <div class="mode">
+      <button class="pill small" id="mode-owner" onclick="setActor('owner')">Field &amp; Co.</button>
+      <button class="pill-outline small" id="mode-creator" onclick="setActor('creator')">Spencer, creator</button>
+      <button class="pill-outline small" id="mode-admin" onclick="setActor('admin')" hidden>Avery, admin</button>
+    </div>
+  </aside>
+
+  <div class="device-wrap">
+    <div class="device shell-ios" id="device">
+      <div class="flash-veil" id="flash-veil"></div>
+      <div class="chrome" id="chrome"><span id="chrome-label">Simple Accountz</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></div>
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span><span id="status-shell">iOS</span></div>
+
+      <section class="screen on" id="home">
+        <div class="pull" id="pull-note"></div>
+        <div class="top">
+          <div class="word">Simple Accountz</div>
+          <span>
+            <button class="pill-outline small" id="signal" onclick="toggleSignal()">Online</button>
+            <button class="pill small biz-only" onclick="openSheet('new')">New</button>
+          </span>
+        </div>
+        <button class="biz" onclick="show('account-setup')"><span class="dot"></span> <span id="biz-label">Field &amp; Co. · United States</span></button>
+        <div class="auto-panel" id="auto-panel" hidden></div>
+        <div id="home-business">
+        <button class="hero" onclick="showFiltered('open')" style="display:block;width:100%;text-align:left;border:0;cursor:pointer;font:inherit">
+          <div class="kicker">Outstanding</div>
+          <p class="amount" id="outstanding">$4,280.00</p>
+          <div class="meta">
+            <div>Received<b id="received">$1,640.00</b></div>
+            <div>Overdue<b id="overdue-count">1</b></div>
+            <div>Drafts<b id="draft-count">1</b></div>
+          </div>
+        </button>
+        <div class="dash">
+          <button class="card" onclick="showFiltered('overdue')"><span class="note">Overdue</span><strong id="card-overdue">1</strong><p>Tap to open</p></button>
+          <button class="card" onclick="showFiltered('draft')"><span class="note">Drafts</span><strong id="card-drafts">1</strong><p>Not sent yet</p></button>
+          <button class="card" onclick="show('money')"><span class="note">Money out</span><strong id="card-out">$420.00</strong><p>Matches expenses</p></button>
+          <button class="card" onclick="show('banks')"><span class="note">Linked</span><strong id="card-linked">2</strong><p>Bank and card</p></button>
+        </div>
+        <div class="section-label">Recent</div>
+        <div id="recent"></div>
+        </div>
+        <div id="home-personal" hidden>
+          <button class="hero" onclick="show('money')" style="display:block;width:100%;text-align:left;border:0;cursor:pointer;font:inherit">
+            <div class="kicker">Spent this month</div>
+            <p class="amount" id="personal-spent">$0.00</p>
+            <p style="margin:0;color:var(--linen)">Personal checking and card. The business books stay separate.</p>
+          </button>
+          <div class="dash">
+            <button class="card" onclick="beginReceipt()"><span class="note">Receipt photo</span><strong>Take</strong><p>Picture of a receipt</p></button>
+            <button class="card" onclick="show('banks')"><span class="note">Personal accounts</span><strong id="personal-linked">2</strong><p>Checking and credit</p></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="documents">
+        <div class="top">
+          <h2 class="title">Documents</h2>
+          <button class="pill small biz-only" onclick="openSheet('new')">New</button>
+        </div>
+        <div id="docs-personal" hidden>
+          <div class="card"><h3>This is a personal account</h3><p>Invoices, estimates, clients, deposits, late fees, and the sales-tax packet belong to a business account.</p></div>
+          <button class="pill" onclick="chooseKind('business')">Use a business account</button>
+        </div>
+        <div id="docs-tools">
+        <input class="search" id="docsearch" placeholder="Search clients or numbers" aria-label="Search documents">
+        <div class="seg" id="docseg">
+          <button class="on" data-filter="all">All</button>
+          <button data-filter="invoice">Invoices</button>
+          <button data-filter="estimate">Estimates</button>
+          <button data-filter="receipt">Receipts</button>
+        </div>
+        <div id="doclist"></div>
+        </div>
+        <button class="textlink" onclick="beginInvoiceScan()">Scan an invoice</button>
+        <button class="textlink" onclick="show('files')">Upload a file</button>
+      </section>
+
+      <section class="screen no-tabs" id="editor">
+        <button class="back" onclick="show('home')">Back</button>
+        <div class="top"><h2 class="title">Invoice</h2><span class="chip overdue" id="editor-chip">Overdue</span></div>
+        <p class="note">Number assigned when you send. This one is already INV-1042. Totals are calculated from the lines.</p>
+        <div class="field"><label>Template</label><input value="Ledger" readonly></div>
+        <div class="field"><label>Client</label><input value="Oak Street HOA" readonly></div>
+        <div class="card" id="editor-lines">
+          <div class="line"><span>Deck staining<br><span class="note">1 × $1,450.00</span></span><b>$1,450.00</b></div>
+          <div class="line"><span>Sealer and materials<br><span class="note">1 × $400.00</span></span><b>$400.00</b></div>
+        </div>
+        <p class="note" id="editor-math">Total $1,850.00 · Paid $0.00 · Balance $1,850.00</p>
+        <div class="field"><label>Due date</label><input value="Nov 12, 2026" readonly></div>
+        <div class="field"><label>Notes</label><textarea rows="2" readonly>Deck boards stained and sealed. Balance due on receipt of this invoice.</textarea></div>
+        <div class="toggle">Accept online payment <span class="switch"></span></div>
+        <button class="textlink" onclick="ask('late')">Figure the late fee</button>
+        <button class="textlink" onclick="ask('deposit')">Request 25% now</button>
+        <button class="textlink" onclick="ask('recur','1042')">Repeat monthly</button>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Balance due</small><span id="editor-balance">$1,850.00</span></div>
+          <button class="pill" onclick="show('preview')">Preview</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="editor-viewed">
+        <button class="back" onclick="show('documents')">Back</button>
+        <div class="top"><h2 class="title">Invoice</h2><span class="chip viewed">Viewed</span></div>
+        <div class="field"><label>Client</label><input value="Maria Chen" readonly></div>
+        <div class="card" id="maria-lines">
+          <div class="line"><span>Interior paint, two rooms<br><span class="note">1 × $2,430.00</span></span><b>$2,430.00</b></div>
+        </div>
+        <p class="note">Opened yesterday at 4:12 PM. Read receipt sent.</p>
+        <p class="warn" id="maria-warn" hidden></p>
+        <button class="textlink" onclick="ask('recur','1041')">Repeat monthly</button>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Balance due</small><span id="maria-balance">$2,430.00</span></div>
+          <button class="pill" onclick="openSend('1041')">Send</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="editor-converted">
+        <button class="back" onclick="show('editor-estimate')">Back</button>
+        <div class="top"><h2 class="title">Invoice</h2><span class="chip draft">Draft</span></div>
+        <div class="field"><label>Client</label><input value="Harbor Rental" readonly></div>
+        <div class="card">
+          <div class="line"><span>Equipment, one week<br><span class="note">Copied from EST-088</span></span><b>$900.00</b></div>
+        </div>
+        <p class="note">New draft. It does not reuse INV-1042. A number is assigned only when you send it.</p>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Draft</small><span id="conv-total">$900.00</span></div>
+          <button class="pill" onclick="openSend('088')">Send</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="editor-estimate">
+        <button class="back" onclick="show('home')">Back</button>
+        <div class="top"><h2 class="title">Estimate</h2><span class="chip signed">Signed</span></div>
+        <div class="field"><label>Client</label><input value="Harbor Rental" readonly></div>
+        <div class="card" id="est-lines">
+          <div class="line"><span>Equipment, one week<br><span class="note">1 × $900.00</span></span><b>$900.00</b></div>
+        </div>
+        <p class="note">Signed by Jordan Hale on Nov 20, 2026. Terms are locked. Convert starts a new invoice.</p>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Estimate</small><span id="est-total">$900.00</span></div>
+          <button class="pill" onclick="show('editor-converted')">Convert to invoice</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="doc-view">
+        <button class="back" onclick="show('documents')">Back</button>
+        <div class="top"><h2 class="title" id="dv-title">Invoice</h2><span class="chip" id="dv-chip"></span></div>
+        <article class="paper-doc">
+          <header><strong id="dv-biz"></strong><p id="dv-meta"></p></header>
+          <div class="body">
+            <p id="dv-to"></p>
+            <div id="dv-lines"></div>
+          </div>
+        </article>
+        <div class="dv-actions">
+          <button class="pill" id="dv-send" onclick="sendDocLive()">Send</button>
+          <button class="pill-outline" id="dv-remind" onclick="remindLive()">Send reminder</button>
+          <button class="pill-outline" id="dv-paid" onclick="markPaidLive()">Mark paid</button>
+          <button class="pill-outline" onclick="window.print()">Print or PDF</button>
+          <button class="textlink" id="dv-delete" onclick="deleteDraftLive()">Delete draft</button>
+        </div>
+        <p class="note" id="dv-note"></p>
+      </section>
+
+      <section class="screen no-tabs" id="editor-draft">
+        <button class="back" onclick="show('home')">Back</button>
+        <div class="top"><h2 class="title">Invoice</h2><span class="chip draft">Draft</span></div>
+        <div class="field"><label>Client</label><input id="draft-client" placeholder="Add a client"></div>
+        <div class="field live-only"><label>Client email (optional)</label><input id="draft-email" type="email" placeholder="name@example.com"></div>
+        <div class="field live-only"><label>Due date</label><input id="draft-due" type="date"></div>
+        <div class="field"><label>Description</label><input id="draft-desc" value="Description"></div>
+        <div class="field"><label>Quantity</label><input id="draft-qty" value="1" inputmode="decimal"></div>
+        <div class="field"><label>Rate</label><input id="draft-rate" value="0" inputmode="decimal"></div>
+        <div class="field"><label>Tax %</label><input id="draft-tax" value="0" inputmode="decimal"></div>
+        <p class="note" id="draft-math">The total updates as you type.</p>
+        <p class="note">Tap Save draft to keep it. Send stays off until a client and a line are filled in.</p>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Draft total</small><span id="draft-total">$0.00</span></div>
+          <button class="pill preview-only" onclick="saveWorkingDraft()">Save draft</button>
+          <button class="pill live-only" onclick="saveInvoiceLive()">Save invoice</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="preview">
+        <button class="back" onclick="show('editor')">Back</button>
+        <div class="top"><h2 class="title">Preview</h2></div>
+        <article class="paper-doc">
+          <header>
+            <strong>FIELD &amp; CO.</strong>
+            <p>Invoice INV-1042 · Due Nov 12, 2026</p>
+          </header>
+          <div class="body">
+            <p><b style="color:var(--obsidian)">Bill to</b><br>Oak Street HOA<br>18 Oak Street</p>
+            <div id="preview-figures">
+              <div class="line"><span>Deck staining</span><b>$1,450.00</b></div>
+              <div class="line"><span>Sealer and materials</span><b>$400.00</b></div>
+              <div class="line"><span id="owner-tax">Sales tax</span><b>$0.00</b></div>
+              <div class="tot"><span>Total</span><span id="preview-total">$1,850.00</span></div>
+            </div>
+            <p class="note" style="margin-top:12px">Pay by card, bank transfer, or check. Thank you.</p>
+          </div>
+        </article>
+        <button class="textlink" onclick="show('public')">Customer view</button>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Ready to send</small>INV-1042</div>
+          <button class="pill" onclick="openSend('1042')">Send</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="public">
+        <button class="back" onclick="show('preview')">Back</button>
+        <p class="note" id="owner-lang-note">Your language stays English. The customer sees English and the tax name Sales tax.</p>
+        <div class="seg" id="cust-lang">
+          <button class="on" data-lang="en">English</button>
+          <button data-lang="es">Español</button>
+          <button data-lang="de">Deutsch</button>
+          <button data-lang="pt">Português</button>
+          <button data-lang="ja">日本語</button>
+        </div>
+        <div class="seg" id="cust-country">
+          <button class="on" data-country="US">US</button>
+          <button data-country="MX">MX</button>
+          <button data-country="DE">DE</button>
+          <button data-country="AU">AU</button>
+          <button data-country="BR">BR</button>
+        </div>
+        <article class="paper-doc">
+          <header>
+            <strong>FIELD &amp; CO.</strong>
+            <p id="public-title">Invoice INV-1042</p>
+          </header>
+          <div class="body">
+            <div id="public-figures">
+              <div class="line"><span id="public-tax">Sales tax</span><b>$0.00</b></div>
+              <div class="tot"><span id="public-balance-label">Balance due</span><span id="public-balance">$1,850.00</span></div>
+            </div>
+            <p class="note" id="public-due">Due Nov 12, 2026</p>
+          </div>
+        </article>
+        <div class="methods" id="public-methods"></div>
+        <button class="pill" id="public-pay" style="width:100%" onclick="payCurrent()">Pay balance</button>
+      </section>
+
+      <section class="screen no-tabs" id="paid">
+        <div class="hero" style="margin-top:24px">
+          <div class="kicker">Paid</div>
+          <p class="amount">$1,850</p>
+          <p style="margin:0;color:var(--linen)">Receipt sent to Oak Street HOA.</p>
+        </div>
+        <button class="pill" onclick="show('home')">Done</button>
+      </section>
+
+      <section class="screen" id="money">
+        <div class="top">
+          <h2 class="title">Money</h2>
+          <button class="pill small" onclick="beginReceipt()">Add expense</button>
+        </div>
+        <div class="seg" id="period">
+          <button data-period="week">Week</button>
+          <button class="on" data-period="month">Month</button>
+          <button data-period="year">Year</button>
+        </div>
+        <button class="doc" onclick="show('banks')">
+          <span class="name">Linked accounts</span>
+          <span class="amt">2</span>
+          <span class="sub" id="linked-summary">Harbor Checking · City Card •••• 1884</span>
+        </button>
+        <div class="card"><h3 id="money-in">$1,640.00 in</h3><p id="money-in-note">Card and check payments this month</p></div>
+        <div class="card"><h3 id="money-out">$420.00 out</h3><p>Expenses in USD only</p></div>
+        <div class="card"><h3 id="money-profit">$1,220.00 rough profit</h3><p>Calculated from dated payments and expenses. Not a full ledger.</p></div>
+        <p class="note" id="money-fx"></p>
+        <p class="note" id="books-note"></p>
+        <div class="section-label">Expenses</div>
+        <div id="expense-list"></div>
+        <button class="textlink" onclick="show('reports')">Open reports</button>
+      </section>
+
+      <section class="screen no-tabs" id="receipt-scan">
+        <button class="back" onclick="closeReceiptCamera(); show('money')">Back</button>
+        <h2 class="title">Receipt photo</h2>
+        <p class="note">Take a picture of the paper receipt. It stays on this device. Nothing is filed until you save the expense.</p>
+        <div class="finder" id="receipt-finder">
+          <video id="receipt-video" playsinline autoplay muted hidden></video>
+          <p class="note" id="receipt-camera-note">Allow the camera, or take a photo with the button below.</p>
+        </div>
+        <input id="receipt-camera-file" type="file" accept="image/*" capture="environment" hidden>
+        <input id="receipt-library" type="file" accept="image/*" hidden>
+        <button class="textlink" onclick="document.getElementById('receipt-library').click()">Choose a photo</button>
+        <button class="textlink preview-only" onclick="useSampleReceipt()">Use the sample receipt</button>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note">On this device</span>
+          <button class="pill" onclick="captureReceipt()">Take photo</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="invoice-scan">
+        <button class="back" onclick="closeReceiptCamera(); show('documents')">Back</button>
+        <h2 class="title">Scan invoice</h2>
+        <p class="note">Take a picture of the paper invoice. It stays on this device. Saving keeps a draft. It is not sent.</p>
+        <div class="finder">
+          <video id="invoice-video" playsinline autoplay muted hidden></video>
+          <p class="note" id="invoice-camera-note">Allow the camera, or take a photo with the button below.</p>
+        </div>
+        <input id="invoice-camera-file" type="file" accept="image/*" capture="environment" hidden>
+        <input id="invoice-library" type="file" accept="image/*" hidden>
+        <button class="textlink" onclick="document.getElementById('invoice-library').click()">Choose a photo</button>
+        <button class="textlink preview-only" onclick="useSampleInvoice()">Use the sample invoice</button>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note">Draft only</span>
+          <button class="pill" onclick="captureInvoice()">Take photo</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="invoice-review">
+        <button class="back" onclick="backFromInvoice()">Back</button>
+        <h2 class="title">Scanned invoice</h2>
+        <p class="note" id="invoice-note">Check the client and the total. This preview does not read the print. Nothing is sent.</p>
+        <img class="receipt-shot" id="invoice-photo" alt="Scanned invoice" hidden>
+        <div class="card" id="invoice-card" style="background:var(--linen)">
+          <h3>Sample invoice</h3>
+          <p>North dock · $320.00. Save keeps it as a draft.</p>
+        </div>
+        <div class="field"><label>Client</label><input id="invoice-client" value=""></div>
+        <div class="field"><label>Total</label><input id="invoice-total" value=""></div>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note" id="invoice-currency">USD</span>
+          <button class="pill" id="invoice-save" onclick="saveInvoiceScan()">Save draft</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="files">
+        <button class="back" onclick="show('documents')">Back</button>
+        <h2 class="title">Files</h2>
+        <p class="note" id="files-note">Upload a PDF, JPEG, PNG, WebP, CSV, or text file. It stays on this device. It is not sent anywhere.</p>
+        <div class="section-label">Scanned invoices</div>
+        <div id="scan-list"></div>
+        <div class="section-label">Uploads</div>
+        <div id="upload-list"></div>
+        <input id="upload-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.txt,application/pdf,image/jpeg,image/png,image/webp,text/csv,text/plain" hidden>
+        <button class="textlink preview-only" onclick="useSampleFile()">Use the sample file</button>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note">On this device</span>
+          <button class="pill" onclick="document.getElementById('upload-file').click()">Upload file</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="expense">
+        <button class="back" onclick="backFromReceipt()">Back</button>
+        <h2 class="title">Receipt</h2>
+        <p class="note" id="expense-note">Check the photo, then save. Nothing is filed until then.</p>
+        <img class="receipt-shot" id="receipt-photo" alt="Receipt photo" hidden>
+        <div class="card" id="receipt-card" style="background:var(--linen)">
+          <h3>Sample receipt</h3>
+          <p>Harbor Lumber · Nov 18, 2026. Check the total, then save.</p>
+        </div>
+        <div class="field"><label>Merchant</label><input id="expense-merchant" value="Harbor Lumber"></div>
+        <div class="field"><label>Date</label><input id="expense-date" value="Nov 18, 2026" data-iso="2026-11-18" readonly></div>
+        <div class="field"><label>Total</label><input id="expense-total" value="$186.40"></div>
+        <div class="field"><label>Category</label><input id="expense-category" value="Materials"></div>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note" id="expense-currency">USD</span>
+          <button class="pill" id="expense-save" onclick="saveExpense()">Save expense</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="reports">
+        <button class="back" onclick="show('money')">Back</button>
+        <div class="top">
+          <h2 class="title">Reports</h2>
+          <button class="pill-outline small" onclick="downloadBooks('report')">Export</button>
+        </div>
+        <div class="seg lime" id="report-period">
+          <button data-period="last_month">Last month</button>
+          <button class="on" data-period="month">This month</button>
+          <button data-period="year">Year</button>
+        </div>
+        <div class="bars" aria-hidden="true">
+          <div style="height:40%"></div>
+          <div class="alt" style="height:55%"></div>
+          <div style="height:70%"></div>
+          <div class="alt" style="height:48%"></div>
+          <div style="height:90%"></div>
+          <div class="alt" style="height:62%"></div>
+        </div>
+        <div class="axis"><span>Jun</span><span>Nov</span></div>
+        <div class="card"><h3>Top client</h3><p id="report-top">Maria Chen · $2,430 viewed, not yet paid</p></div>
+        <div class="card"><h3 id="report-income">$1,640.00 in</h3><p id="report-expense">Expenses in this period</p></div>
+        <div class="card"><h3>Tax collected</h3><p id="report-tax">$0.00 this month</p></div>
+        <p class="note" id="report-export-note"></p>
+        <button class="textlink" onclick="show('taxes')">Prepare the tax packet</button>
+      </section>
+
+      <section class="screen no-tabs" id="taxes">
+        <button class="back" onclick="show('reports')">Back</button>
+        <h2 class="title">Tax packet</h2>
+        <p class="note">Adds up the tax inside payments and groups expenses by category. Give the file to your preparer. Simple Accountz does not submit the return.</p>
+        <div class="seg" id="tax-period">
+          <button data-period="month">This month</button>
+          <button data-period="last_month">Last month</button>
+          <button class="on" data-period="year">This year</button>
+        </div>
+        <div class="card"><h3 id="tax-collected">$0.00</h3><p id="tax-collected-note">Tax collected</p></div>
+        <div class="card"><h3 id="tax-income">$0.00 in</h3><p id="tax-expense">Expenses in this period</p></div>
+        <div class="section-label">Expenses by category</div>
+        <div id="tax-categories"></div>
+        <div class="card">
+          <h3>Before you file</h3>
+          <p>Use the tax collected figure for the payments in this period.</p>
+          <p>Read each category and leave out anything that is not deductible.</p>
+          <p>Export the packet and keep it with the return.</p>
+        </div>
+        <p class="note" id="tax-export-note"></p>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note" id="tax-range">This year</span>
+          <button class="pill" onclick="downloadBooks('tax')">Export tax packet</button>
+        </div>
+      </section>
+
+      <section class="screen" id="settings">
+        <div class="top"><h2 class="title">Settings</h2></div>
+        <div class="field live-only" style="margin-top:4px"><label>Business name</label><input id="biz-name" placeholder="Your business" onchange="setBusinessName(this.value)"></div>
+        <button class="set-row" onclick="openAccountSetup()"><span class="name">Account type</span><span class="sub" id="account-sub">Business</span></button>
+        <button class="set-row" id="auto-row" onclick="toggleAuto()"><span class="name">Assistant works automatically</span><span class="switch" id="auto-switch" style="grid-row:1 / span 2;grid-column:2"></span><span class="sub" id="auto-sub">On · matches deposits, files expenses, starts monthly drafts</span></button>
+        <button class="set-row" onclick="show('files')"><span class="name">Files</span><span class="sub">Scan an invoice or upload</span></button>
+        <button class="preview-only set-row biz-only" onclick="show('business-profile')"><span class="name">Business profile</span><span class="sub">Field &amp; Co. · tax ID on file</span></button>
+        <button class="set-row" id="platform-row" onclick="show('platform')" hidden><span class="name">Creator console</span><span class="sub" id="platform-sub">Spencer only</span></button>
+        <button class="set-row" onclick="show('region')"><span class="name">Country and currency</span><span class="sub" id="region-sub">United States · USD</span></button>
+        <button class="set-row" onclick="show('banks')"><span class="name">Banks and cards</span><span class="sub" id="banks-sub">Business checking and credit</span></button>
+        <button class="preview-only set-row biz-only" onclick="show('payments')"><span class="name">Get paid</span><span class="sub">Stripe connected · PayPal off</span></button>
+        <button class="preview-only set-row biz-only" onclick="show('paywall')"><span class="name">Plan</span><span class="sub">Plus · 10 invoices a month</span></button>
+        <button class="set-row biz-only" onclick="show('taxes')"><span class="name">Tax packet</span><span class="sub">Export for your preparer</span></button>
+        <button class="preview-only set-row biz-only" onclick="show('clients')"><span class="name">Clients</span><span class="sub">3 saved</span></button>
+        <button class="preview-only set-row biz-only"><span class="name">Templates</span><span class="sub">Ledger · 64 original layouts</span></button>
+        <button class="preview-only set-row biz-only"><span class="name">Team</span><span class="sub">Just you</span></button>
+        <button class="preview-only set-row" onclick="show('security')"><span class="name">Sign-in and recovery</span><span class="sub" id="security-sub">Two-factor off</span></button>
+        <button class="set-row live-only" onclick="eraseBooks()"><span class="name">Erase data on this device</span><span class="sub">Removes every invoice, expense, and file saved here</span></button>
+        <button class="set-row"><span class="name">Your language</span><span class="sub">English · does not change the customer invoice</span></button>
+        <button class="preview-only set-row"><span class="name">Support</span><span class="sub">Chat and email</span></button>
+      </section>
+
+      <section class="screen no-tabs" id="payments">
+        <button class="back" onclick="show('settings')">Back</button>
+        <h2 class="title">Payments</h2>
+        <div class="card"><h3>Stripe</h3><p>Connected. Cards, Apple Pay, Google Pay, bank debit. Customers pay you through Stripe. Simple Accountz does not hold that money.</p></div>
+        <div class="card"><h3>PayPal</h3><p>Not connected.</p></div>
+        <div class="toggle">QR on printed invoices <span class="switch"></span></div>
+        <div class="toggle">Pass card fee to customer <span class="switch off"></span></div>
+        <div class="section-label">Offered in this country</div>
+        <div class="methods" id="method-list"></div>
+        <p class="note" id="method-note">Only methods that work here are shown. Venmo stays hidden until PayPal certifies it.</p>
+        <p class="note">A card fee is not part of the invoice total.</p>
+        <button class="textlink">Open payouts</button>
+      </section>
+
+      <section class="screen no-tabs" id="paywall">
+        <button class="back" onclick="show('settings')">Back</button>
+        <h2 class="title">Plan</h2>
+        <div class="seg" id="billseg" style="margin:12px 0">
+          <button class="on" data-cadence="monthly">Monthly</button>
+          <button data-cadence="annual">Annual</button>
+        </div>
+        <div class="plans" id="plans">
+          <button class="plan" data-plan="essentials"><b>Essentials <em>$6.99</em></b><span class="note">3 invoices a month. Unlimited estimates. Payments and expenses.</span></button>
+          <button class="plan on" data-plan="plus"><b>Plus <em>$14.99</em></b><span class="note">10 invoices. Photos, your signature, reports, due reminders.</span></button>
+          <button class="plan" data-plan="premium"><b>Premium <em>$21.99</em></b><span class="note">Unlimited invoices. Client signatures, deposits, version restore.</span></button>
+        </div>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <div class="total"><small>Selected</small><span id="planlabel">Plus</span></div>
+          <button class="pill" onclick="show('settings')">Subscribe</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="clients">
+        <button class="back" onclick="show('settings')">Back</button>
+        <div class="top"><h2 class="title">Clients</h2><button class="pill small">Add client</button></div>
+        <button class="doc"><span class="name">Oak Street HOA</span><span class="amt" style="color:var(--overdue-fg)">$1,850</span><span class="sub">1 overdue invoice</span></button>
+        <button class="doc"><span class="name">Maria Chen</span><span class="amt">$2,430</span><span class="sub">Viewed · not paid</span></button>
+        <button class="doc"><span class="name">Harbor Rental</span><span class="amt">$0</span><span class="sub">Estimate signed</span></button>
+      </section>
+
+      <section class="screen no-tabs" id="account-setup">
+        <button class="back" onclick="show('settings')">Back</button>
+        <h2 class="title">Account</h2>
+        <p class="note">Make a personal account or a business account. The books stay separate, and you can switch later.</p>
+        <div class="plans" id="account-kinds">
+          <button class="plan" data-kind="personal"><b>Personal</b><span class="note">Spending, receipt photos, personal checking, and a personal card.</span></button>
+          <button class="plan on" data-kind="business"><b>Business</b><span class="note">Invoices, estimates, clients, tax, get paid, business checking, and business credit.</span></button>
+        </div>
+        <div class="card"><h3 id="account-blurb-title">Business</h3><p id="account-blurb">Invoices, estimates, clients, tax packet, get paid, business checking, and business credit.</p></div>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note" id="account-kind-label">Business</span>
+          <button class="pill" onclick="commitAccountKind()">Use this account</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="business-profile">
+        <button class="back" onclick="show('settings')">Back</button>
+        <h2 class="title">Business</h2>
+        <div class="card"><h3>Field &amp; Co.</h3><p>United States · USD</p><p>Tax ID on file · ••••4412</p></div>
+        <p class="note">A business account has the tools a business uses here. Personal spending stays on a personal account.</p>
+        <div id="business-feature-list"></div>
+        <button class="textlink" onclick="show('banks')">Link business checking or business credit</button>
+      </section>
+
+      <section class="screen no-tabs" id="link-bank">
+        <button class="back" onclick="show('banks')">Back</button>
+        <h2 class="title" id="link-bank-title">Business checking</h2>
+        <p class="note" id="link-bank-note">Simple Accountz opens your bank’s sign-in. The password stays with the bank. This links a business checking account.</p>
+        <div id="bank-choices"></div>
+      </section>
+
+      <section class="screen no-tabs" id="link-card">
+        <button class="back" onclick="show('banks')">Back</button>
+        <h2 class="title" id="link-card-title">Business credit</h2>
+        <p class="note" id="link-card-note">You sign in with the card issuer. Simple Accountz reads the balance and purchases. This links a business credit account.</p>
+        <div id="card-choices"></div>
+      </section>
+
+      <section class="screen no-tabs" id="link-done">
+        <div class="hero" style="margin-top:28px">
+          <div class="kicker">Linked</div>
+          <p class="amount" style="font-size:36px">Ready</p>
+          <p style="margin:0;color:var(--linen)">Transactions will sync. Nothing was moved.</p>
+        </div>
+        <button class="pill" onclick="show('banks')">Done</button>
+      </section>
+
+      <section class="screen no-tabs" id="banks">
+        <button class="back" onclick="show('money')">Back</button>
+        <div class="top"><h2 class="title">Accounts</h2></div>
+        <p class="note" id="banks-note">Link business checking and business credit. You sign in at the bank. Simple Accountz stores the connection, the balance, and transactions. It never stores your password, and it cannot move money out.</p>
+        <div id="banklist"></div>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note">Read only</span>
+          <button class="pill preview-only" onclick="openSheet('link')">Link account</button>
+          <p class="note live-only">Bank and card linking is coming soon. Add expenses with a receipt photo for now.</p>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="bank-detail">
+        <button class="back" onclick="show('banks')">Back</button>
+        <h2 class="title" id="bank-title">Harbor Checking</h2>
+        <div class="hero">
+          <div class="kicker" id="bank-kicker">Available</div>
+          <p class="amount" id="bank-amount">$6,420.00</p>
+          <p style="margin:0;color:var(--linen)" id="bank-mask">•••• 4412 · updated 8:10 AM</p>
+        </div>
+        <div class="section-label">Recent transactions</div>
+        <div id="bank-txns"></div>
+        <button class="textlink" onclick="ask('match')">Ask the assistant to match the deposit</button>
+      </section>
+
+      <section class="screen" id="platform">
+        <div class="top"><h2 class="title">Platform</h2></div>
+        <p class="note" id="platform-note">Creator view. Business owners never see this.</p>
+        <div class="hero">
+          <div class="kicker">Platform revenue</div>
+          <p class="amount" id="plat-rev-month">$0.00</p>
+          <p style="margin:0;color:var(--linen)">This month · plan subscriptions in USD</p>
+        </div>
+        <div class="card"><h3 id="plat-rev-year">$0.00 this year</h3><p id="plat-rev-plans">By plan, this month</p></div>
+        <p class="note">Subscriptions Simple Accountz collects. The open invoices below stay in each business’s currency.</p>
+        <div class="dash">
+          <button class="card" onclick="show('people')"><span class="note">Businesses</span><strong id="plat-businesses">3</strong><p>Every country</p></button>
+          <button class="card"><span class="note">Countries</span><strong>3</strong><p>US, BR, DE</p></button>
+          <button class="card"><span class="note">Open, by currency</span><strong id="plat-open">—</strong><p>Not one mixed total</p></button>
+          <button class="card" onclick="show('people')"><span class="note">Admins</span><strong id="plat-admins">1</strong><p>Creator included</p></button>
+        </div>
+        <div class="section-label">Businesses a normal user cannot list</div>
+        <div id="plat-list"></div>
+        <button class="textlink" onclick="show('people')">People and admin access</button>
+      </section>
+
+      <section class="screen no-tabs" id="people">
+        <button class="back" onclick="show('platform')">Back</button>
+        <h2 class="title">People</h2>
+        <p class="note">Only Spencer can make another account a platform admin. An admin cannot grant admin, and nobody can change Spencer.</p>
+        <div id="people-list"></div>
+        <div id="audit" class="audit" hidden></div>
+      </section>
+
+      <section class="screen no-tabs" id="region">
+        <button class="back" onclick="show('home')">Back</button>
+        <h2 class="title">Country</h2>
+        <p class="note">New documents use this currency. Invoices already sent keep the currency they were issued in. Stores and card payments are available only where Apple, Google, and the processor allow them.</p>
+        <button class="choice" onclick="setRegion('United States', 'USD', 'US')">United States<span>USD · Sales tax</span></button>
+        <button class="choice" onclick="setRegion('United Kingdom', 'GBP', 'GB')">United Kingdom<span>GBP · VAT</span></button>
+        <button class="choice" onclick="setRegion('Germany', 'EUR', 'DE')">Germany<span>EUR · VAT</span></button>
+        <button class="choice" onclick="setRegion('Australia', 'AUD', 'AU')">Australia<span>AUD · GST</span></button>
+        <button class="choice" onclick="setRegion('Japan', 'JPY', 'JP')">Japan<span>JPY · Consumption tax</span></button>
+        <button class="choice" onclick="setRegion('Brazil', 'BRL', 'BR')">Brazil<span>BRL · IVA</span></button>
+      </section>
+
+      <section class="screen no-tabs" id="security">
+        <button class="back" onclick="show('settings')">Back</button>
+        <h2 class="title">Sign-in</h2>
+        <p class="note">Turn on an authenticator app. If you are locked out, use the email on the account or the recovery QR you saved.</p>
+        <div class="card"><h3 id="twofactor-state">Two-factor is off</h3><p>Scan the QR with a verification app, then enter its code.</p></div>
+        <img class="qr" alt="Authenticator QR for Simple Accountz" src="authenticator-qr.svg">
+        <div class="field"><label>Code from the app</label><input id="auth-code" inputmode="numeric" placeholder="6-digit code"></div>
+        <p class="note">This preview accepts 482913 so you can finish setup without a live code. A real build checks the rotating code from the QR.</p>
+        <button class="pill" onclick="enableTwoFactor()">Turn on two-factor</button>
+        <button class="textlink" onclick="show('recovery-qr')">Save recovery QR</button>
+        <button class="textlink" onclick="show('locked')">Preview a lockout</button>
+      </section>
+
+      <section class="screen no-tabs" id="recovery-qr">
+        <button class="back" onclick="show('security')">Back</button>
+        <h2 class="title">Recovery QR</h2>
+        <p class="note">Save this somewhere that is not this phone. It is not the authenticator QR.</p>
+        <img class="qr" alt="Recovery QR for Simple Accountz" src="recovery-qr.svg">
+        <button class="pill" onclick="show('security')">Saved</button>
+      </section>
+
+      <section class="screen no-tabs" id="locked">
+        <button class="back" onclick="show('security')">Back</button>
+        <h2 class="title">Locked out</h2>
+        <p class="note">Get back in with the email on the account, or with the recovery QR you saved.</p>
+        <div class="field"><label>Account email</label><input id="recover-email" placeholder="field@example.com"></div>
+        <button class="pill" onclick="recoverByEmail()">Email me a way in</button>
+        <button class="textlink" onclick="show('recover-scan')">I have my recovery QR</button>
+        <p class="note" id="recover-msg"></p>
+      </section>
+
+      <section class="screen no-tabs" id="recover-scan">
+        <button class="back" onclick="show('locked')">Back</button>
+        <h2 class="title">Scan recovery QR</h2>
+        <p class="note">Point the camera at the recovery QR you saved. This preview uses the sample code from that image.</p>
+        <img class="qr" alt="Recovery QR to scan" src="recovery-qr.svg">
+        <button class="pill" onclick="recoverByQr()">I scanned my saved QR</button>
+        <p class="note" id="scan-msg"></p>
+      </section>
+
+      <section class="screen" id="assistant">
+        <div class="top"><h2 class="title">Assistant</h2></div>
+        <p class="note" id="assistant-note">It works on its own: it matches deposits, files expenses, and starts next month&rsquo;s drafts. Anything your customer would see waits for one lime tap. Turn it off in Settings.</p>
+        <div id="thread">
+          <div class="bubble ai" id="assistant-intro">Oak Street is overdue by $1,850. A $400 deposit in Harbor Checking is still unmatched. I can remind the client, match the deposit, or file the lumber receipt.</div>
+        </div>
+        <button class="suggest biz-only" onclick="ask('owed')">What’s outstanding?</button>
+        <button class="suggest biz-only preview-only" onclick="ask('remind')">Remind Oak Street</button>
+        <button class="suggest biz-only preview-only" onclick="ask('match')">Match the $400 deposit</button>
+        <button class="suggest preview-only" onclick="ask('sort')">File the lumber receipt</button>
+        <button class="suggest biz-only preview-only" onclick="ask('late')">Figure Oak Street’s late fee</button>
+        <button class="suggest biz-only preview-only" onclick="ask('recur','1042')">Repeat Oak Street monthly</button>
+        <button class="suggest biz-only preview-only" onclick="ask('recur','1041')">Repeat Maria monthly</button>
+        <button class="suggest biz-only preview-only" onclick="ask('deposit')">Request a 25% deposit</button>
+        <button class="suggest biz-only" onclick="ask('weekly')">Who owes you this week</button>
+        <div id="ai-action"></div>
+      </section>
+
+      <nav class="tabs" id="tabs">
+        <button class="tab on" data-screen="home">
+          <svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M7 10.5V20h10v-9.5"/></svg>
+          Home
+        </button>
+        <button class="tab" data-screen="documents">
+          <svg viewBox="0 0 24 24"><path d="M7 3.5h7l5 5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V9h5"/></svg>
+          Documents
+        </button>
+        <button class="tab" data-screen="money">
+          <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>
+          Money
+        </button>
+        <button class="tab" data-screen="assistant">
+          <svg viewBox="0 0 24 24"><path d="M12 3.5a6.5 6.5 0 0 1 4 11.6V18a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 18v-2.9A6.5 6.5 0 0 1 12 3.5z"/><path d="M10 21.5h4"/></svg>
+          Assistant
+        </button>
+        <button class="tab" data-screen="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.8 6.8l1.6 1.6M17.6 15.6l1.6 1.6M3.5 12h2.2M18.3 12H20.5M4.8 17.2l1.6-1.6M17.6 8.4l1.6-1.6"/></svg>
+          Settings
+        </button>
+      </nav>
+
+      <button class="cam-fab" id="cam-fab" aria-label="Camera: scan an invoice or photograph a receipt" onclick="openSheet('camera')">
+        <svg viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.5-2h5.6l1.5 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      </button>
+
+      <div class="overlay" id="overlay">
+        <div class="sheet" id="sheet-camera" style="display:none">
+          <div class="grab"></div>
+          <h2 class="title" style="margin-bottom:12px">Camera</h2>
+          <button class="choice" onclick="closeSheet(); beginInvoiceScan()">Scan an invoice<span>Photograph a paper invoice. It stays a draft until you send it.</span></button>
+          <button class="choice" onclick="closeSheet(); beginReceipt()">Photo of a receipt<span>Take a picture of a paper receipt. It is filed when you save the expense.</span></button>
+          <button class="textlink" onclick="closeSheet()">Cancel</button>
+        </div>
+        <div class="sheet" id="sheet-new">
+          <div class="grab"></div>
+          <h2 class="title" style="margin-bottom:12px">New document</h2>
+          <button class="choice preview-only" onclick="closeSheet(); show('editor-estimate')">Estimate<span>Quote a job. Unlimited on every plan.</span></button>
+          <button class="choice" onclick="closeSheet(); openInvoiceEditor()">Invoice<span>Starts a draft. Send stays off until it is complete.</span></button>
+          <button class="choice preview-only" onclick="closeSheet(); show('editor-draft')">Receipt<span>Record a payment you already took. This does not mark an old invoice paid.</span></button>
+          <button class="choice" onclick="closeSheet(); beginInvoiceScan()">Scan invoice<span>Photograph a paper invoice. It stays a draft until you send it.</span></button>
+          <button class="choice" onclick="closeSheet(); show('files')">Upload a file<span>PDF, image, CSV, or text. It stays on this device.</span></button>
+          <button class="textlink" onclick="closeSheet()">Cancel</button>
+        </div>
+        <div class="sheet" id="sheet-link" style="display:none">
+          <div class="grab"></div>
+          <h2 class="title" style="margin-bottom:12px">Link an account</h2>
+          <button class="choice" id="link-bank-choice" onclick="closeSheet(); show('link-bank')">Business checking<span id="link-bank-detail">Sign in at the bank. Read only.</span></button>
+          <button class="choice" id="link-card-choice" onclick="closeSheet(); show('link-card')">Business credit<span id="link-card-detail">Sign in at the card issuer. Read only.</span></button>
+          <button class="textlink" onclick="closeSheet()">Cancel</button>
+        </div>
+        <div class="sheet" id="sheet-send" style="display:none">
+          <div class="grab"></div>
+          <h2 class="title" style="margin-bottom:8px">Send invoice</h2>
+          <p class="note" id="send-summary">INV-1042 · Oak Street HOA · oak@example.com</p>
+          <p class="warn" id="send-warn" hidden></p>
+          <div class="toggle">Email <span class="switch"></span></div>
+          <div class="toggle">Copy link <span class="switch"></span></div>
+          <div class="toggle">Share sheet <span class="switch off"></span></div>
+          <div class="toggle">Print <span class="switch off"></span></div>
+          <button class="textlink">Download PDF</button>
+          <button class="pill" style="width:100%; margin-top:8px" onclick="confirmSend()">Send now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="app-state.js"></script>
+<script>
+  const tabScreens = new Set(["home", "documents", "money", "assistant", "settings", "platform"]);
+  let docs = [
+    { id: "1042", type: "invoice", name: "Oak Street HOA", number: "INV-1042", subtitle: "Deck staining", stored: "viewed", display: "Overdue", chip: "overdue", balanceMinor: 185000, totalMinor: 185000, paidMinor: 0, taxBps: 0, currency: "USD", closed: false, due: "2026-11-12", sentOn: "2026-11-05", go: "editor", lines: [
+      { name: "Deck staining", qtyBps: 10000, rateMinor: 145000 },
+      { name: "Sealer and materials", qtyBps: 10000, rateMinor: 40000 }
+    ] },
+    { id: "1041", type: "invoice", name: "Maria Chen", number: "INV-1041", subtitle: "Interior paint", stored: "viewed", display: "Viewed", chip: "viewed", balanceMinor: 243000, totalMinor: 243000, paidMinor: 0, taxBps: 0, currency: "USD", closed: false, due: "2026-11-28", sentOn: "2026-11-24", go: "editor-viewed", lines: [
+      { name: "Interior paint, two rooms", qtyBps: 10000, rateMinor: 243000 }
+    ] },
+    { id: "088", type: "estimate", name: "Harbor Rental", number: "EST-088", subtitle: "Equipment week", stored: "signed", display: "Signed", chip: "signed", balanceMinor: 90000, totalMinor: 90000, paidMinor: 0, taxBps: 0, currency: "USD", closed: false, go: "editor-estimate", lines: [
+      { name: "Equipment, one week", qtyBps: 10000, rateMinor: 90000 }
+    ] },
+    { id: "draft", type: "invoice", name: "No client yet", number: "Draft", subtitle: "not sent", stored: "draft", display: "Draft", chip: "draft", balanceMinor: 0, currency: "USD", closed: false, go: "editor-draft" },
+    { id: "220", type: "receipt", name: "Oak Street HOA", number: "RCT-220", subtitle: "Deposit", stored: "paid", display: "Paid", chip: "paid", balanceMinor: 0, amountMinor: 40000, currency: "USD", closed: false, go: "paid" }
+  ];
+  let users = [
+    { id: "spencer", name: "Spencer", role: "creator" },
+    { id: "avery", name: "Avery Cole", role: "member" },
+    { id: "jordan", name: "Jordan Hale", role: "member" }
+  ];
+  const businesses = [
+    { id: "field", ownerId: "field-owner", name: "Field & Co.", country: "US", currency: "USD", openMinor: 428000 },
+    { id: "norte", ownerId: "norte-owner", name: "Studio Norte", country: "BR", currency: "BRL", openMinor: 120000 },
+    { id: "klein", ownerId: "klein-owner", name: "Klein GmbH", country: "DE", currency: "EUR", openMinor: 64000 }
+  ];
+  let accountKind = "business";
+  let pendingKind = "business";
+  let businessTransactions = SA.SAMPLE_TRANSACTIONS.map((tx) => Object.assign({}, tx));
+  let personalTransactions = SA.PERSONAL_TRANSACTIONS.map((tx) => Object.assign({}, tx));
+  let transactions = businessTransactions;
+  let moneyPeriod = "month";
+  let receiptStream = null;
+  let receiptCameraToken = 0;
+  let receiptPhoto = null;
+  let editingExpenseId = null;
+  let invoiceScan = null;
+  let editingScanId = null;
+  let uploads = [];
+  let reportPeriod = "month";
+  let taxPeriod = "year";
+  let assistantStarted = false;
+  let sendDocId = "1042";
+  let weeklyNote = null;
+  let businessLinks = [
+    { id: "chk", name: "Harbor Checking", kind: "Checking", holder: "business", mask: "4412", balanceMinor: 642000, currency: "USD" },
+    { id: "card", name: "City Card", kind: "Credit", holder: "business", mask: "1884", balanceMinor: 86000, currency: "USD" }
+  ];
+  let personalLinks = [
+    { id: "pchk", name: "Everyday Checking", kind: "Checking", holder: "personal", mask: "2290", balanceMinor: 184000, currency: "USD" },
+    { id: "pcard", name: "Everyday Card", kind: "Credit", holder: "personal", mask: "5518", balanceMinor: 24000, currency: "USD" }
+  ];
+  let links = businessLinks;
+  const institutions = {
+    business: {
+      Checking: [
+        { name: "Harbor Credit Union", detail: "Business checking" },
+        { name: "First National", detail: "Business checking" }
+      ],
+      Credit: [
+        { name: "City Card", detail: "Business credit" },
+        { name: "Harbor Visa", detail: "Business credit" }
+      ]
+    },
+    personal: {
+      Checking: [
+        { name: "Northline Savings", detail: "Personal checking" },
+        { name: "Everyday Credit Union", detail: "Personal checking" }
+      ],
+      Credit: [
+        { name: "Everyday Card", detail: "Personal credit" },
+        { name: "Northline Visa", detail: "Personal credit" }
+      ]
+    }
+  };
+  let actor = { id: "field-owner", name: "Field & Co.", role: "owner" };
+  let docType = "all";
+  let regionName = "United States";
+  let businessCurrency = "USD";
+  let countryCode = "US";
+  let customerLang = "en";
+  let customerCountry = "US";
+  let online = true;
+  let outbox = [];
+  let draftSeq = 0;
+  let pullTimer = null;
+  let twoFactorOn = false;
+  const account = { email: "field@example.com", recoveryToken: SA.RECOVERY_TOKEN };
+  const methodLabels = {
+    card: "Card",
+    apple_pay: "Apple Pay",
+    google_pay: "Google Pay",
+    ach: "US bank debit",
+    sepa: "SEPA debit",
+    pix: "Pix",
+    becs: "BECS debit"
+  };
+  let audit = "";
+  const actors = {
+    owner: { id: "field-owner", name: "Field & Co.", role: "owner" },
+    creator: { id: "spencer", name: "Spencer", role: "creator" },
+    admin: { id: "avery", name: "Avery Cole", role: "platform_admin" }
+  };
+  let statusFilter = "all";
+
+  function show(id) {
+    if (id === "home" && canSeePlatform()) id = "platform";
+    if (id === "platform" && !canSeePlatform()) return;
+    const next = document.getElementById(id);
+    if (!next || !next.classList.contains("screen")) return;
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
+    next.classList.add("on");
+    const tabs = document.getElementById("tabs");
+    tabs.classList.toggle("hide", !tabScreens.has(id));
+    document.querySelectorAll(".tab").forEach(t => {
+      const homeAlias = id === "platform" && t.dataset.screen === "home";
+      t.classList.toggle("on", t.dataset.screen === id || homeAlias);
+    });
+    closeSheet();
+    if (id !== "receipt-scan" && id !== "invoice-scan") closeReceiptCamera();
+    next.scrollTop = 0;
+    const scroller = next.querySelector(".scroller");
+    if (scroller) scroller.scrollTop = 0;
+  }
+
+  function canSeePlatform() {
+    return actor.role === "creator" || actor.role === "platform_admin";
+  }
+
+  function openSheet(name) {
+    document.getElementById("overlay").classList.add("on");
+    document.getElementById("sheet-new").style.display = name === "new" ? "block" : "none";
+    document.getElementById("sheet-send").style.display = name === "send" ? "block" : "none";
+    document.getElementById("sheet-link").style.display = name === "link" ? "block" : "none";
+    document.getElementById("sheet-camera").style.display = name === "camera" ? "block" : "none";
+  }
+
+  function openSend(id) {
+    sendDocId = id || "1042";
+    const doc = docs.find(item => item.id === sendDocId);
+    const summary = document.getElementById("send-summary");
+    const warn = document.getElementById("send-warn");
+    if (summary && doc) summary.textContent = (doc.number || "Draft") + " · " + doc.name;
+    if (warn && doc) {
+      const duplicate = SA.duplicateWarning(docs, doc, SA.LEDGER_TODAY);
+      warn.hidden = !duplicate.warning;
+      warn.textContent = duplicate.warning ? "Same client and amount already went out this week. Sending makes a second copy." : "";
+    }
+    openSheet("send");
+  }
+
+  function confirmSend() {
+    const doc = docs.find(item => item.id === sendDocId);
+    closeSheet();
+    if (sendDocId === "1042") {
+      show("public");
+      return;
+    }
+    const who = doc ? doc.name : "This document";
+    showPull(who + " stays on your list. This preview’s customer page is Oak Street’s invoice.");
+    show("documents");
+  }
+
+  const replies = {
+    owed: {
+      user: "What’s outstanding?",
+      ai: "Two invoices are still open. Oak Street HOA owes $1,850 and is overdue. Maria Chen owes $2,430 and has viewed the invoice. Together that is $4,280.",
+      label: ""
+    },
+    remind: {
+      user: "Remind Oak Street",
+      ai: "I wrote this reminder. It does not send until you confirm. “INV-1042 for $1,850 was due Nov 12. You can pay from the link on the invoice.”",
+      label: "Send reminder"
+    },
+    match: {
+      user: "Match the $400 deposit",
+      ai: "Harbor Checking received $400 from Oak Street HOA on Nov 21. That matches the deposit receipt RCT-220. Confirm and I’ll attach the deposit to INV-1042. Balance left would be $1,450.",
+      label: "Match deposit"
+    },
+    sort: {
+      user: "File the lumber receipt",
+      ai: "The $186.40 Harbor Lumber purchase on the City Card is already an expense. I’ll set the category to Materials and attach it to the Oak Street job.",
+      label: "File receipt"
+    },
+    late: { user: "Figure the late fee", ai: "", label: "Add late fee" },
+    recur: { user: "Repeat this invoice monthly", ai: "", label: "Create monthly draft" },
+    deposit: { user: "Request a 25% deposit", ai: "", label: "Put 25% due now" },
+    weekly: { user: "Who owes you this week?", ai: "", label: "Send weekly note" }
+  };
+
+  function ask(key, invoiceId) {
+    const spec = SA.replyFor(key);
+    if (!spec || !replies[key]) return;
+    const targetId = invoiceId || "1042";
+    const invoice = docs.find(doc => doc.id === targetId) || docs.find(doc => doc.id === "1042");
+    if (!invoice && key !== "owed" && key !== "weekly") return;
+    const item = Object.assign({}, replies[key]);
+    const owed = invoice ? SA.formatMoney(SA.balanceOf(invoice), invoice.currency) : "";
+    if (key === "owed") {
+      item.ai = "Open invoices total " + SA.formatOutstanding(docs) + ". Drafts, estimates, and receipts are not included.";
+    }
+    if (key === "remind") {
+      if (SA.balanceOf(invoice) <= 0) {
+        item.ai = (invoice.number || invoice.name) + " is paid. There is nothing to remind.";
+        item.label = "";
+      } else {
+        item.ai = "I wrote this reminder. It does not send until you confirm. “" + (invoice.number || "Your invoice") + " for " + owed + " was due " + shortDate(invoice.due) + ". You can pay from the link on the invoice.”";
+      }
+    }
+    if (key === "match") {
+      const deposit = transactions.find(tx => tx.id === "in-nov21");
+      const suggestion = SA.suggestDepositMatch(docs, transactions, deposit);
+      if (!suggestion) {
+        item.ai = "That $400 deposit is already matched, or no single open invoice can take it.";
+        item.label = "";
+      } else {
+        item.ai = "Harbor Checking received " + SA.formatMoney(suggestion.amountMinor, invoice.currency) + " from Oak Street HOA on Nov 21. Confirm and I’ll attach it to INV-1042. Balance left would be " + SA.formatMoney(suggestion.balanceAfterMinor, invoice.currency) + ".";
+        item.label = spec.label;
+      }
+    }
+    if (key === "late") {
+      const quote = SA.lateFeeQuote(invoice, SA.LEDGER_TODAY);
+      if (!quote.ok || quote.feeMinor <= 0) {
+        item.ai = quote.error === "already_applied"
+          ? "The late fee is already on this invoice."
+          : "No late fee is due. The due date has not passed.";
+        item.label = "";
+      } else {
+        item.ai = invoice.name + " is " + quote.days + " days past due. At 1.5% per 30 days, the fee is " + SA.formatMoney(quote.feeMinor, invoice.currency) + ". It is not added until you confirm.";
+        item.label = spec.label;
+      }
+    }
+    if (key === "recur") {
+      const recur = SA.recurInvoice(invoice, SA.LEDGER_TODAY, docs);
+      if (!recur.ok) {
+        item.ai = recur.error === "already_drafted"
+          ? "Next month’s draft for " + invoice.name + " is already made, due " + shortDate(recur.doc.due) + ". I’ll keep starting one each month."
+          : "That document cannot be repeated.";
+        item.label = "";
+      } else {
+        const warn = SA.duplicateWarning(docs, recur.doc, SA.LEDGER_TODAY);
+        item.user = "Repeat " + invoice.name + " monthly";
+        item.ai = "I’ll copy the lines onto a new draft due " + shortDate(recur.doc.due) + ". The total is recalculated at " + SA.formatMoney(recur.doc.totalMinor, invoice.currency) + ". It is not sent.";
+        if (warn.warning) item.ai += "\n\nWarning: the same client and amount already went out this week.";
+        item.label = spec.label;
+      }
+    }
+    if (key === "deposit") {
+      const split = SA.depositRequest(invoice, 25);
+      if (!split.ok) {
+        const why = {
+          estimates_cannot_take_a_deposit: "Estimates cannot take a deposit.",
+          nothing_due: "This invoice is paid, so there is nothing to split.",
+          deposit_or_installments: "This invoice already uses installments."
+        };
+        item.ai = why[split.error] || "This invoice cannot take a deposit.";
+        item.label = "";
+      } else if (invoice.depositPercent === 25) {
+        item.ai = "This invoice already asks for 25% now.";
+        item.label = "";
+      } else {
+        item.ai = "25% of " + SA.formatMoney(split.totalMinor, invoice.currency) + " is due now: " + SA.formatMoney(split.dueNowMinor, invoice.currency) + ". The rest, " + SA.formatMoney(split.dueLaterMinor, invoice.currency) + ", stays on the same invoice. Nothing changes until you confirm.";
+        item.label = spec.label;
+      }
+    }
+    if (key === "weekly") {
+      const note = SA.weeklyOwedNote(docs, customerLang, SA.LEDGER_TODAY);
+      const view = SA.customerInvoiceView(customerLang, customerCountry);
+      item.ai = "Your screens stay in English. The customer note is in " + view.languageName + ". It is not sent until you confirm.\n\n" + note.title + "\n" + note.body;
+      item.label = weeklyNote && weeklyNote.sent ? "" : spec.label;
+    }
+    assistantStarted = true;
+    show("assistant");
+    const thread = document.getElementById("thread");
+    thread.innerHTML = "";
+    const user = document.createElement("div");
+    user.className = "bubble user";
+    user.textContent = item.user;
+    const ai = document.createElement("div");
+    ai.className = "bubble ai";
+    ai.textContent = item.ai;
+    thread.appendChild(user);
+    thread.appendChild(ai);
+    const slot = document.getElementById("ai-action");
+    slot.innerHTML = "";
+    if (!item.label) return;
+    const button = document.createElement("button");
+    button.className = "pill";
+    button.style.width = "100%";
+    button.style.marginTop = "8px";
+    button.textContent = item.label;
+    button.onclick = () => finishAi(key, targetId);
+    slot.appendChild(button);
+  }
+
+  function finishAi(key, invoiceId) {
+    document.getElementById("ai-action").innerHTML = "";
+    const targetId = invoiceId || "1042";
+    let message = "Done.";
+    if (key === "remind") {
+      const target = docs.find(doc => doc.id === targetId);
+      message = "Reminder sent to " + (target ? target.name : "the client") + ". The invoice is still unpaid.";
+      if (LIVE && target) {
+        shareLive("Reminder: invoice " + (target.number || ""), SA.reminderText(target, bizName()), target.email);
+        message = "Your reminder to " + target.name + " is open in your mail or share sheet. Send it from there.";
+      }
+      markHandled("remind", targetId);
+    }
+    if (key === "match") {
+      const deposit = transactions.find(tx => tx.id === "in-nov21");
+      const suggestion = SA.suggestDepositMatch(docs, transactions, deposit);
+      if (!suggestion) {
+        message = "That deposit is already matched.";
+      } else {
+        const before = docs.find(doc => doc.id === suggestion.invoiceId);
+        const calc = SA.calculateDocument(before);
+        docs = SA.applyDepositMatch(docs, suggestion.invoiceId, suggestion.amountMinor, SA.LEDGER_TODAY);
+        transactions = SA.linkDeposit(transactions, deposit.id, suggestion.invoiceId, calc);
+        const invoice = docs.find(doc => doc.id === suggestion.invoiceId);
+        message = "Deposit matched. " + (invoice.number || invoice.name) + " balance is now " + SA.formatMoney(SA.balanceOf(invoice), invoice.currency) + ". The bank row was not added again.";
+        renderAll();
+      }
+    }
+    if (key === "sort") {
+      const filed = SA.addExpense(transactions, {
+        date: "2026-11-18",
+        name: "Harbor Lumber",
+        amountMinor: 18640,
+        currency: "USD",
+        accountId: "card",
+        category: "Materials"
+      }, businessCurrency);
+      transactions = filed.transactions;
+      message = filed.added
+        ? "Harbor Lumber is filed under Materials on the Oak Street job."
+        : "Harbor Lumber is already in the expenses, so it was not added again.";
+      renderAll();
+    }
+    if (key === "late") {
+      const result = SA.applyLateFee(docs, targetId, SA.LEDGER_TODAY);
+      docs = result.docs;
+      const invoice = docs.find(doc => doc.id === targetId);
+      message = result.applied
+        ? "Late fee of " + SA.formatMoney(result.feeMinor, invoice.currency) + " added. The balance was recalculated."
+        : "No late fee was added.";
+      markHandled("late", targetId);
+      renderAll();
+    }
+    if (key === "recur") {
+      const source = docs.find(doc => doc.id === targetId);
+      const recur = source ? SA.recurInvoice(source, SA.LEDGER_TODAY, docs) : { ok: false };
+      if (!recur.ok) {
+        message = recur.error === "already_drafted"
+          ? "Next month’s draft is already made. Nothing was added."
+          : "That document cannot be repeated.";
+      } else {
+        const warn = SA.duplicateWarning(docs, recur.doc, SA.LEDGER_TODAY);
+        docs = docs.map(doc => doc.id === source.id ? Object.assign({}, doc, { repeatMonthly: true }) : doc).concat([recur.doc]);
+        message = "Monthly draft created for " + shortDate(recur.doc.due) + ". Total " + SA.formatMoney(recur.doc.totalMinor, source.currency) + ". It was not sent. From now on I’ll start next month’s draft automatically.";
+        if (warn.warning) message += " Same client and amount already went out this week.";
+        renderAll();
+      }
+    }
+    if (key === "deposit") {
+      const result = SA.applyDepositRequest(docs, targetId, 25);
+      docs = result.docs;
+      const invoice = docs.find(doc => doc.id === targetId);
+      message = result.applied
+        ? "25% is due now: " + SA.formatMoney(invoice.dueNowMinor, invoice.currency) + ". The rest stays on this invoice."
+        : "The deposit was not added.";
+      renderAll();
+    }
+    if (key === "weekly") {
+      weeklyNote = SA.confirmWeeklyNote(SA.weeklyOwedNote(docs, customerLang, SA.LEDGER_TODAY));
+      const view = SA.customerInvoiceView(customerLang, customerCountry);
+      message = weeklyNote.ok
+        ? "Weekly note sent in " + view.languageName + ".\n" + weeklyNote.body
+        : "The weekly note was not sent.";
+      if (LIVE && weeklyNote.ok) {
+        shareLive(weeklyNote.title, weeklyNote.body, "");
+        message = "The weekly note is open in your mail or share sheet.\n" + weeklyNote.body;
+      }
+    }
+    const note = document.createElement("div");
+    note.className = "bubble ai";
+    note.textContent = message;
+    document.getElementById("thread").appendChild(note);
+    renderAll();
+  }
+
+  // ---- Automatic assistant ----
+  let autoMode = true;
+  let autoDone = [];
+  let autoWaiting = [];
+  let autoUndo = null;
+  let autoSkip = [];
+  let autoHandled = [];
+
+  function markHandled(key, invoiceId) {
+    const tag = key + ":" + (invoiceId || "");
+    if (autoHandled.indexOf(tag) === -1) autoHandled.push(tag);
+  }
+
+  function runAutopilot() {
+    // Undo only covers the assistant's own last pass. Once you change the books
+    // yourself, it would also wipe your change, so it goes away.
+    if (autoUndo && (docs !== autoUndo.afterDocs || transactions !== autoUndo.afterTx)) autoUndo = null;
+    if (!autoMode) { autoWaiting = []; return; }
+    const result = SA.autopilot(docs, transactions, SA.LEDGER_TODAY, {
+      kind: accountKind,
+      weeklySent: !!(weeklyNote && weeklyNote.sent),
+      handled: autoHandled,
+      skip: autoSkip
+    });
+    if (result.done.length) {
+      autoUndo = { docs, transactions, items: result.done, afterDocs: result.docs, afterTx: result.transactions };
+      docs = result.docs;
+      transactions = result.transactions;
+      autoDone = result.done.concat(autoDone).slice(0, 12);
+    }
+    autoWaiting = result.waiting;
+  }
+
+  function undoAutopilot() {
+    if (!autoUndo) return;
+    autoUndo.items.forEach((item) => {
+      const tag = item.key === "recur" ? "recur:" + item.invoiceId : item.key + ":" + item.txId;
+      if (autoSkip.indexOf(tag) === -1) autoSkip.push(tag);
+    });
+    docs = autoUndo.docs;
+    transactions = autoUndo.transactions;
+    autoDone = autoDone.filter((item) => autoUndo.items.indexOf(item) === -1);
+    autoUndo = null;
+    renderAll();
+    showPull("Undone. The assistant will leave those alone.");
+  }
+
+  function toggleAuto() {
+    autoMode = !autoMode;
+    renderAll();
+  }
+
+  function approveAuto(key, invoiceId) {
+    show("assistant");
+    document.getElementById("thread").innerHTML = "";
+    finishAi(key, invoiceId);
+  }
+
+  function renderAuto() {
+    const panel = document.getElementById("auto-panel");
+    const sub = document.getElementById("auto-sub");
+    const sw = document.getElementById("auto-switch");
+    if (sub) sub.textContent = autoMode
+      ? "On · matches deposits, files expenses, starts monthly drafts"
+      : "Off · it waits for you to ask";
+    if (sw) sw.classList.toggle("off", !autoMode);
+    const intro = document.getElementById("assistant-intro");
+    if (intro) {
+      const did = autoDone.length ? "I already did " + autoDone.length + (autoDone.length === 1 ? " thing" : " things") + " for you. " : "";
+      const wait = autoWaiting.length ? autoWaiting.length + " more " + (autoWaiting.length === 1 ? "is" : "are") + " ready for your OK on Home." : "Nothing is waiting on you.";
+      intro.textContent = autoMode ? did + wait : "Automatic mode is off. Ask me below, or turn it on in Settings.";
+    }
+    if (!panel) return;
+    panel.innerHTML = "";
+    panel.hidden = !autoMode || (!autoDone.length && !autoWaiting.length);
+    if (panel.hidden) return;
+    const head = document.createElement("div");
+    head.className = "auto-head";
+    head.textContent = "Assistant";
+    panel.appendChild(head);
+    if (autoDone.length) {
+      const label = document.createElement("div");
+      label.className = "auto-label";
+      label.textContent = "Done for you";
+      panel.appendChild(label);
+      autoDone.slice(0, 4).forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "auto-row done";
+        row.textContent = item.text;
+        panel.appendChild(row);
+      });
+      if (autoUndo) {
+        const undo = document.createElement("button");
+        undo.className = "textlink";
+        undo.textContent = "Undo";
+        undo.onclick = undoAutopilot;
+        panel.appendChild(undo);
+      }
+    }
+    if (autoWaiting.length) {
+      const label = document.createElement("div");
+      label.className = "auto-label";
+      label.textContent = "Ready for your OK";
+      panel.appendChild(label);
+      const labels = { remind: "Send reminder", late: "Add late fee", weekly: "Send weekly note" };
+      autoWaiting.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "auto-row wait";
+        const text = document.createElement("span");
+        text.textContent = item.text;
+        const go = document.createElement("button");
+        go.className = "pill small";
+        go.textContent = labels[item.key] || "Approve";
+        go.onclick = () => approveAuto(item.key, item.invoiceId);
+        row.appendChild(text);
+        row.appendChild(go);
+        panel.appendChild(row);
+      });
+    }
+  }
+
+  function docButton(doc) {
+    const button = document.createElement("button");
+    button.className = "doc";
+    button.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span><span class="chip"></span>';
+    button.querySelector(".name").textContent = doc.name;
+    const shown = doc.type === "invoice" ? SA.balanceOf(doc) : (doc.amountMinor != null ? doc.amountMinor : doc.balanceMinor);
+    button.querySelector(".amt").textContent = SA.formatMoney(shown, doc.currency);
+    button.querySelector(".sub").textContent = [doc.number, doc.subtitle].filter(Boolean).join(" · ");
+    const chip = button.querySelector(".chip");
+    chip.className = "chip " + doc.chip;
+    chip.textContent = doc.display;
+    button.onclick = () => {
+      if (String(doc.id).indexOf("recur-") === 0) {
+        showPull(doc.name + " monthly draft is " + SA.formatMoney(SA.balanceOf(doc), doc.currency) + ". It has not been sent.");
+        show("documents");
+        return;
+      }
+      if (doc.scan) {
+        openSavedScan(doc);
+        return;
+      }
+      if (doc.go === "doc-view") {
+        openDoc(doc.id);
+        return;
+      }
+      show(doc.go);
+    };
+    return button;
+  }
+
+  function renderDocs() {
+    const query = document.getElementById("docsearch").value;
+    let rows = SA.filterDocuments(docs, docType, query);
+    if (statusFilter === "overdue") rows = rows.filter(doc => doc.display === "Overdue" && SA.isOpenInvoice(doc));
+    if (statusFilter === "draft") rows = rows.filter(doc => doc.stored === "draft");
+    if (statusFilter === "open") rows = rows.filter(doc => SA.isOpenInvoice(doc));
+    const doclist = document.getElementById("doclist");
+    doclist.innerHTML = "";
+    rows.forEach(doc => doclist.appendChild(docButton(doc)));
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = "No documents match.";
+      doclist.appendChild(empty);
+    }
+  }
+
+  function showFiltered(kind) {
+    statusFilter = kind;
+    docType = "invoice";
+    document.querySelectorAll("#docseg button").forEach(button => {
+      button.classList.toggle("on", button.dataset.filter === "invoice");
+    });
+    show("documents");
+    renderDocs();
+  }
+
+  function renderRecent() {
+    const recent = document.getElementById("recent");
+    recent.innerHTML = "";
+    docs.slice(0, 4).forEach(doc => recent.appendChild(docButton(doc)));
+  }
+
+  function renderHome() {
+    applyDraftMath();
+    const month = SA.periodTotals(transactions, "month", SA.LEDGER_TODAY, businessCurrency);
+    document.getElementById("outstanding").textContent = SA.formatOutstanding(docs);
+    document.getElementById("received").textContent = SA.formatMoney(month.inMinor, businessCurrency);
+    const overdue = docs.filter(doc => doc.display === "Overdue" && SA.isOpenInvoice(doc)).length;
+    const drafts = docs.filter(doc => doc.stored === "draft").length;
+    document.getElementById("overdue-count").textContent = String(overdue);
+    document.getElementById("draft-count").textContent = String(drafts);
+    document.getElementById("card-overdue").textContent = String(overdue);
+    document.getElementById("card-drafts").textContent = String(drafts);
+    document.getElementById("card-out").textContent = SA.formatMoney(month.outMinor, businessCurrency);
+    document.getElementById("card-linked").textContent = String(links.length);
+    const personalSpent = document.getElementById("personal-spent");
+    const personalLinked = document.getElementById("personal-linked");
+    if (personalSpent) personalSpent.textContent = SA.formatMoney(month.outMinor, businessCurrency);
+    if (personalLinked) personalLinked.textContent = String(links.length);
+    document.getElementById("biz-label").textContent = accountKind === "business"
+      ? (LIVE ? bizName() : "Field & Co.") + " · " + regionName
+      : "Personal · " + regionName;
+    document.getElementById("region-sub").textContent = regionName + " · " + businessCurrency;
+    const invoice = docs.find(doc => doc.id === "1042");
+    const balance = document.getElementById("editor-balance");
+    if (balance && invoice) balance.textContent = SA.formatMoney(SA.balanceOf(invoice), invoice.currency);
+    renderRecent();
+    renderMoney();
+    renderInvoiceFigures();
+    renderAssistantIntro();
+  }
+
+  function renderBanks() {
+    const list = document.getElementById("banklist");
+    list.innerHTML = "";
+    links.forEach(link => {
+      const button = document.createElement("button");
+      button.className = "doc";
+      button.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+      button.querySelector(".name").textContent = link.name;
+      button.querySelector(".amt").textContent = SA.formatMoney(link.balanceMinor, link.currency);
+      const holderName = link.holder === "business" ? "Business" : link.holder === "personal" ? "Personal" : "";
+      button.querySelector(".sub").textContent = (holderName ? holderName + " " : "") + link.kind.toLowerCase() + " · •••• " + link.mask;
+      button.onclick = () => openBank(link.id);
+      list.appendChild(button);
+    });
+  }
+
+  function openBank(id) {
+    const link = links.find(item => item.id === id);
+    if (!link) return;
+    document.getElementById("bank-title").textContent = link.name;
+    document.getElementById("bank-kicker").textContent = link.kind === "Credit" ? "Balance owed" : "Available";
+    document.getElementById("bank-amount").textContent = SA.formatMoney(link.balanceMinor, link.currency);
+    document.getElementById("bank-mask").textContent = "•••• " + link.mask + " · updated today";
+    const txns = document.getElementById("bank-txns");
+    txns.innerHTML = "";
+    const rows = transactions
+      .filter(tx => tx.accountId === link.id)
+      .slice()
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "doc";
+      empty.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+      empty.querySelector(".name").textContent = "No transactions yet";
+      empty.querySelector(".sub").textContent = "Waiting for the first sync";
+      txns.appendChild(empty);
+    }
+    rows.forEach(tx => {
+      const line = document.createElement("div");
+      line.className = "doc";
+      line.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+      line.querySelector(".name").textContent = tx.name;
+      const sign = tx.kind === "out" || tx.kind === "refund" ? "−" : "+";
+      line.querySelector(".amt").textContent = sign + SA.formatMoney(tx.amountMinor, tx.currency);
+      const detail = tx.kind === "out" ? (tx.category || "Expense") : (tx.invoiceId ? "Matched deposit" : "Deposit");
+      line.querySelector(".sub").textContent = shortDate(tx.date) + " · " + detail;
+      txns.appendChild(line);
+    });
+    if (link.id === "chk") {
+      const askLink = document.createElement("button");
+      askLink.className = "textlink";
+      askLink.textContent = "Ask the assistant to match the deposit";
+      askLink.onclick = () => ask("match");
+      txns.appendChild(askLink);
+    }
+    show("bank-detail");
+  }
+
+  function linkInstitution(name, kind) {
+    const result = SA.linkFinancialAccount(links, {
+      name: name,
+      kind: kind,
+      holder: accountKind,
+      currency: businessCurrency
+    }, accountKind);
+    if (!result.added) {
+      showPull(result.reason === "duplicate" ? "That account is already linked." : "That account does not belong on this profile.");
+      show("banks");
+      return;
+    }
+    if (accountKind === "personal") personalLinks = result.links;
+    else businessLinks = result.links;
+    links = result.links;
+    renderBanks();
+    renderHome();
+    show("link-done");
+  }
+
+  function renderInstitutions() {
+    ["Checking", "Credit"].forEach((kind) => {
+      const box = document.getElementById(kind === "Checking" ? "bank-choices" : "card-choices");
+      if (!box) return;
+      box.innerHTML = "";
+      if (LIVE) return;
+      (institutions[accountKind][kind] || []).forEach((item) => {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.appendChild(document.createTextNode(item.name));
+        const detail = document.createElement("span");
+        detail.textContent = item.detail;
+        button.appendChild(detail);
+        button.onclick = () => linkInstitution(item.name, kind);
+        box.appendChild(button);
+      });
+    });
+  }
+
+  function renderAccountChoices() {
+    document.querySelectorAll("#account-kinds .plan").forEach((plan) => {
+      plan.classList.toggle("on", plan.dataset.kind === pendingKind);
+    });
+    const businessPick = pendingKind === "business";
+    document.getElementById("account-blurb-title").textContent = businessPick ? "Business" : "Personal";
+    document.getElementById("account-blurb").textContent = businessPick
+      ? "Invoices, estimates, clients, tax packet, get paid, business checking, and business credit."
+      : "Spending, receipt photos, personal checking, and a personal card.";
+    document.getElementById("account-kind-label").textContent = businessPick ? "Business" : "Personal";
+  }
+
+  function openAccountSetup() {
+    pendingKind = accountKind;
+    renderAccountChoices();
+    show("account-setup");
+  }
+
+  function chooseKind(kind) {
+    if (SA.ACCOUNT_KINDS.indexOf(kind) === -1) return;
+    pendingKind = kind;
+    commitAccountKind();
+  }
+
+  function commitAccountKind() {
+    if (SA.ACCOUNT_KINDS.indexOf(pendingKind) === -1) return;
+    const switched = SA.switchAccountBooks(
+      { business: businessTransactions, personal: personalTransactions },
+      accountKind, pendingKind, transactions
+    );
+    businessTransactions = switched.books.business;
+    personalTransactions = switched.books.personal;
+    accountKind = pendingKind;
+    links = accountKind === "personal" ? personalLinks : businessLinks;
+    transactions = switched.transactions;
+    renderAccountChrome();
+    renderAll();
+    show("home");
+  }
+
+  function renderAccountChrome() {
+    const business = accountKind === "business";
+    document.querySelectorAll(".biz-only").forEach((node) => {
+      node.hidden = !business;
+    });
+    const homeBusiness = document.getElementById("home-business");
+    const homePersonal = document.getElementById("home-personal");
+    const docsTools = document.getElementById("docs-tools");
+    const docsPersonal = document.getElementById("docs-personal");
+    if (homeBusiness) homeBusiness.hidden = !business;
+    if (homePersonal) homePersonal.hidden = business;
+    if (docsTools) docsTools.hidden = !business;
+    if (docsPersonal) docsPersonal.hidden = business;
+    document.getElementById("account-sub").textContent = business ? "Business · " + (LIVE ? bizName() : "Field & Co.") : "Personal";
+    document.getElementById("banks-sub").textContent = business ? "Business checking and credit" : "Personal checking and credit";
+    document.getElementById("banks-note").textContent = business
+      ? "Link business checking and business credit. You sign in at the bank. Simple Accountz stores the connection, the balance, and transactions. It never stores your password, and it cannot move money out."
+      : "Link personal checking and a personal card. Business checking and business credit stay on a business account. Nothing is moved, and the password stays at the bank.";
+    document.getElementById("books-note").textContent = business
+      ? ""
+      : "These totals are the personal account. Business invoices are not included.";
+    document.getElementById("link-bank-choice").firstChild.textContent = business ? "Business checking" : "Personal checking";
+    document.getElementById("link-card-choice").firstChild.textContent = business ? "Business credit" : "Personal credit";
+    document.getElementById("link-bank-title").textContent = business ? "Business checking" : "Personal checking";
+    document.getElementById("link-card-title").textContent = business ? "Business credit" : "Personal credit";
+    document.getElementById("link-bank-note").textContent = business
+      ? "Simple Accountz opens your bank’s sign-in. The password stays with the bank. This links a business checking account."
+      : "Simple Accountz opens your bank’s sign-in. The password stays with the bank. This links a personal checking account.";
+    document.getElementById("link-card-note").textContent = business
+      ? "You sign in with the card issuer. This links a business credit account. The full number is not stored."
+      : "You sign in with the card issuer. This links a personal credit account. The full number is not stored.";
+    document.getElementById("assistant-note").textContent = business
+      ? "It can draft, match, file, figure a late fee, repeat a month, and write the weekly note. It sends or changes a record only after you tap the lime button."
+      : "It can file a receipt. It changes a record only after you tap the lime button.";
+    const intro = document.getElementById("assistant-intro");
+    if (intro && !assistantStarted) {
+      intro.textContent = business
+        ? "Oak Street is overdue by $1,850. A $400 deposit in Harbor Checking is still unmatched. I can remind the client, match the deposit, or file the lumber receipt."
+        : "This is the personal account. I can file a receipt after you take the photo and confirm.";
+    }
+    document.getElementById("kind-business").className = business ? "pill small" : "pill-outline small";
+    document.getElementById("kind-personal").className = business ? "pill-outline small" : "pill small";
+    const names = links.map((link) => link.name);
+    document.getElementById("linked-summary").textContent = names.length ? names.join(" · ") : "Nothing linked";
+    renderInstitutions();
+    renderAccountChoices();
+    const featureList = document.getElementById("business-feature-list");
+    if (featureList) {
+      const labels = {
+        invoices: "Invoices",
+        estimates: "Estimates",
+        receipts: "Customer receipts",
+        clients: "Clients",
+        "late-fee": "Late fees",
+        "recurring-invoice": "Monthly invoices",
+        "deposit-request": "Deposit requests",
+        "duplicate-warning": "Duplicate warning",
+        "weekly-owed-note": "Weekly note for who owes you",
+        "tax-packet": "Sales-tax packet",
+        "export-books": "Export",
+        reports: "Reports",
+        "get-paid": "Get paid",
+        "receipt-photo": "Receipt photos",
+        "invoice-scan": "Scan an invoice",
+        "file-upload": "Upload a file",
+        expenses: "Expenses",
+        "business-checking": "Business checking",
+        "business-credit": "Business credit",
+        "customer-language": "Customer language",
+        "country-payment-methods": "Local payment methods",
+        plans: "Plans",
+        "assistant-confirm": "Assistant, after you confirm"
+      };
+      featureList.innerHTML = "";
+      SA.featuresForAccount("business").forEach((name) => {
+        if (!labels[name]) return;
+        const row = document.createElement("div");
+        row.className = "doc";
+        row.innerHTML = "<span class=\"name\"></span>";
+        row.querySelector(".name").textContent = labels[name];
+        featureList.appendChild(row);
+      });
+    }
+  }
+
+  function renderPlatform() {
+    const open = SA.outstandingByCurrency(docs);
+    const field = businesses.find(business => business.id === "field");
+    if (field) field.openMinor = open[field.currency] || 0;
+    const visible = SA.visibleBusinesses(actor, businesses);
+    document.getElementById("plat-businesses").textContent = String(visible.length);
+    document.getElementById("plat-open").textContent = String(new Set(visible.map(business => business.currency)).size);
+    document.getElementById("plat-admins").textContent = String(users.filter(user => user.role === "creator" || user.role === "platform_admin").length);
+    document.getElementById("platform-note").textContent = actor.role === "creator"
+      ? "Creator view. You can see every business and grant admin."
+      : "Admin view. You can see every business. Only Spencer can grant admin.";
+    document.getElementById("platform-sub").textContent = actor.role === "creator" ? "Spencer · creator" : "Platform admin";
+    const list = document.getElementById("plat-list");
+    list.innerHTML = "";
+    const monthRev = SA.platformRevenue(SA.SAMPLE_SUBSCRIPTIONS, "month", SA.LEDGER_TODAY);
+    const yearRev = SA.platformRevenue(SA.SAMPLE_SUBSCRIPTIONS, "year", SA.LEDGER_TODAY);
+    const usdMonth = (monthRev && monthRev.currencies.USD) || { totalMinor: 0, byPlan: {}, businessIds: {} };
+    const usdYear = (yearRev && yearRev.currencies.USD) || { totalMinor: 0, byPlan: {} };
+    document.getElementById("plat-rev-month").textContent = SA.formatMoney(usdMonth.totalMinor, "USD");
+    document.getElementById("plat-rev-year").textContent = SA.formatMoney(usdYear.totalMinor, "USD") + " this year";
+    const planNames = { essentials: "Essentials", plus: "Plus", premium: "Premium" };
+    document.getElementById("plat-rev-plans").textContent = ["essentials", "plus", "premium"].map((plan) =>
+      planNames[plan] + " " + SA.formatMoney(usdMonth.byPlan[plan] || 0, "USD")
+    ).join(" · ") + " this month";
+    visible.forEach(business => {
+      const row = document.createElement("div");
+      row.className = "doc";
+      row.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+      row.querySelector(".name").textContent = business.name;
+      row.querySelector(".amt").textContent = SA.formatMoney(business.openMinor, business.currency);
+      const sub = SA.SAMPLE_SUBSCRIPTIONS.find((item) => item.businessId === business.id);
+      const planLabel = sub ? (planNames[sub.plan] || sub.plan) + (sub.cadence === "annual" ? " · annual" : "") : "No plan";
+      row.querySelector(".sub").textContent = business.country + " · " + planLabel + " · open invoices";
+      list.appendChild(row);
+    });
+  }
+
+  function renderPeople() {
+    const list = document.getElementById("people-list");
+    list.innerHTML = "";
+    users.forEach(user => {
+      const row = document.createElement("div");
+      row.className = "doc";
+      row.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+      row.querySelector(".name").textContent = user.name;
+      row.querySelector(".sub").textContent = user.role === "creator" ? "Creator · cannot be changed" : user.role === "platform_admin" ? "Platform admin" : "Member";
+      if (actor.role === "creator" && user.role === "member") {
+        const button = document.createElement("button");
+        button.className = "pill small";
+        button.textContent = "Make admin";
+        button.onclick = () => grant(user.id);
+        row.querySelector(".amt").replaceWith(button);
+      } else {
+        row.querySelector(".amt").textContent = user.role === "creator" ? "Locked" : "";
+      }
+      list.appendChild(row);
+    });
+    const auditNode = document.getElementById("audit");
+    auditNode.hidden = !audit;
+    auditNode.textContent = audit;
+  }
+
+  function grant(id) {
+    const result = SA.grantPlatformAdmin(actor, users, id);
+    if (!result.ok) {
+      audit = result.error === "creator_locked" ? "Spencer’s role cannot be changed." : "Only Spencer can grant admin.";
+    } else {
+      users = result.users;
+      audit = result.audit;
+      document.getElementById("mode-admin").hidden = false;
+    }
+    renderPeople();
+    renderPlatform();
+  }
+
+  function setShell(shell) {
+    if (SA.SHELLS.indexOf(shell) === -1) return;
+    const device = document.getElementById("device");
+    SA.SHELLS.forEach((name) => device.classList.remove("shell-" + name));
+    device.classList.add("shell-" + shell);
+    device.classList.remove("flashing");
+    void device.offsetWidth;
+    device.classList.add("flashing");
+    const labels = { ios: "iOS", android: "Android", windows: "Windows", pc: "PC" };
+    document.getElementById("status-shell").textContent = labels[shell];
+    const chrome = document.getElementById("chrome-label");
+    if (shell === "pc") {
+      chrome.textContent = "";
+      chrome.className = "url";
+      chrome.textContent = "simpleaccountz.app";
+    } else {
+      chrome.className = "";
+      chrome.textContent = "Simple Accountz";
+    }
+    document.querySelectorAll("#shells button").forEach((button) => {
+      button.className = button.dataset.shell === shell ? "pill small" : "pill-outline small";
+    });
+    document.getElementById("shell-note").textContent = labels[shell] + " shows all " + SA.FEATURES.length + " features. iOS, Android, Windows, and PC stay in lockstep.";
+  }
+
+  document.querySelectorAll(".dash .card").forEach((card) => {
+    card.addEventListener("click", () => {
+      card.classList.remove("hit");
+      void card.offsetWidth;
+      card.classList.add("hit");
+    });
+  });
+
+  function setActor(kind) {
+    if (kind === "admin") {
+      const avery = users.find(user => user.id === "avery");
+      if (!avery || avery.role !== "platform_admin") return;
+      actor = { id: avery.id, name: avery.name, role: avery.role };
+    } else {
+      actor = actors[kind];
+    }
+    document.getElementById("mode-owner").className = kind === "owner" ? "pill small" : "pill-outline small";
+    document.getElementById("mode-creator").className = kind === "creator" ? "pill small" : "pill-outline small";
+    document.getElementById("mode-admin").className = kind === "admin" ? "pill small" : "pill-outline small";
+    document.getElementById("platform-row").hidden = !canSeePlatform();
+    renderPlatform();
+    show(canSeePlatform() ? "platform" : "home");
+  }
+
+  function setRegion(name, currency, code) {
+    regionName = name;
+    businessCurrency = currency;
+    countryCode = code;
+    customerCountry = code;
+    const languageByCountry = { US: "en", GB: "en", DE: "de", AU: "en", JP: "ja", BR: "pt", MX: "es" };
+    customerLang = languageByCountry[code] || "en";
+    syncCustomerControls();
+    renderHome();
+    renderInvoiceLocale();
+    show("home");
+  }
+
+  function syncCustomerControls() {
+    document.querySelectorAll("#cust-lang button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.lang === customerLang);
+    });
+    document.querySelectorAll("#cust-country button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.country === customerCountry);
+    });
+  }
+
+  function renderInvoiceLocale() {
+    const view = SA.customerInvoiceView(customerLang, customerCountry);
+    document.getElementById("owner-lang-note").textContent = "Your language stays English. The customer sees " + view.languageName + " and the tax name " + view.taxName + ".";
+    document.getElementById("public-title").textContent = view.title + " INV-1042";
+    document.getElementById("public-due").textContent = view.due + " Nov 12, 2026";
+    renderInvoiceFigures();
+    renderMethods();
+  }
+
+  function renderMethods() {
+    const names = SA.paymentMethods(customerCountry);
+    const publicMethods = document.getElementById("public-methods");
+    const settingsMethods = document.getElementById("method-list");
+    [publicMethods, settingsMethods].forEach((node) => {
+      node.innerHTML = "";
+      names.forEach((name) => {
+        const chip = document.createElement("span");
+        chip.textContent = methodLabels[name] || name;
+        node.appendChild(chip);
+      });
+    });
+    document.getElementById("method-note").textContent = regionName + " offers " + names.length + " ways to pay. A method that does not work here is not shown.";
+  }
+
+  function toggleSignal() {
+    online = !online;
+    const button = document.getElementById("signal");
+    button.textContent = online ? "Online" : "Offline";
+    if (online) {
+      const synced = SA.syncDrafts(true, outbox);
+      outbox = synced.queue;
+      showPull(synced.synced.length ? "Back online. " + synced.synced.length + " draft synced." : "Back online.");
+    } else {
+      showPull("No signal. Drafts stay on this device until you are online.");
+    }
+    renderOutbox();
+  }
+
+  function saveWorkingDraft() {
+    applyDraftMath();
+    const draft = docs.find(doc => doc.id === "draft");
+    const result = SA.saveDraft(online, outbox, {
+      id: "draft-" + (++draftSeq),
+      name: draft ? draft.name : "Field draft",
+      totalMinor: draft && draft.totalMinor ? draft.totalMinor : 0
+    });
+    outbox = result.queue;
+    showPull(result.pending ? "Saved on this device. It will sync when you are online." : "Draft saved.");
+    renderAll();
+    renderOutbox();
+    show("home");
+  }
+
+  function renderOutbox() {
+    let note = document.getElementById("outbox-note");
+    if (!note) {
+      note = document.createElement("p");
+      note.id = "outbox-note";
+      note.className = "note";
+      document.getElementById("recent").before(note);
+    }
+    note.textContent = outbox.length
+      ? outbox.length + (outbox.length === 1 ? " draft is" : " drafts are") + " waiting to sync."
+      : "";
+  }
+
+  function showPull(text) {
+    const pull = document.getElementById("pull-note");
+    pull.textContent = text;
+    pull.classList.add("show");
+    if (pullTimer) clearTimeout(pullTimer);
+    pullTimer = setTimeout(() => {
+      pull.classList.remove("show");
+      pull.textContent = "";
+      pullTimer = null;
+    }, 5000);
+  }
+
+  function refreshFromPull() {
+    if (!SA.pullRefresh(80, 64)) return;
+    if (!online) {
+      showPull("No signal. Pull again when you are online.");
+      return;
+    }
+    const synced = SA.syncDrafts(true, outbox);
+    outbox = synced.queue;
+    renderOutbox();
+    renderHome();
+    showPull(synced.synced.length ? "Updated. " + synced.synced.length + " draft synced." : "Updated just now.");
+  }
+
+  function bindPull(screenId) {
+    const screen = document.getElementById(screenId);
+    let startY = null;
+    screen.addEventListener("pointerdown", (event) => {
+      const scroller = screen.querySelector(".scroller") || screen;
+      if (scroller.scrollTop > 4) return;
+      startY = event.clientY;
+    });
+    screen.addEventListener("pointerup", (event) => {
+      if (startY == null) return;
+      const distance = event.clientY - startY;
+      startY = null;
+      if (SA.pullRefresh(distance, 64)) refreshFromPull();
+    });
+  }
+
+  function enableTwoFactor() {
+    const result = SA.confirmTwoFactor(document.getElementById("auth-code").value.trim());
+    const state = document.getElementById("twofactor-state");
+    if (!result.ok) {
+      state.textContent = "That code did not match.";
+      return;
+    }
+    twoFactorOn = true;
+    state.textContent = "Two-factor is on";
+    document.getElementById("security-sub").textContent = "Two-factor on";
+  }
+
+  function recoverByEmail() {
+    const result = SA.recoverAccount("email", document.getElementById("recover-email").value, account);
+    const message = document.getElementById("recover-msg");
+    if (!result.ok) {
+      message.textContent = "That email is not the one on the account.";
+      return;
+    }
+    showPull("A sign-in link is on its way to " + account.email + ".");
+    show("home");
+  }
+
+  function recoverByQr() {
+    const result = SA.recoverAccount("qr", account.recoveryToken, account);
+    document.getElementById("scan-msg").textContent = result.ok ? "Recovery QR matched. You are back in." : "That QR does not match.";
+    if (result.ok) show("home");
+  }
+
+  function payCurrent() {
+    const invoice = docs.find(doc => doc.id === "1042");
+    if (!invoice || SA.balanceOf(invoice) <= 0) return;
+    const paidMinor = SA.balanceOf(invoice);
+    const result = SA.recordCustomerPayment(docs, transactions, "1042", SA.LEDGER_TODAY);
+    docs = result.docs;
+    transactions = result.transactions;
+    renderAll();
+    document.querySelector("#paid .amount").textContent = SA.formatMoney(paidMinor, invoice.currency);
+    show("paid");
+  }
+
+  function renderPrices() {
+    document.querySelectorAll(".plan").forEach(plan => {
+      const amount = SA.planAmount(plan.dataset.plan, cadence);
+      const price = plan.querySelector("em");
+      if (price && amount != null) price.textContent = SA.formatMoney(amount, "USD");
+    });
+  }
+
+  function shortDate(iso) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const parts = String(iso).split("-");
+    return months[Number(parts[1]) - 1] + " " + Number(parts[2]);
+  }
+
+  function moneyRow(label, amount, currency, note) {
+    const row = document.createElement("div");
+    row.className = "line";
+    const span = document.createElement("span");
+    span.appendChild(document.createTextNode(label));
+    if (note) {
+      span.appendChild(document.createElement("br"));
+      const extra = document.createElement("span");
+      extra.className = "note";
+      extra.textContent = note;
+      span.appendChild(extra);
+    }
+    const amountNode = document.createElement("b");
+    amountNode.textContent = SA.formatMoney(amount, currency);
+    row.appendChild(span);
+    row.appendChild(amountNode);
+    return row;
+  }
+
+  function totalRow(label, amount, currency) {
+    const row = document.createElement("div");
+    row.className = "tot";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const amountNode = document.createElement("span");
+    amountNode.textContent = SA.formatMoney(amount, currency);
+    row.appendChild(name);
+    row.appendChild(amountNode);
+    return row;
+  }
+
+  function renderWorkLines(container, doc) {
+    if (!container || !doc) return null;
+    const calc = SA.calculateDocument(doc);
+    container.innerHTML = "";
+    if (!calc.ok) return calc;
+    calc.lines.forEach((line) => {
+      container.appendChild(moneyRow(
+        line.name,
+        line.extendedMinor,
+        doc.currency,
+        SA.formatQty(line.qtyBps) + " × " + SA.formatMoney(line.rateMinor, doc.currency)
+      ));
+    });
+    return calc;
+  }
+
+  function renderBreakdown(container, doc, labels) {
+    if (!container || !doc) return null;
+    const calc = SA.calculateDocument(doc);
+    container.innerHTML = "";
+    if (!calc.ok) return calc;
+    calc.lines.forEach((line) => {
+      container.appendChild(moneyRow(line.name || "Line", line.extendedMinor, doc.currency));
+    });
+    const taxLine = moneyRow(labels.tax, calc.taxMinor, doc.currency);
+    if (labels.taxId) taxLine.querySelector("span").id = labels.taxId;
+    container.appendChild(taxLine);
+    container.appendChild(totalRow(labels.total, calc.totalMinor, doc.currency));
+    const paidMinor = Math.max(0, calc.paidMinor - calc.refundedMinor);
+    if (paidMinor > 0) container.appendChild(moneyRow(labels.paid, paidMinor, doc.currency));
+    const balance = totalRow(labels.balance, calc.balanceMinor, doc.currency);
+    if (labels.balanceId) balance.querySelector("span").id = labels.balanceId;
+    container.appendChild(balance);
+    if (doc.depositPercent) {
+      const split = SA.depositRequest(doc, doc.depositPercent);
+      if (split.ok) {
+        container.appendChild(moneyRow((labels.dueNow || "Due now") + " " + split.percent + "%", split.dueNowMinor, doc.currency));
+        container.appendChild(moneyRow(labels.dueLater || "Due later", split.dueLaterMinor, doc.currency));
+      }
+    }
+    return calc;
+  }
+
+  function renderInvoiceFigures() {
+    const invoice = docs.find(doc => doc.id === "1042");
+    const maria = docs.find(doc => doc.id === "1041");
+    const estimate = docs.find(doc => doc.id === "088");
+    if (!invoice) return;
+    const calc = renderWorkLines(document.getElementById("editor-lines"), invoice);
+    const chip = document.getElementById("editor-chip");
+    if (chip) {
+      chip.textContent = invoice.display;
+      chip.className = "chip " + invoice.chip;
+    }
+    if (calc && calc.ok) {
+      const paidMinor = Math.max(0, calc.paidMinor - calc.refundedMinor);
+      document.getElementById("editor-math").textContent = "Total " + SA.formatMoney(calc.totalMinor, invoice.currency)
+        + " · Paid " + SA.formatMoney(paidMinor, invoice.currency)
+        + " · Balance " + SA.formatMoney(calc.balanceMinor, invoice.currency);
+    }
+    renderWorkLines(document.getElementById("maria-lines"), maria);
+    const mariaCalc = maria ? SA.calculateDocument(maria) : null;
+    if (mariaCalc && mariaCalc.ok) document.getElementById("maria-balance").textContent = SA.formatMoney(mariaCalc.balanceMinor, maria.currency);
+    const estCalc = renderWorkLines(document.getElementById("est-lines"), estimate);
+    if (estCalc && estCalc.ok) {
+      document.getElementById("est-total").textContent = SA.formatMoney(estCalc.totalMinor, estimate.currency);
+      document.getElementById("conv-total").textContent = SA.formatMoney(estCalc.totalMinor, estimate.currency);
+    }
+    const ownerLabels = SA.customerInvoiceView("en", countryCode);
+    renderBreakdown(document.getElementById("preview-figures"), invoice, {
+      tax: SA.taxName(countryCode, "en"),
+      taxId: "owner-tax",
+      total: ownerLabels.total,
+      paid: ownerLabels.paid,
+      balance: "Balance due",
+      dueNow: ownerLabels.dueNow,
+      dueLater: ownerLabels.dueLater
+    });
+    const view = SA.customerInvoiceView(customerLang, customerCountry);
+    const publicCalc = renderBreakdown(document.getElementById("public-figures"), invoice, {
+      tax: view.taxName,
+      taxId: "public-tax",
+      total: view.total,
+      paid: view.paid,
+      balance: view.balance,
+      balanceId: "public-balance-label",
+      dueNow: view.dueNow,
+      dueLater: view.dueLater
+    });
+    const pay = document.getElementById("public-pay");
+    if (pay && publicCalc && publicCalc.ok) {
+      pay.disabled = publicCalc.balanceMinor <= 0;
+      pay.textContent = publicCalc.balanceMinor <= 0 ? view.paid : view.pay;
+    }
+  }
+
+  function renderMoney() {
+    const slice = SA.periodTotals(transactions, moneyPeriod, SA.LEDGER_TODAY, businessCurrency);
+    if (!slice) return;
+    document.getElementById("money-in").textContent = SA.formatMoney(slice.inMinor, businessCurrency) + " in";
+    document.getElementById("money-in-note").textContent = shortDate(slice.start) + "–" + shortDate(slice.end) + " · " + businessCurrency + " only";
+    document.getElementById("money-out").textContent = SA.formatMoney(slice.outMinor, businessCurrency) + " out";
+    document.getElementById("money-profit").textContent = SA.formatMoney(slice.profitMinor, businessCurrency) + " rough profit";
+    const other = transactions.some(tx => tx.currency !== businessCurrency);
+    document.getElementById("money-fx").textContent = other && slice.inMinor === 0 && slice.outMinor === 0
+      ? "This view is " + businessCurrency + " only. Existing money in another currency is not converted."
+      : "";
+    const list = document.getElementById("expense-list");
+    list.innerHTML = "";
+    const rows = transactions
+      .filter(tx => tx.kind === "out" && tx.currency === businessCurrency && tx.date >= slice.start && tx.date <= slice.end)
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = "No expenses in this period.";
+      list.appendChild(empty);
+    } else {
+      rows.forEach(tx => {
+        const button = document.createElement("button");
+        button.className = "exp";
+        button.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+        button.querySelector(".name").textContent = tx.name;
+        button.querySelector(".amt").textContent = SA.formatMoney(tx.amountMinor, tx.currency);
+        button.querySelector(".sub").textContent = shortDate(tx.date) + " · " + (tx.category || "Expense");
+        if (tx.receiptPhoto && tx.receiptPhoto !== "sample") {
+          button.classList.add("has-photo");
+          const thumb = document.createElement("img");
+          thumb.className = "thumb";
+          thumb.alt = "Receipt photo";
+          thumb.src = tx.receiptPhoto;
+          button.insertBefore(thumb, button.firstChild);
+        } else if (tx.receiptPhoto === "sample") {
+          button.classList.add("has-photo");
+          const thumb = document.createElement("span");
+          thumb.className = "thumb";
+          thumb.textContent = "Photo";
+          button.insertBefore(thumb, button.firstChild);
+        }
+        button.onclick = () => openSavedExpense(tx);
+        list.appendChild(button);
+      });
+    }
+    renderReports();
+    renderTaxes();
+  }
+
+  function renderReports() {
+    document.querySelectorAll("#report-period button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.period === reportPeriod);
+    });
+    const packet = SA.taxPacket(transactions, reportPeriod, SA.LEDGER_TODAY, businessCurrency, countryCode);
+    if (!packet) return;
+    document.getElementById("report-income").textContent = SA.formatMoney(packet.incomeMinor, businessCurrency) + " in";
+    document.getElementById("report-expense").textContent = SA.formatMoney(packet.expenseMinor, businessCurrency) + " in expenses · " + packet.start + " to " + packet.end;
+    document.getElementById("report-tax").textContent = SA.formatMoney(packet.taxCollectedMinor, businessCurrency) + " · " + packet.taxName;
+    const open = docs.filter(doc => SA.isOpenInvoice(doc)).sort((a, b) => SA.balanceOf(b) - SA.balanceOf(a));
+    document.getElementById("report-top").textContent = open.length
+      ? open[0].name + " · " + SA.formatMoney(SA.balanceOf(open[0]), open[0].currency) + " still open"
+      : "Nothing open.";
+  }
+
+  function renderTaxes() {
+    document.querySelectorAll("#tax-period button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.period === taxPeriod);
+    });
+    const packet = SA.taxPacket(transactions, taxPeriod, SA.LEDGER_TODAY, businessCurrency, countryCode);
+    if (!packet) return;
+    const labels = { month: "This month", last_month: "Last month", year: "This year" };
+    document.getElementById("tax-collected").textContent = SA.formatMoney(packet.taxCollectedMinor, businessCurrency);
+    document.getElementById("tax-collected-note").textContent = packet.taxName + " inside payments · " + packet.start + " to " + packet.end;
+    document.getElementById("tax-income").textContent = SA.formatMoney(packet.incomeMinor, businessCurrency) + " in";
+    document.getElementById("tax-expense").textContent = SA.formatMoney(packet.expenseMinor, businessCurrency) + " in expenses to review";
+    document.getElementById("tax-range").textContent = labels[taxPeriod] || "Period";
+    const list = document.getElementById("tax-categories");
+    list.innerHTML = "";
+    if (!packet.categories.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = packet.incomeMinor === 0 ? "Nothing was recorded in this period." : "No expenses in this period.";
+      list.appendChild(empty);
+    } else {
+      packet.categories.forEach((row) => {
+        const line = document.createElement("div");
+        line.className = "doc";
+        line.innerHTML = '<span class="name"></span><span class="amt"></span>';
+        line.querySelector(".name").textContent = row.category;
+        line.querySelector(".amt").textContent = SA.formatMoney(row.amountMinor, businessCurrency);
+        list.appendChild(line);
+      });
+    }
+  }
+
+  function downloadBooks(which) {
+    const period = which === "tax" ? taxPeriod : reportPeriod;
+    const book = SA.exportBooks(docs, transactions, period, SA.LEDGER_TODAY, businessCurrency, countryCode);
+    if (!book.ok) return;
+    const blob = new Blob([book.csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = book.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const note = document.getElementById(which === "tax" ? "tax-export-note" : "report-export-note");
+    if (note) note.textContent = "Saved " + book.filename + ". Give it to your preparer. This does not file the return.";
+  }
+
+  function renderAssistantIntro() {
+    if (assistantStarted || accountKind === "personal") return;
+    const invoice = docs.find(doc => doc.id === "1042");
+    const deposit = transactions.find(tx => tx.id === "in-nov21");
+    const bubble = document.getElementById("assistant-intro");
+    if (!bubble || !invoice || !deposit) return;
+    const owed = SA.formatMoney(SA.balanceOf(invoice), invoice.currency);
+    if (SA.balanceOf(invoice) <= 0) bubble.textContent = "Oak Street is paid. Nothing on that invoice needs a reminder.";
+    else if (deposit.invoiceId) bubble.textContent = "Oak Street still owes " + owed + ". The $400 deposit is already matched.";
+    else bubble.textContent = "Oak Street is overdue by " + owed + ". A $400 deposit in Harbor Checking is still unmatched. I can remind the client, match the deposit, or file the lumber receipt.";
+  }
+
+  function draftDocumentFromInputs() {
+    const exponent = SA.CURRENCIES[businessCurrency] ? SA.CURRENCIES[businessCurrency].exponent : 2;
+    const qty = SA.parseDecimalToScale(document.getElementById("draft-qty").value, 4);
+    const rate = SA.parseDecimalToScale(document.getElementById("draft-rate").value, exponent);
+    const tax = SA.parseDecimalToScale(document.getElementById("draft-tax").value, 2);
+    if (!qty.ok || !rate.ok || !tax.ok) return { ok: false };
+    return {
+      ok: true,
+      doc: {
+        lines: [{
+          name: document.getElementById("draft-desc").value.trim() || "Description",
+          qtyBps: qty.value,
+          rateMinor: rate.value,
+          taxes: tax.value > 0 ? [{ bps: tax.value }] : []
+        }]
+      }
+    };
+  }
+
+  function applyDraftMath() {
+    const math = document.getElementById("draft-math");
+    const total = document.getElementById("draft-total");
+    if (!math || !total) return;
+    const built = draftDocumentFromInputs();
+    if (!built.ok) {
+      math.textContent = "Enter a quantity, a rate, and a tax percent.";
+      return;
+    }
+    const calc = SA.calculateDocument(built.doc);
+    if (!calc.ok) {
+      math.textContent = "That amount cannot be calculated.";
+      return;
+    }
+    total.textContent = SA.formatMoney(calc.totalMinor, businessCurrency);
+    math.textContent = "Subtotal " + SA.formatMoney(calc.subtotalMinor, businessCurrency)
+      + " · Tax " + SA.formatMoney(calc.taxMinor, businessCurrency)
+      + " · Total " + SA.formatMoney(calc.totalMinor, businessCurrency);
+    const draft = docs.find(doc => doc.id === "draft");
+    if (!draft) return;
+    const client = document.getElementById("draft-client").value.trim();
+    draft.name = client || "No client yet";
+    draft.lines = built.doc.lines;
+    draft.balanceMinor = calc.balanceMinor;
+    draft.totalMinor = calc.totalMinor;
+    draft.taxMinor = calc.taxMinor;
+    draft.paidMinor = 0;
+    draft.currency = businessCurrency;
+  }
+
+  function closeReceiptCamera() {
+    if (receiptStream) {
+      receiptStream.getTracks().forEach((track) => track.stop());
+      receiptStream = null;
+    }
+    ["receipt-video", "invoice-video"].forEach((id) => {
+      const video = document.getElementById(id);
+      if (!video) return;
+      video.srcObject = null;
+      video.hidden = true;
+    });
+  }
+
+  function beginReceipt() {
+    editingExpenseId = null;
+    receiptPhoto = null;
+    show("receipt-scan");
+    startReceiptCamera();
+  }
+
+  function startCamera(screenId, videoId, noteId) {
+    closeReceiptCamera();
+    const token = ++receiptCameraToken;
+    const video = document.getElementById(videoId);
+    const note = document.getElementById(noteId);
+    note.hidden = false;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      note.textContent = "Take photo opens the camera. You can also choose a photo.";
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false })
+      .catch(() => navigator.mediaDevices.getUserMedia({ video: true, audio: false }))
+      .then((stream) => {
+        if (token !== receiptCameraToken || !document.getElementById(screenId).classList.contains("on")) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        receiptStream = stream;
+        video.srcObject = stream;
+        video.hidden = false;
+        note.hidden = true;
+      })
+      .catch(() => {
+        if (token !== receiptCameraToken) return;
+        note.hidden = false;
+        note.textContent = "The live camera stayed off. Take photo still opens the camera, or choose a photo.";
+      });
+  }
+
+  function startReceiptCamera() {
+    startCamera("receipt-scan", "receipt-video", "receipt-camera-note");
+  }
+
+  function shrinkReceiptPhoto(dataUrl) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, 1280 / Math.max(image.width || 1, image.height || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.onerror = () => resolve("");
+      image.src = dataUrl;
+    });
+  }
+
+  function acceptReceiptPhoto(dataUrl) {
+    shrinkReceiptPhoto(dataUrl).then((shrunk) => {
+      const staged = SA.stageReceiptPhoto(shrunk);
+      if (!staged.ok) {
+        document.getElementById("receipt-camera-note").textContent = staged.error === "too_large"
+          ? "That photo is too large. Move closer and take it again."
+          : "Choose a JPEG, PNG, or WebP photo.";
+        show("receipt-scan");
+        startReceiptCamera();
+        return;
+      }
+      receiptPhoto = staged;
+      editingExpenseId = null;
+      setReceiptEditable(true);
+      fillReceiptForm("photo");
+      document.getElementById("expense-save").textContent = "Save expense";
+      show("expense");
+    });
+  }
+
+  function readReceiptFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    const typed = /^image\/(jpeg|jpg|png|webp)$/i.test(file.type);
+    const named = /\.(jpe?g|png|webp)$/i.test(file.name || "");
+    if (!typed && !named) {
+      document.getElementById("receipt-camera-note").textContent = "Choose a JPEG, PNG, or WebP photo.";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => acceptReceiptPhoto(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  }
+
+  function captureReceipt() {
+    const video = document.getElementById("receipt-video");
+    if (receiptStream && video && video.videoWidth) {
+      const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      acceptReceiptPhoto(canvas.toDataURL("image/jpeg", 0.82));
+      return;
+    }
+    document.getElementById("receipt-camera-file").click();
+  }
+
+  function useSampleReceipt() {
+    receiptPhoto = SA.stageReceiptPhoto("sample");
+    editingExpenseId = null;
+    setReceiptEditable(true);
+    fillReceiptForm("sample");
+    document.getElementById("expense-save").textContent = "Save expense";
+    show("expense");
+  }
+
+  function setReceiptEditable(on) {
+    ["expense-merchant", "expense-total", "expense-category"].forEach((id) => {
+      document.getElementById(id).readOnly = !on;
+    });
+  }
+
+  function fillReceiptForm(mode) {
+    const merchant = document.getElementById("expense-merchant");
+    const date = document.getElementById("expense-date");
+    const total = document.getElementById("expense-total");
+    const category = document.getElementById("expense-category");
+    const img = document.getElementById("receipt-photo");
+    const card = document.getElementById("receipt-card");
+    document.getElementById("expense-currency").textContent = businessCurrency;
+    if (mode === "sample") {
+      merchant.value = "Harbor Lumber";
+      date.value = "Nov 18, 2026";
+      date.dataset.iso = "2026-11-18";
+      total.value = "$186.40";
+      category.value = "Materials";
+      img.hidden = true;
+      img.removeAttribute("src");
+      card.hidden = false;
+      card.querySelector("h3").textContent = "Sample receipt";
+      card.querySelector("p").textContent = "Harbor Lumber · Nov 18, 2026. Check the total, then save.";
+      document.getElementById("expense-note").textContent = "Sample receipt. Save files it. A photo you take stays on this device until then.";
+      return;
+    }
+    merchant.value = "";
+    date.value = shortDate(SA.LEDGER_TODAY);
+    date.dataset.iso = SA.LEDGER_TODAY;
+    total.value = "";
+    category.value = "";
+    img.hidden = false;
+    img.src = receiptPhoto.photo;
+    card.hidden = true;
+    document.getElementById("expense-note").textContent = "Check the merchant, date, and total against the photo. Nothing is filed until you save.";
+  }
+
+  function backFromReceipt() {
+    if (editingExpenseId) {
+      show("money");
+      return;
+    }
+    beginReceipt();
+  }
+
+  function openSavedExpense(tx) {
+    editingExpenseId = tx.id;
+    receiptPhoto = tx.receiptPhoto
+      ? { ok: true, photo: tx.receiptPhoto, source: tx.receiptPhoto === "sample" ? "sample" : "photo" }
+      : null;
+    setReceiptEditable(false);
+    document.getElementById("expense-merchant").value = tx.name;
+    document.getElementById("expense-date").value = shortDate(tx.date);
+    document.getElementById("expense-date").dataset.iso = tx.date;
+    document.getElementById("expense-total").value = SA.formatMoney(tx.amountMinor, tx.currency);
+    document.getElementById("expense-category").value = tx.category || "";
+    document.getElementById("expense-currency").textContent = tx.currency;
+    const img = document.getElementById("receipt-photo");
+    const card = document.getElementById("receipt-card");
+    if (receiptPhoto && receiptPhoto.photo !== "sample") {
+      img.src = receiptPhoto.photo;
+      img.hidden = false;
+      card.hidden = true;
+    } else {
+      img.hidden = true;
+      img.removeAttribute("src");
+      card.hidden = false;
+      card.querySelector("h3").textContent = receiptPhoto ? "Sample receipt" : "No photo on this expense";
+      card.querySelector("p").textContent = tx.name + " · " + shortDate(tx.date);
+    }
+    document.getElementById("expense-note").textContent = "Already filed. Take a new photo from Add expense.";
+    document.getElementById("expense-save").textContent = "Done";
+    show("expense");
+  }
+
+  function saveExpense() {
+    if (editingExpenseId) {
+      show("money");
+      return;
+    }
+    const staged = SA.stageReceiptPhoto(receiptPhoto ? receiptPhoto.photo : "");
+    const note = document.getElementById("expense-note");
+    if (!staged.ok) {
+      note.textContent = "Take a photo of the receipt before saving.";
+      beginReceipt();
+      return;
+    }
+    const name = document.getElementById("expense-merchant").value.trim();
+    const parsed = SA.parseDecimalToScale(document.getElementById("expense-total").value, 2);
+    if (!name || !parsed.ok || parsed.value <= 0) {
+      note.textContent = "Enter the merchant and the total before saving.";
+      return;
+    }
+    const result = SA.addExpense(transactions, {
+      date: document.getElementById("expense-date").dataset.iso || SA.LEDGER_TODAY,
+      name,
+      amountMinor: parsed.value,
+      currency: businessCurrency,
+      accountId: SA.expenseAccountId(links, accountKind),
+      category: document.getElementById("expense-category").value.trim(),
+      receiptPhoto: staged.photo
+    }, businessCurrency);
+    transactions = result.transactions;
+    if (result.added) showPull("Expense saved with the receipt photo.");
+    else if (result.reason === "currency_mismatch") showPull("This expense is not in " + businessCurrency + ", so it was not added.");
+    else showPull("That expense is already in the books.");
+    renderAll();
+    show("money");
+  }
+
+  function beginInvoiceScan() {
+    invoiceScan = null;
+    editingScanId = null;
+    const note = document.getElementById("invoice-camera-note");
+    note.hidden = false;
+    note.textContent = "Allow the camera, or take a photo with the button below.";
+    show("invoice-scan");
+    startCamera("invoice-scan", "invoice-video", "invoice-camera-note");
+  }
+
+  function captureInvoice() {
+    const video = document.getElementById("invoice-video");
+    if (receiptStream && video && video.videoWidth) {
+      const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      acceptInvoicePhoto(canvas.toDataURL("image/jpeg", 0.82));
+      return;
+    }
+    document.getElementById("invoice-camera-file").click();
+  }
+
+  function acceptInvoicePhoto(dataUrl) {
+    shrinkReceiptPhoto(dataUrl).then((shrunk) => {
+      const staged = SA.stageInvoiceScan(shrunk);
+      if (!staged.ok) {
+        document.getElementById("invoice-camera-note").textContent = staged.error === "too_large"
+          ? "That photo is too large. Move closer and take it again."
+          : "Choose a JPEG, PNG, or WebP photo.";
+        show("invoice-scan");
+        startCamera("invoice-scan", "invoice-video", "invoice-camera-note");
+        return;
+      }
+      invoiceScan = staged;
+      editingScanId = null;
+      setInvoiceEditable(true);
+      fillInvoiceForm("photo");
+      document.getElementById("invoice-save").textContent = "Save draft";
+      show("invoice-review");
+    });
+  }
+
+  function readInvoiceFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    const typed = /^image\/(jpeg|jpg|png|webp)$/i.test(file.type);
+    const named = /\.(jpe?g|png|webp)$/i.test(file.name || "");
+    if (!typed && !named) {
+      document.getElementById("invoice-camera-note").textContent = "Choose a JPEG, PNG, or WebP photo.";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => acceptInvoicePhoto(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  }
+
+  function useSampleInvoice() {
+    invoiceScan = SA.stageInvoiceScan("sample");
+    editingScanId = null;
+    setInvoiceEditable(true);
+    fillInvoiceForm("sample");
+    document.getElementById("invoice-save").textContent = "Save draft";
+    show("invoice-review");
+  }
+
+  function setInvoiceEditable(on) {
+    ["invoice-client", "invoice-total"].forEach((id) => {
+      document.getElementById(id).readOnly = !on;
+    });
+  }
+
+  function fillInvoiceForm(mode) {
+    const client = document.getElementById("invoice-client");
+    const total = document.getElementById("invoice-total");
+    const img = document.getElementById("invoice-photo");
+    const card = document.getElementById("invoice-card");
+    document.getElementById("invoice-currency").textContent = businessCurrency;
+    if (mode === "sample") {
+      client.value = "North dock";
+      total.value = "$320.00";
+      img.hidden = true;
+      img.removeAttribute("src");
+      card.hidden = false;
+      card.querySelector("h3").textContent = "Sample invoice";
+      card.querySelector("p").textContent = "North dock · $320.00. Save keeps it as a draft.";
+      document.getElementById("invoice-note").textContent = "Sample invoice. Save keeps a draft. It is not sent. This preview does not read the print.";
+      return;
+    }
+    client.value = "";
+    total.value = "";
+    img.hidden = false;
+    img.src = invoiceScan.photo;
+    card.hidden = true;
+    document.getElementById("invoice-note").textContent = "Check the client and the total against the photo. This preview does not read the print. Nothing is sent.";
+  }
+
+  function backFromInvoice() {
+    if (editingScanId) {
+      show(accountKind === "personal" ? "files" : "documents");
+      return;
+    }
+    beginInvoiceScan();
+  }
+
+  function openSavedScan(doc) {
+    editingScanId = doc.id;
+    invoiceScan = doc.scan
+      ? { ok: true, photo: doc.scan, source: doc.scan === "sample" ? "sample" : "photo", kind: "invoice" }
+      : null;
+    setInvoiceEditable(false);
+    document.getElementById("invoice-client").value = doc.name;
+    document.getElementById("invoice-total").value = SA.formatMoney(doc.totalMinor, doc.currency);
+    document.getElementById("invoice-currency").textContent = doc.currency;
+    const img = document.getElementById("invoice-photo");
+    const card = document.getElementById("invoice-card");
+    if (invoiceScan && invoiceScan.photo !== "sample") {
+      img.src = invoiceScan.photo;
+      img.hidden = false;
+      card.hidden = true;
+    } else {
+      img.hidden = true;
+      img.removeAttribute("src");
+      card.hidden = false;
+      card.querySelector("h3").textContent = "Sample invoice";
+      card.querySelector("p").textContent = doc.name + " · " + SA.formatMoney(doc.totalMinor, doc.currency);
+    }
+    document.getElementById("invoice-note").textContent = "Already saved as a draft. It has not been sent.";
+    document.getElementById("invoice-save").textContent = "Done";
+    show("invoice-review");
+  }
+
+  function saveInvoiceScan() {
+    if (editingScanId) {
+      show(accountKind === "personal" ? "files" : "documents");
+      return;
+    }
+    const staged = SA.stageInvoiceScan(invoiceScan ? invoiceScan.photo : "");
+    const note = document.getElementById("invoice-note");
+    if (!staged.ok) {
+      note.textContent = "Take a photo of the invoice before saving.";
+      beginInvoiceScan();
+      return;
+    }
+    const name = document.getElementById("invoice-client").value.trim();
+    const exponent = SA.CURRENCIES[businessCurrency] ? SA.CURRENCIES[businessCurrency].exponent : 2;
+    const parsed = SA.parseDecimalToScale(document.getElementById("invoice-total").value, exponent);
+    if (!name || !parsed.ok || parsed.value <= 0) {
+      note.textContent = "Enter a client and a total before saving.";
+      return;
+    }
+    const result = SA.invoiceFromScan(staged, {
+      name: name,
+      amountMinor: parsed.value,
+      currency: businessCurrency,
+      date: SA.LEDGER_TODAY
+    });
+    if (!result.ok || result.sent) {
+      note.textContent = "Enter a client and a total before saving.";
+      return;
+    }
+    if (docs.some((doc) => doc.id === result.doc.id)) {
+      note.textContent = "That scan is already saved as a draft.";
+      return;
+    }
+    docs = docs.concat([result.doc]);
+    renderAll();
+    show(accountKind === "personal" ? "files" : "documents");
+    showPull("Saved as a draft. It has not been sent.");
+  }
+
+  function setFilesNote(text) {
+    const note = document.getElementById("files-note");
+    if (note) note.textContent = text;
+    showPull(text);
+  }
+
+  function keepUpload(staged) {
+    if (!staged || !staged.ok) {
+      const reason = staged && staged.error;
+      setFilesNote(reason === "too_large"
+        ? "That file is too large. It was not saved."
+        : "Upload a PDF, JPEG, PNG, WebP, CSV, or text file. A path or a program file is refused.");
+      return;
+    }
+    const result = SA.addUpload(uploads, staged);
+    if (!result.added) {
+      setFilesNote(staged.name + " is already saved.");
+      return;
+    }
+    uploads = result.files;
+    renderFiles();
+    setFilesNote(staged.name + " stays on this device. It has not been sent.");
+  }
+
+  function useSampleFile() {
+    keepUpload(SA.stageUpload({
+      name: "north-dock.pdf",
+      type: "application/pdf",
+      data: "data:application/pdf;base64,JVBERg=="
+    }));
+  }
+
+  function readUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      keepUpload(SA.stageUpload({
+        name: file.name,
+        type: file.type,
+        data: String(reader.result || "")
+      }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderFiles() {
+    const scans = document.getElementById("scan-list");
+    const list = document.getElementById("upload-list");
+    if (!scans || !list) return;
+    scans.innerHTML = "";
+    const scanned = docs.filter((doc) => doc.scan);
+    if (!scanned.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = "No scanned invoices yet.";
+      scans.appendChild(empty);
+    } else {
+      scanned.forEach((doc) => scans.appendChild(docButton(doc)));
+    }
+    list.innerHTML = "";
+    if (!uploads.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = "No files uploaded yet.";
+      list.appendChild(empty);
+    } else {
+      uploads.forEach((file) => {
+        const row = document.createElement("button");
+        row.className = "doc";
+        row.type = "button";
+        row.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+        row.querySelector(".name").textContent = file.name;
+        row.querySelector(".sub").textContent = file.type;
+        row.querySelector(".amt").textContent = "On device";
+        row.onclick = () => setFilesNote(file.name + " stays on this device. It has not been sent.");
+        list.appendChild(row);
+      });
+    }
+  }
+
+  function renderWarnings() {
+    const maria = docs.find(doc => doc.id === "1041");
+    const node = document.getElementById("maria-warn");
+    if (!node || !maria) return;
+    const recur = SA.recurInvoice(maria, SA.LEDGER_TODAY);
+    const warn = recur.ok ? SA.duplicateWarning(docs, recur.doc, SA.LEDGER_TODAY) : { warning: false };
+    node.hidden = !warn.warning;
+    node.textContent = warn.warning
+      ? "Same client and amount already went out this week. Repeat monthly makes a draft. It does not send."
+      : "";
+  }
+
+  // ---- Live web app ----
+  const LIVE = !!window.SA_LIVE;
+  let businessName = "";
+
+  function bizName() {
+    return businessName || "My business";
+  }
+
+  function startLive() {
+    SA.LEDGER_TODAY = SA.todayIso();
+    let saved = SA.emptyBooks();
+    try { saved = SA.restoreBooks(localStorage.getItem(SA.BOOKS_KEY)); } catch (error) { saved = SA.emptyBooks(); }
+    docs = SA.refreshStatuses(saved.docs, SA.LEDGER_TODAY);
+    businessTransactions = saved.business;
+    personalTransactions = saved.personal;
+    accountKind = saved.accountKind;
+    pendingKind = accountKind;
+    transactions = accountKind === "personal" ? personalTransactions : businessTransactions;
+    businessLinks = [];
+    personalLinks = [];
+    links = [];
+    uploads = saved.uploads;
+    businessName = saved.businessName;
+    autoMode = saved.autoMode;
+    autoHandled = saved.autoHandled;
+    autoSkip = saved.autoSkip;
+    const nameInput = document.getElementById("biz-name");
+    if (nameInput) nameInput.value = businessName;
+    const hint = document.getElementById("draft-hint");
+    if (hint) hint.textContent = "Save invoice keeps it on this device. Send it from the invoice screen.";
+    window.addEventListener("resize", fitLiveShell);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  }
+
+  function saveBooks() {
+    if (!LIVE) return;
+    const business = accountKind === "business" ? transactions : businessTransactions;
+    const personal = accountKind === "personal" ? transactions : personalTransactions;
+    try {
+      localStorage.setItem(SA.BOOKS_KEY, SA.serializeBooks({
+        businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip
+      }));
+    } catch (error) {
+      showPull("This device is out of space for Simple Accountz. Remove a large photo or file.");
+    }
+  }
+
+  let liveShell = "";
+  function fitLiveShell() {
+    const want = window.innerWidth >= 900 ? "pc" : "ios";
+    if (want === liveShell) return;
+    liveShell = want;
+    setShell(want);
+  }
+
+  function setBusinessName(value) {
+    businessName = String(value || "").trim().slice(0, 80);
+    renderAll();
+  }
+
+  function eraseBooks() {
+    if (!window.confirm("Erase every invoice, expense, and file saved on this device?")) return;
+    try { localStorage.removeItem(SA.BOOKS_KEY); } catch (error) {}
+    location.reload();
+  }
+
+  function shareLive(subject, body, email) {
+    if (email) {
+      window.location.href = SA.mailtoLink(email, subject, body);
+      return;
+    }
+    if (navigator.share) {
+      navigator.share({ title: subject, text: body }).catch(() => {});
+      return;
+    }
+    window.location.href = SA.mailtoLink("", subject, body);
+  }
+
+  function openInvoiceEditor() {
+    if (LIVE) {
+      document.getElementById("draft-client").value = "";
+      document.getElementById("draft-email").value = "";
+      document.getElementById("draft-desc").value = "";
+      document.getElementById("draft-desc").placeholder = "What you did";
+      document.getElementById("draft-qty").value = "1";
+      document.getElementById("draft-rate").value = "";
+      document.getElementById("draft-tax").value = "0";
+      document.getElementById("draft-due").value = SA.shiftDate(SA.LEDGER_TODAY, 14);
+    }
+    show("editor-draft");
+    applyDraftMath();
+  }
+
+  function saveInvoiceLive() {
+    const exponent = SA.CURRENCIES[businessCurrency] ? SA.CURRENCIES[businessCurrency].exponent : 2;
+    const qty = SA.parseDecimalToScale(document.getElementById("draft-qty").value, 4);
+    const rate = SA.parseDecimalToScale(document.getElementById("draft-rate").value, exponent);
+    const tax = SA.parseDecimalToScale(document.getElementById("draft-tax").value, 2);
+    const math = document.getElementById("draft-math");
+    if (!qty.ok || !rate.ok || !tax.ok) {
+      math.textContent = "Check the quantity, rate, and tax. Use numbers only.";
+      return;
+    }
+    const result = SA.createInvoice(docs, {
+      name: document.getElementById("draft-client").value,
+      email: document.getElementById("draft-email").value,
+      description: document.getElementById("draft-desc").value,
+      qtyBps: qty.value,
+      rateMinor: rate.value,
+      taxBps: tax.value,
+      taxName: SA.taxName(countryCode, "en"),
+      due: document.getElementById("draft-due").value,
+      currency: businessCurrency
+    }, SA.LEDGER_TODAY);
+    if (!result.ok) {
+      math.textContent = result.error === "client" ? "Add the client's name first." : "Add a quantity and a rate above zero.";
+      return;
+    }
+    docs = result.docs;
+    renderAll();
+    openDoc(result.doc.id);
+    showPull(result.doc.number + " saved. Send it when you are ready.");
+  }
+
+  let viewingDocId = null;
+  function openDoc(id) {
+    const doc = docs.find(item => item.id === id);
+    if (!doc) { show("documents"); return; }
+    viewingDocId = id;
+    const calc = SA.calculateDocument(doc);
+    document.getElementById("dv-title").textContent = doc.number || "Invoice";
+    const chip = document.getElementById("dv-chip");
+    chip.className = "chip " + doc.chip;
+    chip.textContent = doc.display;
+    document.getElementById("dv-biz").textContent = bizName().toUpperCase();
+    document.getElementById("dv-meta").textContent = "Invoice " + (doc.number || "") + (doc.due ? " · Due " + shortDate(doc.due) : "");
+    document.getElementById("dv-to").textContent = "Bill to: " + doc.name + (doc.email ? " · " + doc.email : "");
+    renderBreakdown(document.getElementById("dv-lines"), doc, { tax: SA.taxName(countryCode, "en"), total: "Total", paid: "Paid", balance: "Balance due" });
+    const draft = doc.stored === "draft";
+    const open = SA.isOpenInvoice(doc);
+    document.getElementById("dv-send").textContent = draft ? "Send" : "Send again";
+    document.getElementById("dv-send").hidden = !draft && !open;
+    document.getElementById("dv-remind").hidden = !open;
+    document.getElementById("dv-paid").hidden = !open;
+    document.getElementById("dv-delete").hidden = !draft;
+    document.getElementById("dv-note").textContent = draft
+      ? "Send opens your email with the invoice written out, or your share sheet if there is no email."
+      : (open ? "Sent " + shortDate(doc.sentOn) + ". Mark paid when the money arrives." : "Paid in full.");
+    show("doc-view");
+  }
+
+  function sendDocLive() {
+    const result = SA.markSent(docs, viewingDocId, SA.LEDGER_TODAY);
+    const doc = result.docs.find(item => item.id === viewingDocId);
+    if (!result.sent || !doc) {
+      showPull("Add a client and an amount before sending.");
+      return;
+    }
+    docs = result.docs;
+    renderAll();
+    shareLive(bizName() + " invoice " + doc.number, SA.invoiceText(doc, bizName()), doc.email);
+    openDoc(doc.id);
+  }
+
+  function remindLive() {
+    const doc = docs.find(item => item.id === viewingDocId);
+    if (!doc) return;
+    markHandled("remind", doc.id);
+    shareLive("Reminder: invoice " + (doc.number || ""), SA.reminderText(doc, bizName()), doc.email);
+    renderAll();
+  }
+
+  function markPaidLive() {
+    const doc = docs.find(item => item.id === viewingDocId);
+    if (!doc) return;
+    const result = SA.recordCustomerPayment(docs, transactions, doc.id, SA.LEDGER_TODAY);
+    docs = SA.refreshStatuses(result.docs, SA.LEDGER_TODAY);
+    transactions = result.transactions;
+    renderAll();
+    showPull(doc.number + " is paid. " + SA.formatMoney(result.recordedMinor, doc.currency) + " recorded as income.");
+    openDoc(doc.id);
+  }
+
+  function deleteDraftLive() {
+    const doc = docs.find(item => item.id === viewingDocId);
+    if (!doc || doc.stored !== "draft") return;
+    if (!window.confirm("Delete draft " + (doc.number || "") + "?")) return;
+    docs = docs.filter(item => item.id !== doc.id);
+    renderAll();
+    show("documents");
+  }
+
+  function renderEmptyStates() {
+    if (!LIVE) return;
+    const list = document.getElementById("doclist");
+    if (list && !list.children.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      const title = document.createElement("b");
+      title.textContent = docs.length ? "Nothing matches" : "No invoices yet";
+      const text = document.createElement("span");
+      text.textContent = docs.length ? "Try another search or filter." : "Tap New, then Invoice, to make your first one.";
+      empty.appendChild(title);
+      empty.appendChild(text);
+      list.appendChild(empty);
+    }
+  }
+
+  function renderAll() {
+    runAutopilot();
+    renderAccountChrome();
+    renderHome();
+    renderDocs();
+    renderWarnings();
+    renderBanks();
+    renderPlatform();
+    renderPeople();
+    renderPrices();
+    renderInvoiceLocale();
+    renderFiles();
+    renderAuto();
+    renderEmptyStates();
+    saveBooks();
+  }
+
+  function wrapFooters() {
+    document.querySelectorAll(".screen").forEach(screen => {
+      const sticky = screen.querySelector(":scope > .sticky");
+      if (!sticky || screen.querySelector(":scope > .scroller")) return;
+      const scroller = document.createElement("div");
+      scroller.className = "scroller";
+      while (screen.firstChild && screen.firstChild !== sticky) scroller.appendChild(screen.firstChild);
+      screen.insertBefore(scroller, sticky);
+      screen.classList.add("has-footer");
+    });
+  }
+  function closeSheet() {
+    document.getElementById("overlay").classList.remove("on");
+  }
+  document.getElementById("overlay").addEventListener("click", (e) => {
+    if (e.target.id === "overlay") closeSheet();
+  });
+
+  document.getElementById("tabs").addEventListener("click", (e) => {
+    const btn = e.target.closest(".tab");
+    if (btn) show(btn.dataset.screen);
+  });
+
+  let cadence = "monthly";
+  document.getElementById("cust-lang").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    customerLang = button.dataset.lang;
+    syncCustomerControls();
+    renderInvoiceLocale();
+  });
+  document.getElementById("cust-country").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    customerCountry = button.dataset.country;
+    syncCustomerControls();
+    renderInvoiceLocale();
+  });
+  wrapFooters();
+  bindPull("home");
+  if (LIVE) startLive();
+  renderAll();
+  if (LIVE) fitLiveShell(); else setShell("ios");
+  document.getElementById("docsearch").addEventListener("input", renderDocs);
+  document.getElementById("docseg").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    document.querySelectorAll("#docseg button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    docType = btn.dataset.filter;
+    statusFilter = "all";
+    renderDocs();
+  });
+
+  document.getElementById("account-kinds").addEventListener("click", (event) => {
+    const plan = event.target.closest(".plan");
+    if (!plan) return;
+    pendingKind = plan.dataset.kind;
+    renderAccountChoices();
+  });
+
+  document.getElementById("plans").addEventListener("click", (e) => {
+    const plan = e.target.closest(".plan");
+    if (!plan) return;
+    document.querySelectorAll(".plan").forEach(p => p.classList.remove("on"));
+    plan.classList.add("on");
+    const names = { essentials: "Essentials", plus: "Plus", premium: "Premium" };
+    document.getElementById("planlabel").textContent = names[plan.dataset.plan];
+  });
+
+  document.getElementById("billseg").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    document.querySelectorAll("#billseg button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    cadence = btn.dataset.cadence;
+    renderPrices();
+  });
+
+  document.getElementById("receipt-camera-file").addEventListener("change", readReceiptFile);
+  document.getElementById("receipt-library").addEventListener("change", readReceiptFile);
+  document.getElementById("invoice-camera-file").addEventListener("change", readInvoiceFile);
+  document.getElementById("invoice-library").addEventListener("change", readInvoiceFile);
+  document.getElementById("upload-file").addEventListener("change", readUpload);
+
+  document.getElementById("period").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || !btn.dataset.period) return;
+    document.querySelectorAll("#period button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    moneyPeriod = btn.dataset.period;
+    renderMoney();
+  });
+
+  document.getElementById("report-period").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || !btn.dataset.period) return;
+    reportPeriod = btn.dataset.period;
+    renderReports();
+  });
+
+  document.getElementById("tax-period").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || !btn.dataset.period) return;
+    taxPeriod = btn.dataset.period;
+    renderTaxes();
+  });
+  ["draft-qty", "draft-rate", "draft-tax", "draft-desc", "draft-client"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", () => {
+      applyDraftMath();
+      renderDocs();
+      renderRecent();
+    });
+  });
+</script>
+</body>
+</html>

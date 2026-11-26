@@ -1202,6 +1202,177 @@ function formatQty(qtyBps) {
   return frac ? whole + "." + frac : String(whole);
 }
 
+// ---- Live web app: real invoices, real dates, books saved on the device ----
+
+const BOOKS_KEY = "simpleaccountz.books.v1";
+
+function todayIso(date) {
+  const d = date || new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function nextInvoiceNumber(docs) {
+  let top = 1000;
+  (docs || []).forEach((doc) => {
+    const match = /^INV-(\d+)$/.exec(String(doc.number || ""));
+    if (match) top = Math.max(top, Number(match[1]));
+  });
+  return "INV-" + (top + 1);
+}
+
+function statusFor(doc, today) {
+  if (doc.type !== "invoice") return { display: doc.display, chip: doc.chip };
+  if (doc.stored === "draft") return { display: "Draft", chip: "draft" };
+  if (doc.stored === "paid" || balanceOf(doc) <= 0) return { display: "Paid", chip: "paid" };
+  if (doc.due && today && doc.due < today) return { display: "Overdue", chip: "overdue" };
+  if (doc.stored === "partially_paid") return { display: "Partial", chip: "partial" };
+  return { display: "Sent", chip: "sent" };
+}
+
+function createInvoice(docs, fields, today) {
+  const f = fields || {};
+  const name = String(f.name || "").trim();
+  if (!name) return { ok: false, error: "client" };
+  const qtyBps = f.qtyBps;
+  const rateMinor = f.rateMinor;
+  if (!Number.isSafeInteger(qtyBps) || qtyBps <= 0 || !Number.isSafeInteger(rateMinor) || rateMinor <= 0) {
+    return { ok: false, error: "line" };
+  }
+  const taxBps = Number.isSafeInteger(f.taxBps) && f.taxBps > 0 ? f.taxBps : 0;
+  const day = today || todayIso();
+  const number = nextInvoiceNumber(docs);
+  const doc = {
+    id: "inv-" + number.slice(4),
+    type: "invoice",
+    name,
+    email: String(f.email || "").trim(),
+    number,
+    subtitle: String(f.description || "").trim() || "Services",
+    stored: "draft",
+    currency: f.currency || "USD",
+    closed: false,
+    created: day,
+    due: /^\d{4}-\d{2}-\d{2}$/.test(String(f.due || "")) ? f.due : shiftDate(day, 14),
+    paidMinor: 0,
+    lines: [{
+      name: String(f.description || "").trim() || "Services",
+      qtyBps,
+      rateMinor,
+      taxes: taxBps ? [{ name: f.taxName || "Tax", bps: taxBps }] : []
+    }],
+    go: "doc-view"
+  };
+  const calc = calculateDocument(doc);
+  if (!calc.ok) return { ok: false, error: calc.error };
+  Object.assign(doc, { totalMinor: calc.totalMinor, balanceMinor: calc.balanceMinor, taxMinor: calc.taxMinor }, statusFor(doc, day));
+  return { ok: true, doc, docs: (docs || []).concat([doc]) };
+}
+
+function markSent(docs, invoiceId, today) {
+  let sent = false;
+  const next = (docs || []).map((doc) => {
+    if (doc.id !== invoiceId || doc.type !== "invoice") return doc;
+    if (!doc.name || !(balanceOf(doc) > 0) || doc.closed) return doc;
+    if (doc.stored !== "draft") { sent = true; return doc; }
+    sent = true;
+    const updated = Object.assign({}, doc, { stored: "sent", sentOn: today || todayIso() });
+    return Object.assign(updated, statusFor(updated, today));
+  });
+  return { docs: next, sent };
+}
+
+function refreshStatuses(docs, today) {
+  return (docs || []).map((doc) => {
+    if (doc.type !== "invoice" || doc.go !== "doc-view") return doc;
+    const status = statusFor(doc, today);
+    return status.display === doc.display && status.chip === doc.chip ? doc : Object.assign({}, doc, status);
+  });
+}
+
+function invoiceText(doc, businessName) {
+  if (!doc) return "";
+  const calc = calculateDocument(doc);
+  const total = calc.ok ? calc.totalMinor : (doc.totalMinor || 0);
+  const lines = [
+    (businessName || "Simple Accountz") + " · Invoice " + (doc.number || ""),
+    "Bill to: " + doc.name
+  ];
+  (doc.lines || []).forEach((line) => {
+    const amount = divRoundHalfUp(BigInt(line.qtyBps) * BigInt(line.rateMinor), QTY_SCALE);
+    lines.push(line.name + " · " + formatQty(line.qtyBps) + " × " + formatMoney(line.rateMinor, doc.currency) + " = " + formatMoney(amount, doc.currency));
+  });
+  if (calc.ok && calc.taxMinor) lines.push("Tax: " + formatMoney(calc.taxMinor, doc.currency));
+  lines.push("Total: " + formatMoney(total, doc.currency));
+  lines.push("Balance due: " + formatMoney(balanceOf(doc), doc.currency) + (doc.due ? " by " + prettyDate(doc.due) : ""));
+  return lines.join("\n");
+}
+
+function reminderText(doc, businessName) {
+  if (!doc) return "";
+  return "Hello " + doc.name + ",\n\nA friendly reminder that invoice " + (doc.number || "") + " for "
+    + formatMoney(balanceOf(doc), doc.currency) + (doc.due ? " was due " + prettyDate(doc.due) : " is open")
+    + ".\n\nThank you,\n" + (businessName || "");
+}
+
+function mailtoLink(email, subject, body) {
+  const to = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(String(email || "")) ? email : "";
+  return "mailto:" + encodeURIComponent(to).replace(/%40/g, "@")
+    + "?subject=" + encodeURIComponent(subject || "") + "&body=" + encodeURIComponent(body || "");
+}
+
+function emptyBooks() {
+  return {
+    version: 1,
+    businessName: "",
+    accountKind: "business",
+    docs: [],
+    business: [],
+    personal: [],
+    uploads: [],
+    autoMode: true,
+    autoHandled: [],
+    autoSkip: []
+  };
+}
+
+function serializeBooks(state) {
+  const base = emptyBooks();
+  const s = state || {};
+  return JSON.stringify({
+    version: 1,
+    businessName: String(s.businessName || ""),
+    accountKind: ACCOUNT_KINDS.indexOf(s.accountKind) !== -1 ? s.accountKind : base.accountKind,
+    docs: Array.isArray(s.docs) ? s.docs : [],
+    business: Array.isArray(s.business) ? s.business : [],
+    personal: Array.isArray(s.personal) ? s.personal : [],
+    uploads: Array.isArray(s.uploads) ? s.uploads : [],
+    autoMode: s.autoMode !== false,
+    autoHandled: Array.isArray(s.autoHandled) ? s.autoHandled : [],
+    autoSkip: Array.isArray(s.autoSkip) ? s.autoSkip : []
+  });
+}
+
+function restoreBooks(text) {
+  const base = emptyBooks();
+  if (!text) return base;
+  let raw;
+  try { raw = JSON.parse(text); } catch (error) { return base; }
+  if (!raw || typeof raw !== "object" || raw.version !== 1) return base;
+  const arr = (value) => (Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : []);
+  return {
+    version: 1,
+    businessName: typeof raw.businessName === "string" ? raw.businessName.slice(0, 80) : "",
+    accountKind: ACCOUNT_KINDS.indexOf(raw.accountKind) !== -1 ? raw.accountKind : "business",
+    docs: arr(raw.docs).filter((doc) => typeof doc.id === "string" && typeof doc.type === "string"),
+    business: arr(raw.business).filter((tx) => typeof tx.id === "string" && Number.isSafeInteger(tx.amountMinor)),
+    personal: arr(raw.personal).filter((tx) => typeof tx.id === "string" && Number.isSafeInteger(tx.amountMinor)),
+    uploads: arr(raw.uploads),
+    autoMode: raw.autoMode !== false,
+    autoHandled: Array.isArray(raw.autoHandled) ? raw.autoHandled.filter((item) => typeof item === "string") : [],
+    autoSkip: Array.isArray(raw.autoSkip) ? raw.autoSkip.filter((item) => typeof item === "string") : []
+  };
+}
+
 // A new expense goes on the card linked to the account you are in, so a
 // personal receipt shows under the personal card, not the business card.
 function expenseAccountId(links, accountKind) {
@@ -1342,6 +1513,20 @@ const SA = {
   CURRENCIES,
   switchAccountBooks,
   expenseAccountId,
+  BOOKS_KEY,
+  todayIso,
+  shiftDate,
+  nextInvoiceNumber,
+  statusFor,
+  createInvoice,
+  markSent,
+  refreshStatuses,
+  invoiceText,
+  reminderText,
+  mailtoLink,
+  emptyBooks,
+  serializeBooks,
+  restoreBooks,
   guessCategory,
   autopilot,
   csvCell,
