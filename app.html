@@ -1020,10 +1020,12 @@
           </div>
         </article>
         <div class="dv-actions">
-          <button class="pill" id="dv-send" onclick="sendDocLive()">Send</button>
+          <button class="pill" id="dv-email" onclick="emailDoc()">Email</button>
+          <button class="pill" id="dv-text" onclick="textDoc()">Text</button>
+          <button class="pill-outline" id="dv-pdf" onclick="shareDocPdf()">Share PDF</button>
+          <button class="pill-outline" id="dv-print" onclick="printDoc()">Print</button>
           <button class="pill-outline" id="dv-remind" onclick="remindLive()">Send reminder</button>
           <button class="pill-outline" id="dv-paid" onclick="markPaidLive()">Mark paid</button>
-          <button class="pill-outline" onclick="printDoc()">Print or PDF</button>
           <button class="textlink" id="dv-delete" onclick="deleteDraftLive()">Delete draft</button>
         </div>
         <p class="note" id="dv-note"></p>
@@ -1033,7 +1035,8 @@
         <button class="back" onclick="show('home')">Back</button>
         <div class="top"><h2 class="title">Invoice</h2><span class="chip draft">Draft</span></div>
         <div class="field"><label>Client</label><input id="draft-client" placeholder="Add a client"></div>
-        <div class="field live-only"><label>Client email (optional)</label><input id="draft-email" type="email" placeholder="name@example.com"></div>
+        <div class="field live-only"><label>Client email (optional)</label><input id="draft-email" type="email" autocomplete="email" placeholder="name@example.com"></div>
+        <div class="field live-only"><label>Client mobile for texts (optional)</label><input id="draft-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 010-2299"></div>
         <div class="field live-only"><label>Due date</label><input id="draft-due" type="date"></div>
         <div class="field"><label>Description</label><input id="draft-desc" value="Description"></div>
         <div class="field"><label>Quantity</label><input id="draft-qty" value="1" inputmode="decimal"></div>
@@ -1901,8 +1904,8 @@
       const target = docs.find(doc => doc.id === targetId);
       message = "Reminder sent to " + (target ? target.name : "the client") + ". The invoice is still unpaid.";
       if (LIVE && target) {
-        shareLive("Reminder: invoice " + (target.number || ""), SA.reminderText(target, bizName()), target.email);
-        message = "Your reminder to " + target.name + " is open in your mail or share sheet. Send it from there.";
+        sendReminder(target);
+        message = "Your reminder to " + target.name + " is open in your " + (target.email ? "mail app" : (target.phone ? "messages" : "share sheet")) + ". Send it from there.";
       }
       markHandled("remind", targetId);
     }
@@ -2991,16 +2994,27 @@
     return true;
   }
 
-  // Print on a computer; on a phone app, share the invoice (the share sheet offers Print and Save as PDF).
+  // Print the same invoice layout everywhere: the print page opens in a new tab
+  // on a computer, and in the phone's browser from the iOS and Android apps
+  // (app web views cannot print on their own). Its print dialog also offers Save as PDF.
   function printDoc() {
+    const doc = docs.find(item => item.id === viewingDocId);
+    if (!doc) return;
+    const base = window.SA_NATIVE || location.protocol === "file:"
+      ? "https://simpleaccountz.com/print.html"
+      : location.origin + "/print.html";
+    const url = SA.printLink(SA.invoiceView(doc, bizName(), SA.taxName(countryCode, "en")), base);
     const plugins = window.Capacitor && window.Capacitor.Plugins;
-    if (window.SA_NATIVE && plugins && plugins.Share) {
-      const doc = docs.find(item => item.id === viewingDocId);
-      if (!doc) return;
-      plugins.Share.share({ title: bizName() + " invoice " + (doc.number || ""), text: SA.invoiceText(doc, bizName()) }).catch(() => {});
+    if (window.SA_NATIVE && plugins && plugins.Browser) {
+      plugins.Browser.open({ url }).catch(() => { window.location.href = url; });
       return;
     }
-    window.print();
+    if (window.SA_NATIVE) {
+      window.location.href = url;
+      return;
+    }
+    const opened = window.open(url, "_blank", "noopener");
+    if (!opened) window.location.href = url;
   }
 
   function renderAssistantIntro() {
@@ -3589,7 +3603,7 @@
       if (sentDaysAgo != null) list = SA.markSent(list, made.doc.id, SA.shiftDate(today, -sentDaysAgo)).docs;
       return made.doc.id;
     };
-    add({ name: "Oak Street HOA", email: "board@example.com", description: "Deck staining", qtyBps: 10000, rateMinor: 185000, due: SA.shiftDate(today, -12) }, 26);
+    add({ name: "Oak Street HOA", email: "board@example.com", phone: "(555) 010-2299", description: "Deck staining", qtyBps: 10000, rateMinor: 185000, due: SA.shiftDate(today, -12) }, 26);
     add({ name: "Maria Chen", description: "Interior paint, two rooms", qtyBps: 10000, rateMinor: 243000, taxBps: 800, due: SA.shiftDate(today, 12) }, 2);
     const paidId = add({ name: "Bea's Bakery", description: "Shelving install", qtyBps: 40000, rateMinor: 16000, due: SA.shiftDate(today, 3) }, 9);
     add({ name: "Harbor Rentals", description: "Fence repair", qtyBps: 60000, rateMinor: 9500 });
@@ -4234,6 +4248,7 @@
     if (LIVE) {
       document.getElementById("draft-client").value = "";
       document.getElementById("draft-email").value = "";
+      document.getElementById("draft-phone").value = "";
       document.getElementById("draft-desc").value = "";
       document.getElementById("draft-desc").placeholder = "What you did";
       document.getElementById("draft-qty").value = "1";
@@ -4258,6 +4273,7 @@
     const result = SA.createInvoice(docs, {
       name: document.getElementById("draft-client").value,
       email: document.getElementById("draft-email").value,
+      phone: document.getElementById("draft-phone").value,
       description: document.getElementById("draft-desc").value,
       qtyBps: qty.value,
       rateMinor: rate.value,
@@ -4288,39 +4304,109 @@
     chip.textContent = doc.display;
     document.getElementById("dv-biz").textContent = bizName().toUpperCase();
     document.getElementById("dv-meta").textContent = "Invoice " + (doc.number || "") + (doc.due ? " · Due " + shortDate(doc.due) : "");
-    document.getElementById("dv-to").textContent = "Bill to: " + doc.name + (doc.email ? " · " + doc.email : "");
+    document.getElementById("dv-to").textContent = "Bill to: " + [doc.name, doc.email, SA.formatPhone(doc.phone)].filter(Boolean).join(" · ");
     renderBreakdown(document.getElementById("dv-lines"), doc, { tax: SA.taxName(countryCode, "en"), total: "Total", paid: "Paid", balance: "Balance due" });
     const draft = doc.stored === "draft";
     const open = SA.isOpenInvoice(doc);
-    document.getElementById("dv-send").textContent = draft ? "Send" : "Send again";
-    document.getElementById("dv-send").hidden = !draft && !open;
     document.getElementById("dv-remind").hidden = !open;
     document.getElementById("dv-paid").hidden = !open;
     document.getElementById("dv-delete").hidden = !draft;
     document.getElementById("dv-note").textContent = draft
-      ? "Send opens your email with the invoice written out, or your share sheet if there is no email."
-      : (open ? "Sent " + shortDate(doc.sentOn) + ". Mark paid when the money arrives." : "Paid in full.");
+      ? "Email and Text open your own apps with the invoice filled in. Share PDF attaches it as a PDF. Sending marks it Sent."
+      : (open ? "Sent " + shortDate(doc.sentOn) + ". Mark paid when the money arrives." : "Paid in full. You can still email, text, or print a copy.");
     show("doc-view");
   }
 
-  function sendDocLive() {
+  // A draft becomes Sent the moment it goes out by email, text, or PDF.
+  function sendingDoc() {
+    const current = docs.find(item => item.id === viewingDocId);
+    if (!current) return null;
+    if (current.stored !== "draft") return current;
     const result = SA.markSent(docs, viewingDocId, SA.LEDGER_TODAY);
     const doc = result.docs.find(item => item.id === viewingDocId);
     if (!result.sent || !doc) {
       showPull("Add a client and an amount before sending.");
-      return;
+      return null;
     }
     docs = result.docs;
     renderAll();
-    shareLive(bizName() + " invoice " + doc.number, SA.invoiceText(doc, bizName()), doc.email);
     openDoc(doc.id);
+    return doc;
+  }
+
+  function invoiceSubject(doc) {
+    return bizName() + " invoice " + (doc.number || "");
+  }
+
+  // Email: opens the person's own mail app (Mail, Gmail, Outlook) on every platform.
+  function emailDoc() {
+    const doc = sendingDoc();
+    if (!doc) return;
+    window.location.href = SA.mailtoLink(doc.email, invoiceSubject(doc), SA.invoiceText(doc, bizName()));
+  }
+
+  // Text: opens Messages with the client's number and a short note filled in.
+  function textDoc() {
+    const doc = sendingDoc();
+    if (!doc) return;
+    const phoneLike = window.SA_NATIVE || /Android|iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+    if (!phoneLike) showPull("If nothing opens, this computer has no texting app. Use Email or Share PDF instead.");
+    else if (!doc.phone) showPull("No mobile number on this invoice. Pick the contact in Messages.");
+    window.location.href = SA.smsLink(doc.phone, SA.invoiceSms(doc, bizName(), SA.LEDGER_TODAY));
+  }
+
+  // Share PDF: the share sheet on phones and on computers that support it
+  // (Mail with the PDF attached, Messages, WhatsApp, Files…); otherwise a download.
+  async function shareDocPdf() {
+    const doc = sendingDoc();
+    if (!doc) return;
+    const view = SA.invoiceView(doc, bizName(), SA.taxName(countryCode, "en"));
+    const pdf = SA.invoicePdf(view);
+    const name = SA.invoicePdfName(view);
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    try {
+      if (window.SA_NATIVE && plugins && plugins.Filesystem && plugins.Share) {
+        const written = await plugins.Filesystem.writeFile({ path: name, data: SA.binaryToBase64(pdf), directory: "CACHE" });
+        await plugins.Share.share({ title: invoiceSubject(doc), text: SA.invoiceSms(doc, bizName(), SA.LEDGER_TODAY), files: [written.uri], dialogTitle: "Send " + name });
+        return;
+      }
+      const bytes = Uint8Array.from(pdf, (c) => c.charCodeAt(0));
+      const file = typeof File === "function" ? new File([bytes], name, { type: "application/pdf" }) : null;
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: invoiceSubject(doc), files: [file] });
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showPull("Saved " + name + ". Attach it to an email or message.");
+    } catch (error) {
+      if (!error || error.name !== "AbortError") showPull("Could not share the PDF. Try again.");
+    }
+  }
+
+  // Reminder by the best way we have: email, then text, then the share sheet.
+  function sendReminder(doc) {
+    if (!doc) return;
+    if (doc.email) {
+      window.location.href = SA.mailtoLink(doc.email, "Reminder: invoice " + (doc.number || ""), SA.reminderText(doc, bizName(), SA.LEDGER_TODAY));
+    } else if (doc.phone) {
+      window.location.href = SA.smsLink(doc.phone, "Reminder from " + SA.invoiceSms(doc, bizName(), SA.LEDGER_TODAY));
+    } else {
+      shareLive("Reminder: invoice " + (doc.number || ""), SA.reminderText(doc, bizName(), SA.LEDGER_TODAY), "");
+    }
   }
 
   function remindLive() {
     const doc = docs.find(item => item.id === viewingDocId);
     if (!doc) return;
     markHandled("remind", doc.id);
-    shareLive("Reminder: invoice " + (doc.number || ""), SA.reminderText(doc, bizName()), doc.email);
+    sendReminder(doc);
     renderAll();
   }
 

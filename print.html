@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Print invoice · Simple Accountz</title>
+<style>
+  :root { --forest: #163300; --lime: #b4ff6a; --ink: #0e0f0c; --slate: #4f524e; --fog: #eef1ec; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: #e8ebe6; }
+  .bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; max-width: 820px; margin: 16px auto; padding: 0 16px; }
+  .bar p { margin: 0; font-size: 13px; color: var(--slate); }
+  .bar button { border: 0; border-radius: 12px; height: 46px; padding: 0 20px; background: var(--forest); color: #fff; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .sheet { max-width: 820px; margin: 0 auto 32px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+  header { background: var(--forest); color: #fff; padding: 28px 36px; display: flex; justify-content: space-between; gap: 16px; }
+  header h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  header .sub { color: var(--lime); font-weight: 700; font-size: 13px; margin-top: 6px; }
+  header .due { text-align: right; }
+  header .due b { display: block; font-size: 24px; }
+  .meta { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 16px; padding: 28px 36px 8px; }
+  .meta small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--slate); margin-bottom: 4px; }
+  .meta b { font-size: 15px; }
+  .meta span { display: block; color: var(--slate); font-size: 13px; }
+  table { width: calc(100% - 72px); margin: 16px 36px; border-collapse: collapse; font-size: 14px; }
+  th { background: var(--fog); text-align: left; font-size: 10px; letter-spacing: .08em; color: var(--slate); padding: 10px; }
+  td { padding: 12px 10px; border-bottom: 1px solid #e3e6e0; }
+  .num { text-align: right; white-space: nowrap; }
+  .totals { margin: 4px 36px 0 auto; width: 320px; font-size: 14px; }
+  .totals div { display: flex; justify-content: space-between; padding: 5px 10px; color: var(--slate); }
+  .totals .strong { color: var(--ink); font-weight: 700; }
+  .totals .balance { background: var(--forest); color: #fff; font-weight: 700; padding: 10px; margin-top: 8px; }
+  .totals .balance span:first-child { color: var(--lime); }
+  footer { display: flex; justify-content: space-between; padding: 28px 36px 32px; font-size: 12px; color: var(--slate); }
+  .empty { max-width: 520px; margin: 80px auto; text-align: center; color: var(--slate); }
+  @media print {
+    body { background: #fff; }
+    .bar { display: none; }
+    .sheet { box-shadow: none; margin: 0; max-width: none; }
+    header, .totals .balance, th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="bar"><p id="hint">Print, or choose “Save as PDF” in the print dialog.</p><button id="print-btn" type="button">Print</button></div>
+<div id="root"></div>
+<script src="print.js"></script>
+</body>
+</html>

@@ -1259,6 +1259,7 @@ function createInvoice(docs, fields, today) {
     type: "invoice",
     name,
     email: String(f.email || "").trim(),
+    phone: cleanPhone(f.phone),
     number,
     subtitle: String(f.description || "").trim() || "Services",
     stored: "draft",
@@ -1320,10 +1321,12 @@ function invoiceText(doc, businessName) {
   return lines.join("\n");
 }
 
-function reminderText(doc, businessName) {
+function reminderText(doc, businessName, today) {
   if (!doc) return "";
+  const day = today || todayIso();
+  const when = doc.due ? (doc.due < day ? " was due " : " is due ") + prettyDate(doc.due) : " is open";
   return "Hello " + doc.name + ",\n\nA friendly reminder that invoice " + (doc.number || "") + " for "
-    + formatMoney(balanceOf(doc), doc.currency) + (doc.due ? " was due " + prettyDate(doc.due) : " is open")
+    + formatMoney(balanceOf(doc), doc.currency) + when
     + ".\n\nThank you,\n" + (businessName || "");
 }
 
@@ -1331,6 +1334,226 @@ function mailtoLink(email, subject, body) {
   const to = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(String(email || "")) ? email : "";
   return "mailto:" + encodeURIComponent(to).replace(/%40/g, "@")
     + "?subject=" + encodeURIComponent(subject || "") + "&body=" + encodeURIComponent(body || "");
+}
+
+// ---- Text messages ----
+// Keeps a leading + and the digits. 7 to 15 digits is a real phone number anywhere.
+function cleanPhone(value) {
+  const raw = String(value || "").trim();
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 7 || digits.length > 15) return "";
+  return (raw.charAt(0) === "+" ? "+" : "") + digits;
+}
+
+// For display: (555) 010-2299 for US numbers, otherwise as stored.
+function formatPhone(value) {
+  const phone = cleanPhone(value);
+  const us = /^(?:\+?1)?(\d{3})(\d{3})(\d{4})$/.exec(phone);
+  return us ? "(" + us[1] + ") " + us[2] + "-" + us[3] : phone;
+}
+
+// "sms:NUMBER?&body=" opens Messages with the text filled in on iPhone, Android, and Mac.
+function smsLink(phone, body) {
+  return "sms:" + cleanPhone(phone) + "?&body=" + encodeURIComponent(body || "");
+}
+
+function invoiceSms(doc, businessName, today) {
+  if (!doc) return "";
+  const day = today || todayIso();
+  const owed = formatMoney(balanceOf(doc), doc.currency);
+  const when = doc.due ? (doc.due < day ? ", was due " : ", due ") + prettyDate(doc.due) : "";
+  return (businessName || "Simple Accountz") + ": invoice " + (doc.number || "") + " for " + owed + when + ". Thank you!";
+}
+
+// ---- Invoice layout shared by the PDF and the print page ----
+function invoiceView(doc, businessName, taxLabel) {
+  const calc = calculateDocument(doc);
+  const currency = doc.currency || "USD";
+  const lines = calc.ok ? calc.lines.map((line) => ({
+    name: line.name || "Item",
+    qty: formatQty(line.qtyBps),
+    rate: formatMoney(line.rateMinor, currency),
+    amount: formatMoney(line.extendedMinor, currency)
+  })) : [];
+  const paid = calc.ok ? Math.max(0, calc.paidMinor - calc.refundedMinor) : 0;
+  return {
+    business: businessName || "Simple Accountz",
+    number: doc.number || "",
+    status: doc.display || "",
+    client: doc.name || "",
+    email: doc.email || "",
+    phone: formatPhone(doc.phone),
+    issued: doc.sentOn || doc.created || "",
+    due: doc.due || "",
+    lines,
+    subtotal: formatMoney(calc.ok ? calc.subtotalMinor : 0, currency),
+    taxLabel: taxLabel || "Tax",
+    tax: formatMoney(calc.ok ? calc.taxMinor : 0, currency),
+    total: formatMoney(calc.ok ? calc.totalMinor : (doc.totalMinor || 0), currency),
+    paid: paid ? formatMoney(paid, currency) : "",
+    balance: formatMoney(balanceOf(doc), currency)
+  };
+}
+
+// ---- PDF (written by hand: no library, works offline) ----
+// Standard Helvetica with WinAnsi encoding. Characters it cannot show become "?".
+const WIN_ANSI = { "€": 128, "‚": 130, "„": 132, "…": 133, "‘": 145, "’": 146, "“": 147, "”": 148, "•": 149, "–": 150, "—": 151, "™": 153 };
+
+function pdfString(value) {
+  let out = "";
+  for (const ch of String(value == null ? "" : value)) {
+    const code = ch.codePointAt(0);
+    let byte = 63;
+    if (code >= 32 && code <= 126) byte = code;
+    else if (code >= 160 && code <= 255) byte = code;
+    else if (WIN_ANSI[ch]) byte = WIN_ANSI[ch];
+    else if (code === 9 || code === 10 || code === 13) byte = 32;
+    const c = String.fromCharCode(byte);
+    out += (c === "(" || c === ")" || c === "\\") ? "\\" + c : c;
+  }
+  return out;
+}
+
+// Helvetica glyph widths (per 1000), close enough to right-align amounts.
+function pdfTextWidth(text, size, bold) {
+  let units = 0;
+  for (const ch of String(text)) {
+    if (/[0-9$€£¥#]/.test(ch)) units += 556;
+    else if (/[.,:;' ]/.test(ch)) units += 278;
+    else if (ch === "-") units += 333;
+    else if (/[A-Z]/.test(ch)) units += bold ? 722 : 667;
+    else if (/[a-z]/.test(ch)) units += bold ? 556 : 500;
+    else units += 556;
+  }
+  return units * size / 1000;
+}
+
+function pdfClip(text, size, bold, width) {
+  let t = String(text || "");
+  while (t.length > 1 && pdfTextWidth(t, size, bold) > width) t = t.slice(0, -2) + "…";
+  return t;
+}
+
+function invoicePdf(view) {
+  const W = 612;
+  const H = 792;
+  const M = 48;
+  const pages = [];
+  let ops = [];
+  const rgb = (c) => (c[0] / 255).toFixed(3) + " " + (c[1] / 255).toFixed(3) + " " + (c[2] / 255).toFixed(3);
+  const rect = (x, y, w, h, c) => ops.push(rgb(c) + " rg " + x + " " + y + " " + w + " " + h + " re f");
+  const text = (x, y, value, size, bold, c, align) => {
+    const t = String(value == null ? "" : value);
+    const tx = align === "right" ? x - pdfTextWidth(t, size, bold) : x;
+    ops.push("BT " + rgb(c || [14, 15, 12]) + " rg /" + (bold ? "F2" : "F1") + " " + size + " Tf " + tx.toFixed(1) + " " + y.toFixed(1) + " Td (" + pdfString(t) + ") Tj ET");
+  };
+  const line = (y) => ops.push("0.890 0.902 0.878 RG 0.8 w " + M + " " + y + " m " + (W - M) + " " + y + " l S");
+  const forest = [22, 51, 0];
+  const lime = [180, 255, 106];
+  const slate = [79, 82, 78];
+
+  // Header band
+  rect(0, H - 120, W, 120, forest);
+  text(M, H - 62, pdfClip(view.business, 22, true, 330), 22, true, [255, 255, 255]);
+  text(M, H - 86, "INVOICE " + view.number, 11, true, lime);
+  text(W - M, H - 62, view.balance, 22, true, [255, 255, 255], "right");
+  text(W - M, H - 86, "Balance due", 11, false, lime, "right");
+
+  let y = H - 160;
+  text(M, y, "BILL TO", 9, true, slate);
+  text(340, y, "ISSUED", 9, true, slate);
+  text(460, y, "DUE", 9, true, slate);
+  y -= 18;
+  text(M, y, pdfClip(view.client, 13, true, 270), 13, true);
+  text(340, y, prettyDate(view.issued) || "—", 12, false);
+  text(460, y, prettyDate(view.due) || "—", 12, false);
+  [view.email, view.phone].filter(Boolean).forEach((extra) => { y -= 16; text(M, y, pdfClip(extra, 11, false, 270), 11, false, slate); });
+
+  const tableHead = (top) => {
+    rect(M, top - 6, W - M * 2, 24, [238, 241, 236]);
+    text(M + 10, top + 2, "DESCRIPTION", 9, true, slate);
+    text(380, top + 2, "QTY", 9, true, slate, "right");
+    text(470, top + 2, "RATE", 9, true, slate, "right");
+    text(W - M - 10, top + 2, "AMOUNT", 9, true, slate, "right");
+    return top - 30;
+  };
+  y = tableHead(y - 44);
+  view.lines.forEach((row) => {
+    if (y < 150) {
+      text(W - M, 40, "Continued on the next page", 9, false, slate, "right");
+      pages.push(ops);
+      ops = [];
+      y = tableHead(H - 70);
+    }
+    text(M + 10, y, pdfClip(row.name, 11, false, 250), 11, false);
+    text(380, y, row.qty, 11, false, null, "right");
+    text(470, y, row.rate, 11, false, null, "right");
+    text(W - M - 10, y, row.amount, 11, false, null, "right");
+    line(y - 9);
+    y -= 26;
+  });
+
+  y -= 6;
+  const totalRow = (label, value, strong) => {
+    text(430, y, label, strong ? 12 : 11, strong, strong ? null : slate, "right");
+    text(W - M - 10, y, value, strong ? 12 : 11, strong, null, "right");
+    y -= strong ? 22 : 18;
+  };
+  totalRow("Subtotal", view.subtotal);
+  totalRow(view.taxLabel, view.tax);
+  totalRow("Total", view.total, true);
+  if (view.paid) totalRow("Paid", view.paid);
+  y -= 10;
+  rect(300, y - 12, W - M - 300, 32, forest);
+  text(316, y, "Balance due", 12, true, lime);
+  text(W - M - 10, y, view.balance, 13, true, [255, 255, 255], "right");
+
+  text(M, 56, "Thank you for your business.", 11, false, slate);
+  text(W - M, 56, "Made with Simple Accountz", 9, false, slate, "right");
+  pages.push(ops);
+
+  // Assemble the file. Objects: 1 catalog, 2 pages, 3 F1, 4 F2, then a page + content per page.
+  const objects = [];
+  const kids = pages.map((_, i) => (5 + i * 2) + " 0 R").join(" ");
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push("<< /Type /Pages /Kids [" + kids + "] /Count " + pages.length + " >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  pages.forEach((pageOps, i) => {
+    const stream = pageOps.join("\n");
+    objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + W + " " + H + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + (6 + i * 2) + " 0 R >>");
+    objects.push("<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream");
+  });
+  let out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(out.length);
+    out += (i + 1) + " 0 obj\n" + body + "\nendobj\n";
+  });
+  const xref = out.length;
+  out += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
+  offsets.forEach((offset) => { out += String(offset).padStart(10, "0") + " 00000 n \n"; });
+  out += "trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n";
+  return out;
+}
+
+function invoicePdfName(view) {
+  const who = String(view.client || "client").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "client";
+  return (view.number || "Invoice") + "-" + who + ".pdf";
+}
+
+// Bytes (one per character) to base64, in browsers and in Node.
+function binaryToBase64(binary) {
+  if (typeof btoa === "function") return btoa(binary);
+  return Buffer.from(binary, "latin1").toString("base64");
+}
+
+// ---- Print page link (data rides in the #fragment, which never reaches a server) ----
+function printLink(view, base) {
+  const json = JSON.stringify(view);
+  const utf8 = unescape(encodeURIComponent(json));
+  const b64 = binaryToBase64(utf8).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return (base || "https://simpleaccountz.com/print.html") + "#d=" + b64;
 }
 
 function emptyBooks() {
@@ -1625,6 +1848,15 @@ const SA = {
   restoreBooks,
   hasBooksData,
   uniqueId,
+  cleanPhone,
+  formatPhone,
+  smsLink,
+  invoiceSms,
+  invoiceView,
+  invoicePdf,
+  invoicePdfName,
+  binaryToBase64,
+  printLink,
   planSync,
   mergeBooks,
   mergeDeleted,
