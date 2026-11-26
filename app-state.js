@@ -1073,6 +1073,19 @@ function stageUpload(file) {
   return { ok: true, name: name, type: expected, data: data, size: data.length, files: false };
 }
 
+// Ids must not collide when two devices add records offline and later merge.
+function uniqueId(prefix) {
+  let rand = "";
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    rand = Array.from(bytes).map((b) => b.toString(36)).join("");
+  } else {
+    rand = Math.random().toString(36).slice(2, 10);
+  }
+  return prefix + "-" + Date.now().toString(36) + rand;
+}
+
 function addUpload(files, staged) {
   const current = Array.isArray(files) ? files : [];
   if (!staged || !staged.ok) return { files: current.slice(), added: false, reason: "not_ready" };
@@ -1081,7 +1094,7 @@ function addUpload(files, staged) {
   }
   return {
     files: current.concat([{
-      id: "file-" + (current.length + 1),
+      id: uniqueId("file"),
       name: staged.name,
       type: staged.type,
       size: staged.size,
@@ -1109,7 +1122,7 @@ function addExpense(transactions, expense, businessCurrency) {
   );
   if (duplicate) return { transactions, added: false, reason: "duplicate" };
   const next = transactions.concat([Object.assign({
-    id: "out-" + (transactions.length + 1),
+    id: uniqueId("out"),
     kind: "out"
   }, expense)]);
   return { transactions: next, added: true };
@@ -1242,7 +1255,7 @@ function createInvoice(docs, fields, today) {
   const day = today || todayIso();
   const number = nextInvoiceNumber(docs);
   const doc = {
-    id: "inv-" + number.slice(4),
+    id: uniqueId("inv-" + number.slice(4)),
     type: "invoice",
     name,
     email: String(f.email || "").trim(),
@@ -1370,6 +1383,63 @@ function restoreBooks(text) {
     autoMode: raw.autoMode !== false,
     autoHandled: Array.isArray(raw.autoHandled) ? raw.autoHandled.filter((item) => typeof item === "string") : [],
     autoSkip: Array.isArray(raw.autoSkip) ? raw.autoSkip.filter((item) => typeof item === "string") : []
+  };
+}
+
+// ---- Cloud sync rules ----
+// meta: { version: the server version this device last matched, dirty: unsynced local edits }
+// server: { books, version } from GET /api/books
+
+function hasBooksData(books) {
+  if (!books) return false;
+  return ["docs", "business", "personal", "uploads"].some((key) => Array.isArray(books[key]) && books[key].length > 0)
+    || Boolean(books.businessName);
+}
+
+function planSync(meta, server) {
+  const m = meta || { version: 0, dirty: false };
+  const s = server || { books: null, version: 0 };
+  if (s.version === m.version) return m.dirty ? "push" : "none";
+  if (!m.dirty) return "pull";
+  if (!hasBooksData(s.books)) return "push";
+  return "merge";
+}
+
+function unionById(mine, theirs) {
+  const out = [];
+  const seen = {};
+  (Array.isArray(mine) ? mine : []).concat(Array.isArray(theirs) ? theirs : []).forEach((item) => {
+    if (!item || item.id == null || seen[item.id]) return;
+    seen[item.id] = true;
+    out.push(item);
+  });
+  return out;
+}
+
+function unionStrings(a, b) {
+  const out = [];
+  (Array.isArray(a) ? a : []).concat(Array.isArray(b) ? b : []).forEach((item) => {
+    if (typeof item === "string" && out.indexOf(item) === -1) out.push(item);
+  });
+  return out;
+}
+
+// Both devices changed the books. Keep everything from both; where the same
+// record changed on both, this device's copy wins because it is the newer edit.
+function mergeBooks(local, server) {
+  const mine = restoreBooks(JSON.stringify(local || emptyBooks()));
+  const theirs = restoreBooks(JSON.stringify(server || emptyBooks()));
+  return {
+    version: 1,
+    businessName: mine.businessName || theirs.businessName,
+    accountKind: mine.accountKind,
+    docs: unionById(mine.docs, theirs.docs),
+    business: unionById(mine.business, theirs.business),
+    personal: unionById(mine.personal, theirs.personal),
+    uploads: unionById(mine.uploads, theirs.uploads),
+    autoMode: mine.autoMode,
+    autoHandled: unionStrings(mine.autoHandled, theirs.autoHandled),
+    autoSkip: unionStrings(mine.autoSkip, theirs.autoSkip)
   };
 }
 
@@ -1527,6 +1597,10 @@ const SA = {
   emptyBooks,
   serializeBooks,
   restoreBooks,
+  hasBooksData,
+  uniqueId,
+  planSync,
+  mergeBooks,
   guessCategory,
   autopilot,
   csvCell,

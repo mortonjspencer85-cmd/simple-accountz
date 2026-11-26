@@ -665,6 +665,7 @@
           </span>
         </div>
         <button class="biz" onclick="show('account-setup')"><span class="dot"></span> <span id="biz-label">Field &amp; Co. · United States</span></button>
+        <button class="textlink live-only" id="sync-status" onclick="show('account')" style="font-size:13px;margin:-6px 0 8px"></button>
         <div class="auto-panel" id="auto-panel" hidden></div>
         <div id="home-business">
         <button class="hero" onclick="showFiltered('open')" style="display:block;width:100%;text-align:left;border:0;cursor:pointer;font:inherit">
@@ -789,6 +790,31 @@
         <div class="sticky">
           <div class="total"><small>Estimate</small><span id="est-total">$900.00</span></div>
           <button class="pill" onclick="show('editor-converted')">Convert to invoice</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="account">
+        <button class="back" onclick="show('settings')">Back</button>
+        <h2 class="title" style="margin-bottom:8px">Account and sync</h2>
+        <div id="acct-out">
+          <p class="note">Create a free account to back up your books and use them on your phone and your computer.</p>
+          <div class="seg lime" id="acct-mode">
+            <button class="on" data-mode="signup">Sign up</button>
+            <button data-mode="login">Sign in</button>
+          </div>
+          <div class="field"><label for="acct-email">Email</label><input id="acct-email" type="email" autocomplete="email" inputmode="email"></div>
+          <div class="field"><label for="acct-pass">Password</label><input id="acct-pass" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></div>
+          <button class="pill" style="width:100%" id="acct-go" onclick="submitAccount()">Create account</button>
+          <p class="note" id="acct-msg" role="status"></p>
+          <p class="note">Keep your password somewhere safe. Password reset by email is coming soon.</p>
+        </div>
+        <div id="acct-in" hidden>
+          <div class="card"><h3 id="acct-email-shown"></h3><p id="acct-sync"></p></div>
+          <div class="dv-actions">
+            <button class="pill" onclick="syncNow(true)">Sync now</button>
+            <button class="pill-outline" onclick="signOut()">Sign out</button>
+          </div>
+          <button class="textlink" onclick="deleteAccount()">Delete account</button>
         </div>
       </section>
 
@@ -1076,6 +1102,7 @@
 
       <section class="screen" id="settings">
         <div class="top"><h2 class="title">Settings</h2></div>
+        <button class="set-row live-only" onclick="show('account')"><span class="name">Account and sync</span><span class="sub" id="acct-sub">Not signed in · sign up to back up and sync</span></button>
         <div class="field live-only" style="margin-top:4px"><label>Business name</label><input id="biz-name" placeholder="Your business" onchange="setBusinessName(this.value)"></div>
         <button class="set-row" onclick="openAccountSetup()"><span class="name">Account type</span><span class="sub" id="account-sub">Business</span></button>
         <button class="set-row" id="auto-row" onclick="toggleAuto()"><span class="name">Assistant works automatically</span><span class="switch" id="auto-switch" style="grid-row:1 / span 2;grid-column:2"></span><span class="sub" id="auto-sub">On · matches deposits, files expenses, starts monthly drafts</span></button>
@@ -3333,6 +3360,28 @@
     SA.LEDGER_TODAY = SA.todayIso();
     let saved = SA.emptyBooks();
     try { saved = SA.restoreBooks(localStorage.getItem(SA.BOOKS_KEY)); } catch (error) { saved = SA.emptyBooks(); }
+    applyBooksState(saved);
+    const hint = document.getElementById("draft-hint");
+    if (hint) hint.textContent = "Save invoice keeps it on this device. Send it from the invoice screen.";
+    window.addEventListener("resize", fitLiveShell);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+    loadSync();
+    document.getElementById("acct-mode").addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      accountMode = button.dataset.mode;
+      renderAccount();
+    });
+    window.addEventListener("online", () => syncNow(false));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") syncNow(false);
+    });
+    if (sync.token) setTimeout(() => syncNow(false), 0);
+  }
+
+  function applyBooksState(saved) {
     docs = SA.refreshStatuses(saved.docs, SA.LEDGER_TODAY);
     businessTransactions = saved.business;
     personalTransactions = saved.personal;
@@ -3349,25 +3398,250 @@
     autoSkip = saved.autoSkip;
     const nameInput = document.getElementById("biz-name");
     if (nameInput) nameInput.value = businessName;
-    const hint = document.getElementById("draft-hint");
-    if (hint) hint.textContent = "Save invoice keeps it on this device. Send it from the invoice screen.";
-    window.addEventListener("resize", fitLiveShell);
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").catch(() => {});
-    }
   }
 
   function saveBooks() {
     if (!LIVE) return;
     const business = accountKind === "business" ? transactions : businessTransactions;
     const personal = accountKind === "personal" ? transactions : personalTransactions;
+    const text = SA.serializeBooks({
+      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip
+    });
     try {
-      localStorage.setItem(SA.BOOKS_KEY, SA.serializeBooks({
-        businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip
-      }));
+      localStorage.setItem(SA.BOOKS_KEY, text);
     } catch (error) {
       showPull("This device is out of space for Simple Accountz. Remove a large photo or file.");
     }
+    if (text !== lastSavedText) {
+      const changed = lastSavedText !== null;
+      lastSavedText = text;
+      if (changed && !applyingRemote) {
+        editCount += 1;
+        if (sync.token) {
+          sync.dirty = true;
+          saveSync();
+          scheduleSync();
+        }
+      }
+    }
+  }
+
+  // ---- Accounts and cloud sync ----
+  const API_BASE = window.SA_API || "https://api-production-87c2c165.up.railway.app";
+  const SYNC_KEY = "simpleaccountz.sync.v1";
+  let sync = { token: "", email: "", version: 0, dirty: false };
+  let lastSavedText = null;
+  let applyingRemote = false;
+  let editCount = 0;
+  let syncBusy = false;
+  let syncAgain = false;
+  let syncTimer = null;
+  let syncNote = "";
+  let lastSyncedAt = null;
+  let accountMode = "signup";
+
+  function loadSync() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(SYNC_KEY) || "null");
+      if (raw && typeof raw.token === "string" && /^[a-f0-9]{64}$/.test(raw.token)) {
+        sync = { token: raw.token, email: String(raw.email || ""), version: Number(raw.version) || 0, dirty: !!raw.dirty };
+      }
+    } catch (error) {}
+  }
+
+  function saveSync() {
+    try {
+      if (sync.token) localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+      else localStorage.removeItem(SYNC_KEY);
+    } catch (error) {}
+  }
+
+  function currentBooks() {
+    const business = accountKind === "business" ? transactions : businessTransactions;
+    const personal = accountKind === "personal" ? transactions : personalTransactions;
+    return JSON.parse(SA.serializeBooks({
+      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip
+    }));
+  }
+
+  function applyRemoteBooks(books) {
+    applyingRemote = true;
+    try {
+      applyBooksState(SA.restoreBooks(JSON.stringify(books)));
+      renderAll();
+    } finally {
+      applyingRemote = false;
+    }
+  }
+
+  function api(method, path, body) {
+    const headers = { "Content-Type": "application/json" };
+    if (sync.token) headers.Authorization = "Bearer " + sync.token;
+    return fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body)
+    }).then((response) => response.json().catch(() => null).then((data) => ({ status: response.status, body: data })));
+  }
+
+  function scheduleSync() {
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => { syncTimer = null; syncNow(false); }, 1500);
+  }
+
+  function signedOutByServer() {
+    sync = { token: "", email: "", version: 0, dirty: false };
+    saveSync();
+    syncNote = "You were signed out. Sign in again to keep syncing. Your books are still on this device.";
+  }
+
+  async function syncNow(manual) {
+    if (!LIVE || !sync.token) return;
+    if (syncBusy) { syncAgain = true; return; }
+    if (navigator.onLine === false) {
+      syncNote = "Offline. Changes will sync when you are back online.";
+      renderAccount();
+      return;
+    }
+    syncBusy = true;
+    syncNote = manual ? "Syncing…" : syncNote;
+    renderAccount();
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const got = await api("GET", "/api/books");
+        if (got.status === 401) { signedOutByServer(); return; }
+        if (got.status !== 200 || !got.body) throw new Error("get " + got.status);
+        const plan = SA.planSync(sync, got.body);
+        if (plan === "none") break;
+        if (plan === "pull") {
+          applyRemoteBooks(got.body.books || SA.emptyBooks());
+          sync.version = got.body.version;
+          sync.dirty = false;
+          saveSync();
+          break;
+        }
+        const stamp = editCount;
+        let books = currentBooks();
+        if (plan === "merge") {
+          books = SA.mergeBooks(books, got.body.books);
+          applyRemoteBooks(books);
+        }
+        const put = await api("PUT", "/api/books", { books, baseVersion: got.body.version });
+        if (put.status === 200 && put.body) {
+          sync.version = put.body.version;
+          sync.dirty = editCount !== stamp;
+          saveSync();
+          if (sync.dirty) syncAgain = true;
+          break;
+        }
+        if (put.status === 409) continue;
+        if (put.status === 401) { signedOutByServer(); return; }
+        if (put.status === 413) {
+          syncNote = "Your books are too large to sync. Remove some receipt photos or files.";
+          return;
+        }
+        throw new Error("put " + put.status);
+      }
+      lastSyncedAt = new Date();
+      syncNote = "";
+    } catch (error) {
+      syncNote = "Could not reach the sync server. Your books are safe on this device and will sync later.";
+    } finally {
+      syncBusy = false;
+      renderAccount();
+      if (syncAgain) { syncAgain = false; scheduleSync(); }
+    }
+  }
+
+  async function submitAccount() {
+    const msg = document.getElementById("acct-msg");
+    const email = document.getElementById("acct-email").value.trim();
+    const password = document.getElementById("acct-pass").value;
+    if (!email || password.length < 8) {
+      msg.textContent = "Enter your email and a password of at least 8 characters.";
+      return;
+    }
+    const button = document.getElementById("acct-go");
+    button.disabled = true;
+    msg.textContent = accountMode === "signup" ? "Creating your account…" : "Signing in…";
+    let result;
+    try {
+      result = await api("POST", accountMode === "signup" ? "/api/signup" : "/api/login", { email, password });
+    } catch (error) {
+      result = { status: 0, body: null };
+    }
+    button.disabled = false;
+    if ((result.status === 200 || result.status === 201) && result.body && result.body.token) {
+      sync = { token: result.body.token, email: result.body.email, version: 0, dirty: SA.hasBooksData(currentBooks()) };
+      saveSync();
+      document.getElementById("acct-pass").value = "";
+      msg.textContent = "";
+      await syncNow(true);
+      showPull(accountMode === "signup" ? "Account created. Your books are backed up." : "Signed in. Your books are synced.");
+      return;
+    }
+    const errors = {
+      email_taken: "That email already has an account. Tap Sign in instead.",
+      bad_login: "That email and password do not match.",
+      weak_password: "Use a password of at least 8 characters.",
+      bad_email: "Check the email address.",
+      slow_down: "Too many tries. Wait 15 minutes and try again."
+    };
+    msg.textContent = (result.body && errors[result.body.error]) || "Could not reach the server. Check your connection and try again.";
+  }
+
+  async function signOut() {
+    if (sync.dirty) await syncNow(true);
+    const unsynced = sync.dirty ? " Some recent changes have not synced yet and will be lost." : "";
+    if (!window.confirm("Sign out? Your books stay in your account and are removed from this device." + unsynced)) return;
+    try { await api("POST", "/api/logout", {}); } catch (error) {}
+    try {
+      localStorage.removeItem(SYNC_KEY);
+      localStorage.removeItem(SA.BOOKS_KEY);
+    } catch (error) {}
+    location.reload();
+  }
+
+  async function deleteAccount() {
+    const password = window.prompt("Type your password to delete your account and its cloud copy. This cannot be undone. Books on this device stay until you erase them.");
+    if (!password) return;
+    let result;
+    try { result = await api("DELETE", "/api/account", { password }); } catch (error) { result = { status: 0 }; }
+    if (result.status === 200) {
+      sync = { token: "", email: "", version: 0, dirty: false };
+      saveSync();
+      syncNote = "Your account and its cloud copy were deleted.";
+      renderAccount();
+      return;
+    }
+    syncNote = result.status === 401 ? "That password is not right. The account was not deleted." : "Could not reach the server. The account was not deleted.";
+    renderAccount();
+  }
+
+  function renderAccount() {
+    if (!LIVE) return;
+    const signedIn = Boolean(sync.token);
+    const out = document.getElementById("acct-out");
+    const inside = document.getElementById("acct-in");
+    if (!out || !inside) return;
+    out.hidden = signedIn;
+    inside.hidden = !signedIn;
+    document.querySelectorAll("#acct-mode button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.mode === accountMode);
+    });
+    document.getElementById("acct-go").textContent = accountMode === "signup" ? "Create account" : "Sign in";
+    document.getElementById("acct-pass").autocomplete = accountMode === "signup" ? "new-password" : "current-password";
+    let status;
+    if (!signedIn) status = syncNote || "Not signed in. Sign up to back up and sync.";
+    else if (syncNote) status = syncNote;
+    else if (syncBusy) status = "Syncing…";
+    else if (sync.dirty) status = "Changes waiting to sync.";
+    else status = lastSyncedAt ? "Synced at " + lastSyncedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Synced.";
+    document.getElementById("acct-email-shown").textContent = sync.email;
+    document.getElementById("acct-sync").textContent = status;
+    document.getElementById("acct-sub").textContent = signedIn ? sync.email + " · " + status : "Not signed in · sign up to back up and sync";
+    const home = document.getElementById("sync-status");
+    if (home) home.textContent = signedIn ? "☁ " + status : "☁ Sign up free to back up and sync your books";
   }
 
   let liveShell = "";
@@ -3546,6 +3820,7 @@
     renderAuto();
     renderEmptyStates();
     saveBooks();
+    renderAccount();
   }
 
   function wrapFooters() {
