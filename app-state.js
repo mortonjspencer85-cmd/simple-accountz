@@ -50,6 +50,7 @@ function formatMoney(minor, currency) {
   return new Intl.NumberFormat("en", {
     style: "currency",
     currency: code,
+    currencyDisplay: "narrowSymbol",
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent
   }).format(major);
@@ -533,7 +534,8 @@ const LATE_FEE_BPS = 150;
 const ISSUED_STORED = ["sent", "viewed", "partially_paid", "paid"];
 
 function taxName(country, language) {
-  const row = TAX_NAMES[country] || TAX_NAMES.US;
+  const row = TAX_NAMES[country];
+  if (!row) return defaultTaxName(country);
   return row[language] || row.en;
 }
 
@@ -1628,9 +1630,13 @@ function invoiceView(doc, businessName, taxLabel) {
 // Standard Helvetica with WinAnsi encoding. Characters it cannot show become "?".
 const WIN_ANSI = { "€": 128, "‚": 130, "„": 132, "…": 133, "‘": 145, "’": 146, "“": 147, "”": 148, "•": 149, "–": 150, "—": 151, "™": 153 };
 
+// Currency signs the built-in PDF fonts cannot draw are written as the code.
+const PDF_CURRENCY_SIGNS = { "₦": "NGN ", "₹": "INR ", "₱": "PHP ", "₩": "KRW ", "₫": "VND ", "₺": "TRY ", "₴": "UAH ", "₸": "KZT ", "₽": "RUB ", "₪": "ILS ", "₵": "GHS ", "₲": "PYG ", "₡": "CRC ", "₭": "LAK ", "₮": "MNT ", "₼": "AZN ", "₾": "GEL ", "৳": "BDT ", "฿": "THB ", "៛": "KHR " };
+
 function pdfString(value) {
   let out = "";
-  for (const ch of String(value == null ? "" : value)) {
+  const text = String(value == null ? "" : value).replace(/[₦₹₱₩₫₺₴₸₽₪₵₲₡₭₮₼₾৳฿៛]/g, (sign) => PDF_CURRENCY_SIGNS[sign]);
+  for (const ch of text) {
     const code = ch.codePointAt(0);
     let byte = 63;
     if (code >= 32 && code <= 126) byte = code;
@@ -2605,6 +2611,196 @@ function cashForecast(docs, transactions, today, days, currency) {
   return { days: span, inMinor, overdueMinor, outMinor, netMinor: inMinor + overdueMinor - outMinor, invoices: count };
 }
 
+// ---- Every country, its currency, and its usual sales-tax name ----
+// Country -> ISO 4217 currency. Decimal places come from the platform (Intl),
+// so a currency like JPY or KWD always rounds the way its banks do.
+const COUNTRY_CURRENCY = ("AD:EUR AE:AED AF:AFN AG:XCD AL:ALL AM:AMD AO:AOA AR:ARS AT:EUR AU:AUD AZ:AZN BA:BAM BB:BBD BD:BDT BE:EUR BF:XOF BG:BGN BH:BHD BI:BIF BJ:XOF BN:BND BO:BOB BR:BRL BS:BSD BT:BTN BW:BWP BY:BYN BZ:BZD "
+  + "CA:CAD CD:CDF CF:XAF CG:XAF CH:CHF CI:XOF CL:CLP CM:XAF CN:CNY CO:COP CR:CRC CU:CUP CV:CVE CY:EUR CZ:CZK DE:EUR DJ:DJF DK:DKK DM:XCD DO:DOP DZ:DZD EC:USD EE:EUR EG:EGP ER:ERN ES:EUR ET:ETB FI:EUR FJ:FJD FM:USD FR:EUR "
+  + "GA:XAF GB:GBP GD:XCD GE:GEL GH:GHS GM:GMD GN:GNF GQ:XAF GR:EUR GT:GTQ GW:XOF GY:GYD HK:HKD HN:HNL HR:EUR HT:HTG HU:HUF ID:IDR IE:EUR IL:ILS IN:INR IQ:IQD IR:IRR IS:ISK IT:EUR JM:JMD JO:JOD JP:JPY "
+  + "KE:KES KG:KGS KH:KHR KI:AUD KM:KMF KN:XCD KR:KRW KW:KWD KZ:KZT LA:LAK LB:LBP LC:XCD LI:CHF LK:LKR LR:LRD LS:LSL LT:EUR LU:EUR LV:EUR LY:LYD MA:MAD MC:EUR MD:MDL ME:EUR MG:MGA MH:USD MK:MKD ML:XOF MM:MMK MN:MNT MO:MOP MR:MRU MT:EUR MU:MUR MV:MVR MW:MWK MX:MXN MY:MYR MZ:MZN "
+  + "NA:NAD NE:XOF NG:NGN NI:NIO NL:EUR NO:NOK NP:NPR NR:AUD NZ:NZD OM:OMR PA:PAB PE:PEN PG:PGK PH:PHP PK:PKR PL:PLN PR:USD PS:ILS PT:EUR PW:USD PY:PYG QA:QAR RO:RON RS:RSD RU:RUB RW:RWF "
+  + "SA:SAR SB:SBD SC:SCR SD:SDG SE:SEK SG:SGD SI:EUR SK:EUR SL:SLE SM:EUR SN:XOF SO:SOS SR:SRD SS:SSP ST:STN SV:USD SY:SYP SZ:SZL TD:XAF TG:XOF TH:THB TJ:TJS TL:USD TM:TMT TN:TND TO:TOP TR:TRY TT:TTD TV:AUD TW:TWD TZ:TZS "
+  + "UA:UAH UG:UGX US:USD UY:UYU UZ:UZS VA:EUR VC:XCD VE:VES VN:VND VU:VUV WS:WST XK:EUR YE:YER ZA:ZAR ZM:ZMW ZW:USD").split(" ").reduce((map, pair) => {
+  const parts = pair.split(":");
+  map[parts[0]] = parts[1];
+  return map;
+}, {});
+
+const GST_COUNTRIES = ["AU", "NZ", "SG", "IN", "MY", "PG", "BT"];
+const IVA_COUNTRIES = ["ES", "MX", "BR", "AR", "CL", "CO", "PE", "UY", "PY", "BO", "EC", "VE", "CR", "GT", "HN", "NI", "PA", "SV", "DO", "IT", "PT"];
+const NO_VAT_COUNTRIES = ["HK", "KW", "QA", "BN", "MO", "LY", "SO", "KI", "TV", "NR", "MH", "FM", "PW", "TL", "IQ", "SY", "AF", "KP"];
+
+function currencyDigits(code) {
+  try {
+    return new Intl.NumberFormat("en", { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits;
+  } catch (error) {
+    return 2;
+  }
+}
+
+Object.keys(COUNTRY_CURRENCY).forEach((country) => {
+  const code = COUNTRY_CURRENCY[country];
+  if (!CURRENCIES[code]) CURRENCIES[code] = { exponent: currencyDigits(code) };
+});
+
+function defaultTaxName(country) {
+  if (TAX_NAMES[country]) return TAX_NAMES[country].en;
+  if (country === "US") return "Sales tax";
+  if (GST_COUNTRIES.indexOf(country) !== -1) return "GST";
+  if (IVA_COUNTRIES.indexOf(country) !== -1) return "IVA";
+  if (NO_VAT_COUNTRIES.indexOf(country) !== -1) return "Tax";
+  return "VAT";
+}
+
+function countryName(code) {
+  try {
+    const names = new Intl.DisplayNames(["en"], { type: "region" });
+    return names.of(code) || code;
+  } catch (error) {
+    return code;
+  }
+}
+
+// Every country the app can be set to, sorted by name.
+function countryList() {
+  return Object.keys(COUNTRY_CURRENCY).map((code) => ({
+    code,
+    name: countryName(code),
+    currency: COUNTRY_CURRENCY[code],
+    taxName: defaultTaxName(code)
+  })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ---- Files other accounting software can import ----
+// QuickBooks, Xero, Sage, Wave, FreshBooks, Zoho Books, and MYOB all import
+// bank statements as OFX or a Date/Description/Amount CSV. QuickBooks and Xero
+// also import sales invoices from their own CSV layouts, written here exactly.
+
+function slashDate(iso, monthFirst) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return "";
+  return monthFirst ? m[2] + "/" + m[3] + "/" + m[1] : m[3] + "/" + m[2] + "/" + m[1];
+}
+
+function csvLine(cells) {
+  // Plain numbers (amounts, quantities, rates) go out as-is so importers read them;
+  // everything else goes through the formula guard.
+  return cells.map((cell) => {
+    const text = cell == null ? "" : String(cell);
+    return /^-?\d+(\.\d+)?%?$/.test(text) ? text : csvCell(text);
+  }).join(",");
+}
+
+function issuedInvoices(docs, start, end, currency) {
+  return (docs || []).filter((doc) => {
+    if (!doc || doc.type !== "invoice" || doc.currency !== currency) return false;
+    if (ISSUED_STORED.indexOf(doc.stored) === -1) return false;
+    const day = doc.sentOn || doc.created || "";
+    return day >= start && day <= end;
+  }).sort((a, b) => ((a.number || "") < (b.number || "") ? -1 : 1));
+}
+
+function invoiceRows(doc) {
+  const rows = [];
+  (doc.lines || []).forEach((line) => {
+    if (!line || line.header || line.rateMinor == null) return;
+    const amountMinor = divRoundHalfUp(BigInt(line.qtyBps) * BigInt(line.rateMinor), 10000n);
+    const taxBps = (Array.isArray(line.taxes) ? line.taxes : []).reduce((t, tax) => t + (tax && tax.bps > 0 ? tax.bps : 0), 0);
+    rows.push({
+      description: String(line.name || doc.subtitle || "Services"),
+      qty: String(line.qtyBps / 10000),
+      rateMinor: line.rateMinor,
+      amountMinor,
+      taxBps
+    });
+  });
+  return rows;
+}
+
+function bankRows(transactions, start, end, currency) {
+  return (transactions || []).filter((tx) =>
+    tx && tx.currency === currency && tx.date >= start && tx.date <= end
+    && (tx.kind === "in" || tx.kind === "out" || tx.kind === "refund")
+  ).sort((a, b) => (a.date === b.date ? (a.id < b.id ? -1 : 1) : (a.date < b.date ? -1 : 1)));
+}
+
+function ofxText(text) {
+  return String(text || "").replace(/[<>&]/g, " ").replace(/[\r\n]+/g, " ").trim().slice(0, 32) || "Transaction";
+}
+
+const ACCOUNTING_FORMATS = {
+  quickbooks: { label: "QuickBooks invoices", ext: "csv" },
+  xero: { label: "Xero invoices", ext: "csv" },
+  bank: { label: "Bank transactions (any program)", ext: "csv" },
+  ofx: { label: "OFX bank statement", ext: "ofx" },
+  customers: { label: "Customers", ext: "csv" }
+};
+
+function accountingExport(format, docs, transactions, period, today, currency, country, businessName) {
+  const spec = ACCOUNTING_FORMATS[format];
+  if (!spec) return { ok: false, error: "bad_format" };
+  const bounds = periodBounds(period, today);
+  if (!bounds) return { ok: false, error: "bad_period" };
+  const start = bounds.start;
+  const end = bounds.end;
+  const monthFirst = country === "US" || country === "PH" || country === "CA";
+  const amount = (minor) => decimalAmount(minor, currency);
+  const lines = [];
+  let count = 0;
+  if (format === "quickbooks") {
+    lines.push("InvoiceNo,Customer,InvoiceDate,DueDate,Memo,Item(Product/Service),ItemDescription,ItemQuantity,ItemRate,ItemAmount,Taxable,TaxRate,Currency");
+    issuedInvoices(docs, start, end, currency).forEach((doc) => {
+      count += 1;
+      invoiceRows(doc).forEach((row) => lines.push(csvLine([
+        doc.number, doc.name, slashDate(doc.sentOn || doc.created, monthFirst), slashDate(doc.due, monthFirst),
+        doc.subtitle || "", "Services", row.description, row.qty, amount(row.rateMinor), amount(row.amountMinor),
+        row.taxBps ? "Y" : "N", row.taxBps ? (row.taxBps / 100) + "%" : "", currency
+      ])));
+    });
+  } else if (format === "xero") {
+    lines.push("*ContactName,EmailAddress,*InvoiceNumber,*InvoiceDate,*DueDate,*Description,*Quantity,*UnitAmount,*AccountCode,*TaxType,Currency");
+    issuedInvoices(docs, start, end, currency).forEach((doc) => {
+      count += 1;
+      invoiceRows(doc).forEach((row) => lines.push(csvLine([
+        doc.name, doc.email || "", doc.number, slashDate(doc.sentOn || doc.created, monthFirst), slashDate(doc.due, monthFirst),
+        row.description, row.qty, amount(row.rateMinor), "200", row.taxBps ? "Tax on Sales" : "Tax Exempt", currency
+      ])));
+    });
+  } else if (format === "bank") {
+    lines.push("Date,Description,Amount,Category");
+    bankRows(transactions, start, end, currency).forEach((tx) => {
+      count += 1;
+      const signed = tx.kind === "in" ? amount(tx.amountMinor) : "-" + amount(tx.amountMinor);
+      lines.push(csvLine([slashDate(tx.date, monthFirst), tx.name, signed, tx.category || ""]));
+    });
+  } else if (format === "customers") {
+    lines.push("Name,Email,Phone,Open balance,Currency");
+    clientSummaries(docs, today).forEach((row) => {
+      count += 1;
+      lines.push(csvLine([row.name, row.email, row.phone, amount(row.owed[currency] || 0), currency]));
+    });
+  } else if (format === "ofx") {
+    const rows = bankRows(transactions, start, end, currency);
+    count = rows.length;
+    const stamp = (iso) => String(iso).replace(/-/g, "") + "120000";
+    const body = rows.map((tx) => {
+      const signed = tx.kind === "in" ? amount(tx.amountMinor) : "-" + amount(tx.amountMinor);
+      return "<STMTTRN><TRNTYPE>" + (tx.kind === "in" ? "CREDIT" : "DEBIT") + "<DTPOSTED>" + stamp(tx.date)
+        + "<TRNAMT>" + signed + "<FITID>" + ofxText(tx.id) + "<NAME>" + ofxText(tx.name) + "</STMTTRN>";
+    });
+    const text = ["OFXHEADER:100", "DATA:OFXSGML", "VERSION:102", "SECURITY:NONE", "ENCODING:USASCII", "CHARSET:1252", "COMPRESSION:NONE", "OLDFILEUID:NONE", "NEWFILEUID:NONE", "",
+      "<OFX><SIGNONMSGSRSV1><SONRS><STATUS><CODE>0<SEVERITY>INFO</STATUS><DTSERVER>" + stamp(today) + "<LANGUAGE>ENG</SONRS></SIGNONMSGSRSV1>",
+      "<BANKMSGSRSV1><STMTTRNRS><TRNUID>1<STATUS><CODE>0<SEVERITY>INFO</STATUS><STMTRS><CURDEF>" + currency,
+      "<BANKACCTFROM><BANKID>SIMPLEACCOUNTZ<ACCTID>BOOKS<ACCTTYPE>CHECKING</BANKACCTFROM>",
+      "<BANKTRANLIST><DTSTART>" + stamp(start) + "<DTEND>" + stamp(end)].concat(body).concat([
+      "</BANKTRANLIST><LEDGERBAL><BALAMT>0.00<DTASOF>" + stamp(end) + "</LEDGERBAL></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>"
+    ]).join("\r\n");
+    return { ok: true, format, count, mime: "application/x-ofx", filename: "simple-accountz-" + start + "-to-" + end + ".ofx", text };
+  }
+  const slug = String(businessName || "simple-accountz").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "simple-accountz";
+  return { ok: true, format, count, mime: "text/csv", filename: slug + "-" + format + "-" + start + "-to-" + end + ".csv", text: "﻿" + lines.join("\r\n") + "\r\n" };
+}
+
 const SA = {
   CURRENCIES,
   switchAccountBooks,
@@ -2740,6 +2936,13 @@ const SA = {
   hoursFromMs,
   timerElapsed,
   cashForecast,
+  COUNTRY_CURRENCY,
+  countryList,
+  countryName,
+  defaultTaxName,
+  currencyDigits,
+  ACCOUNTING_FORMATS,
+  accountingExport,
   DEMO_AUTH_CODE,
   RECOVERY_TOKEN
 };

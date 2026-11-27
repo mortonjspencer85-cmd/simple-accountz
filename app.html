@@ -1339,6 +1339,16 @@
         <div class="card"><h3 id="report-income">$1,640.00 in</h3><p id="report-expense">Expenses in this period</p></div>
         <div class="card"><h3>Tax collected</h3><p id="report-tax">$0.00 this month</p></div>
         <p class="note" id="report-export-note"></p>
+        <div class="section-label">Use with other accounting software</div>
+        <p class="note">Import these into QuickBooks, Xero, Sage, Wave, FreshBooks, Zoho Books, or MYOB. They cover the period picked above.</p>
+        <div class="quick-row">
+          <button class="pill-outline small" onclick="exportFor('quickbooks')">QuickBooks invoices</button>
+          <button class="pill-outline small" onclick="exportFor('xero')">Xero invoices</button>
+          <button class="pill-outline small" onclick="exportFor('bank')">Bank file (CSV)</button>
+          <button class="pill-outline small" onclick="exportFor('ofx')">Bank file (OFX)</button>
+          <button class="pill-outline small" onclick="exportFor('customers')">Customers</button>
+        </div>
+        <p class="note" id="acct-export-note"></p>
         <button class="textlink" onclick="show('taxes')">Prepare the tax packet</button>
       </section>
 
@@ -1593,12 +1603,8 @@
         <button class="back" onclick="show('home')">Back</button>
         <h2 class="title">Country</h2>
         <p class="note">New documents use this currency. Invoices already sent keep the currency they were issued in. Stores and card payments are available only where Apple, Google, and the processor allow them.</p>
-        <button class="choice" onclick="setRegion('United States', 'USD', 'US')">United States<span>USD · Sales tax</span></button>
-        <button class="choice" onclick="setRegion('United Kingdom', 'GBP', 'GB')">United Kingdom<span>GBP · VAT</span></button>
-        <button class="choice" onclick="setRegion('Germany', 'EUR', 'DE')">Germany<span>EUR · VAT</span></button>
-        <button class="choice" onclick="setRegion('Australia', 'AUD', 'AU')">Australia<span>AUD · GST</span></button>
-        <button class="choice" onclick="setRegion('Japan', 'JPY', 'JP')">Japan<span>JPY · Consumption tax</span></button>
-        <button class="choice" onclick="setRegion('Brazil', 'BRL', 'BR')">Brazil<span>BRL · IVA</span></button>
+        <div class="field"><label for="region-search">Search</label><input id="region-search" placeholder="Type a country or currency" oninput="renderRegions()" autocomplete="off"></div>
+        <div id="region-list"></div>
       </section>
 
       <section class="screen no-tabs" id="security">
@@ -1810,6 +1816,15 @@
   let countryCode = "US";
   let customerLang = "en";
   let customerCountry = "US";
+  try {
+    const savedRegion = JSON.parse(localStorage.getItem("simpleaccountz.region.v1") || "null");
+    if (savedRegion && SA.COUNTRY_CURRENCY[savedRegion.code] === savedRegion.currency) {
+      regionName = String(savedRegion.name || savedRegion.code);
+      businessCurrency = savedRegion.currency;
+      countryCode = savedRegion.code;
+      customerCountry = savedRegion.code;
+    }
+  } catch (error) {}
   let online = true;
   let outbox = [];
   let draftSeq = 0;
@@ -2681,6 +2696,7 @@
   }
 
   function setRegion(name, currency, code) {
+    try { localStorage.setItem(REGION_KEY, JSON.stringify({ name, currency, code })); } catch (error) {}
     regionName = name;
     businessCurrency = currency;
     countryCode = code;
@@ -5689,6 +5705,37 @@
     document.getElementById("forecast-note").textContent = parts.join(" · ");
   }
 
+
+  // ---- Every country ----
+  const REGION_KEY = "simpleaccountz.region.v1";
+  function renderRegions() {
+    const list = document.getElementById("region-list");
+    if (!list) return;
+    const q = (document.getElementById("region-search").value || "").trim().toLowerCase();
+    list.innerHTML = "";
+    SA.countryList().filter((c) => !q || c.name.toLowerCase().indexOf(q) !== -1 || c.currency.toLowerCase() === q || c.code.toLowerCase() === q)
+      .forEach((c) => {
+        const btn = document.createElement("button");
+        btn.className = "choice";
+        btn.textContent = c.name;
+        const sub = document.createElement("span");
+        sub.textContent = c.currency + " · " + c.taxName;
+        btn.appendChild(sub);
+        if (c.code === countryCode) btn.classList.add("on");
+        btn.onclick = () => setRegion(c.name, c.currency, c.code);
+        list.appendChild(btn);
+      });
+  }
+
+  function exportFor(format) {
+    const file = SA.accountingExport(format, docs, transactions, reportPeriod, SA.LEDGER_TODAY, businessCurrency, countryCode, bizName());
+    const note = document.getElementById("acct-export-note");
+    if (!file.ok) { if (note) note.textContent = "Could not make that file."; return; }
+    saveFile(file.filename, file.mime, file.text, false);
+    if (note) note.textContent = (window.SA_NATIVE ? "Shared " : "Saved ") + file.filename + " · " + file.count
+      + (file.count === 1 ? " item" : " items") + " in " + businessCurrency + ". Check the account and tax codes when you import.";
+  }
+
   function renderAll() {
     runAutopilot();
     renderAccountChrome();
@@ -5703,6 +5750,7 @@
     renderFiles();
     renderClients();
     renderForecast();
+    renderRegions();
     renderAuto();
     renderEmptyStates();
     saveBooks();
