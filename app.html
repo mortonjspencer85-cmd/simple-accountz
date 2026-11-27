@@ -697,7 +697,14 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .25s, color .25s; }
   .cam.ready .cam-hint { background: var(--lime); color: var(--forest); }
   .cam-bottom { padding: 18px 22px calc(20px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.78) 45%); }
-  .cam-zoom { display: none; }
+  .cam-zoom { margin: 0 2px 14px; gap: 12px; }
+  .cam-zoom input { -webkit-appearance: none; appearance: none; background: transparent; }
+  .cam-zoom input::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.35); }
+  .cam-zoom input::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.35); }
+  .cam-zoom input::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .cam-zoom input::-moz-range-thumb { width: 24px; height: 24px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  #cam-zoom-label { min-width: 42px; }
+  .cam-zooms { margin-bottom: 10px; }
   .cam-zooms { display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; min-height: 38px; }
   .cam-zooms button { min-width: 38px; height: 38px; padding: 0 9px; border-radius: 999px; border: 0; cursor: pointer;
     background: rgba(28,28,30,.6); color: #fff; font: 700 13px/1 inherit; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -733,6 +740,23 @@
   .drive-row .drive-sub { color: var(--slate, #454745); font-size: 13px; margin-top: 2px; }
   .run-chip.break { background: var(--lime); color: var(--forest); }
   .run-chip { white-space: nowrap; }
+  /* ---- Menu and profile, in the same place on every device ---- */
+  .hdr-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(14,15,12,.12);
+    background: var(--paper); display: grid; place-items: center; cursor: pointer; padding: 0; color: var(--forest); }
+  .hdr-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .hdr-icon.avatar { background: var(--forest); color: var(--lime); border-color: var(--forest); font: 700 15px/1 inherit; }
+  .hdr-icon:active { transform: scale(.93); }
+  .top { gap: 8px; flex-wrap: wrap; align-items: center; }
+  .top .title, .top .word { flex: 1 1 auto; min-width: max-content; }
+  .top > span { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  /* The phone's own pull-to-refresh must not swallow ours. */
+  html.live .screen { overscroll-behavior-y: contain; }
+  .row-x { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--linen);
+    color: var(--slate, #454745); font-size: 18px; line-height: 1; cursor: pointer; }
+  .row-x:active { transform: scale(.9); }
+  .file-row { display: flex; align-items: center; gap: 8px; }
+  .file-row .doc { flex: 1; }
+  .danger-link { color: #b3261e; }
   .run-bar { max-width: calc(100% - 24px); flex-wrap: nowrap; }
 
   /* ---- Pull to refresh ---- */
@@ -921,11 +945,13 @@
       <section class="screen on" id="home">
         <div class="pull" id="pull-note"></div>
         <div class="top">
+          <button class="hdr-icon" onclick="openDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
           <div class="word">Simple Accountz</div>
           <span>
             <button class="pill-outline small live-only" id="bell" onclick="show('activity')" aria-label="Activity">Activity</button>
             <button class="pill-outline small" id="signal" onclick="toggleSignal()">Online</button>
             <button class="pill small biz-only" onclick="openSheet('new')">New</button>
+            <button class="hdr-icon avatar" onclick="goProfile()" aria-label="Your profile and account"><span id="hdr-initial">?</span></button>
           </span>
         </div>
         <div class="quick-row">
@@ -969,8 +995,10 @@
 
       <section class="screen" id="documents">
         <div class="top">
+          <button class="hdr-icon" onclick="openDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
           <h2 class="title">Documents</h2>
           <button class="pill small biz-only" onclick="openSheet('new')">New</button>
+          <button class="hdr-icon avatar" onclick="goProfile()" aria-label="Your profile and account"><span id="hdr-initial2">?</span></button>
         </div>
         <div id="docs-personal" hidden>
           <div class="card"><h3>This is a personal account</h3><p>Invoices, estimates, clients, deposits, late fees, and the sales-tax packet belong to a business account.</p></div>
@@ -1234,7 +1262,7 @@
           <button class="pill-outline" id="dv-print" onclick="printDoc()">Print</button>
           <button class="pill-outline" id="dv-remind" onclick="remindLive()">Send reminder</button>
           <button class="pill-outline" id="dv-paid" onclick="markPaidLive()">Mark paid</button>
-          <button class="textlink" id="dv-delete" onclick="deleteDraftLive()">Delete draft</button>
+          <button class="textlink danger-link" id="dv-delete" onclick="deleteDraftLive()">Delete</button>
         </div>
         <p class="note" id="dv-note"></p>
       </section>
@@ -1332,8 +1360,10 @@
 
       <section class="screen" id="money">
         <div class="top">
+          <button class="hdr-icon" onclick="openDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
           <h2 class="title">Money</h2>
           <button class="pill small" onclick="beginReceipt()">Add expense</button>
+          <button class="hdr-icon avatar" onclick="goProfile()" aria-label="Your profile and account"><span id="hdr-initial3">?</span></button>
         </div>
         <div class="seg" id="period">
           <button data-period="week">Week</button>
@@ -1412,6 +1442,7 @@
         <div class="field"><label>Client</label><input id="invoice-client" value=""></div>
         <div class="field"><label>Total</label><input id="invoice-total" value=""></div>
         <div style="height:88px"></div>
+        <button class="textlink danger-link" id="scan-delete" onclick="deleteScan()" hidden>Delete this scan</button>
         <div class="sticky">
           <span class="note" id="invoice-currency">USD</span>
           <button class="pill" id="invoice-save" onclick="saveInvoiceScan()">Save draft</button>
@@ -1449,6 +1480,7 @@
         <div class="field"><label>Date</label><input id="expense-date" value="Nov 18, 2026" data-iso="2026-11-18" readonly></div>
         <div class="field"><label>Total</label><input id="expense-total" value="$186.40"></div>
         <div class="field"><label>Category</label><input id="expense-category" value="Materials"></div>
+        <button class="textlink danger-link" id="expense-delete" onclick="deleteExpense()" hidden>Delete this expense</button>
         <div style="height:88px"></div>
         <div class="sticky">
           <span class="note" id="expense-currency">USD</span>
@@ -1523,7 +1555,7 @@
       </section>
 
       <section class="screen" id="settings">
-        <div class="top"><h2 class="title">Settings</h2></div>
+        <div class="top"><button class="hdr-icon" onclick="openDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><h2 class="title">Settings</h2><button class="hdr-icon avatar" onclick="goProfile()" aria-label="Your profile and account"><span id="hdr-initial5">?</span></button></div>
         <button class="set-row live-only" onclick="show('account')"><span class="name">Account and sync</span><span class="sub" id="acct-sub">Not signed in · sign up to back up and sync</span></button>
         <div class="field live-only" style="margin-top:4px"><label>Business name</label><input id="biz-name" placeholder="Your business" onchange="setBusinessName(this.value)"></div>
         <button class="set-row" onclick="openAccountSetup()"><span class="name">Account type</span><span class="sub" id="account-sub">Business</span></button>
@@ -1799,7 +1831,7 @@
       </section>
 
       <section class="screen" id="assistant">
-        <div class="top"><h2 class="title">Assistant</h2></div>
+        <div class="top"><button class="hdr-icon" onclick="openDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><h2 class="title">Assistant</h2><button class="hdr-icon avatar" onclick="goProfile()" aria-label="Your profile and account"><span id="hdr-initial4">?</span></button></div>
         <p class="note" id="assistant-note">It works on its own: it matches deposits, files expenses, and starts next month&rsquo;s drafts. Anything your customer would see waits for one lime tap. Turn it off in Settings.</p>
         <div id="thread">
           <div class="bubble ai" id="assistant-intro">Oak Street is overdue by $1,850. A $400 deposit in Harbor Checking is still unmatched. I can remind the client, match the deposit, or file the lumber receipt.</div>
@@ -3747,6 +3779,8 @@
     } catch (error) {
       showPull("The photo did not work. Try again.");
     } finally {
+      // Whatever went wrong, never leave the cover and its bar sitting on screen.
+      camBusy(false);
       cam.shooting = false;
     }
   }
@@ -3837,6 +3871,7 @@
   async function handleShot(dataUrl, canvas) {
     const mode = cam.mode;
     let scan = null;
+    let failedRead = false;
     if (cam.auto) {
       try {
         camBusy(true, "Reading the page…", 0.2);
@@ -3846,9 +3881,11 @@
           : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US");
       } catch (error) {
         scan = null;
+        failedRead = true;
       }
     }
     camBusy(false);
+    if (failedRead) showPull("The photo is saved. The text could not be read this time, so fill in the amount yourself.");
     camEl("cam").classList.remove("on");
     if (mode === "invoice") acceptInvoicePhoto(dataUrl, scan);
     else acceptReceiptPhoto(dataUrl, scan);
@@ -3857,6 +3894,7 @@
   // ---- Reading the text (runs on the device, nothing is uploaded) ----
   let ocrWorker = null;
   let ocrLoading = null;
+  let ocrGzip = null;
 
   function loadScriptOnce(src) {
     return new Promise((resolve, reject) => {
@@ -3870,24 +3908,60 @@
     });
   }
 
+  // The Android build unpacks eng.traineddata.gz into eng.traineddata, so ask
+  // the device which one it actually has instead of assuming.
+  async function languageIsPacked() {
+    if (ocrGzip === null) {
+      try {
+        const head = await fetch("ocr/eng.traineddata.gz", { method: "HEAD" });
+        ocrGzip = head.ok;
+      } catch (error) {
+        ocrGzip = false;
+      }
+    }
+    return ocrGzip;
+  }
+
+  // Nothing here may hang: a stuck worker would leave the camera covered for good.
+  function withTimeout(promise, ms, label) {
+    let timer = null;
+    return Promise.race([
+      promise.finally(() => clearTimeout(timer)),
+      new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); })
+    ]);
+  }
+
   async function readText(dataUrl, onProgress) {
     if (!window.Tesseract) {
-      if (!ocrLoading) ocrLoading = loadScriptOnce("ocr/tesseract.min.js");
-      await ocrLoading;
+      if (!ocrLoading) ocrLoading = loadScriptOnce("ocr/tesseract.min.js").catch((error) => { ocrLoading = null; throw error; });
+      await withTimeout(ocrLoading, 30000, "reader_load");
     }
     if (!ocrWorker) {
-      ocrWorker = await window.Tesseract.createWorker("eng", 1, {
-        workerPath: "ocr/worker.min.js",
-        corePath: "ocr/",
-        langPath: "ocr/",
-        gzip: true,
-        logger: (message) => {
-          if (message && message.status === "recognizing text" && onProgress) onProgress(message.progress || 0);
-        }
-      });
+      const gzip = await languageIsPacked();
+      try {
+        ocrWorker = await withTimeout(window.Tesseract.createWorker("eng", 1, {
+          workerPath: "ocr/worker.min.js",
+          corePath: "ocr/",
+          langPath: "ocr/",
+          gzip,
+          logger: (message) => {
+            if (message && message.status === "recognizing text" && onProgress) onProgress(message.progress || 0);
+          }
+        }), 60000, "reader_start");
+      } catch (error) {
+        ocrWorker = null;
+        throw error;
+      }
     }
-    const result = await ocrWorker.recognize(dataUrl);
-    return (result && result.data && result.data.text) || "";
+    try {
+      const result = await withTimeout(ocrWorker.recognize(dataUrl), 60000, "reader_read");
+      return (result && result.data && result.data.text) || "";
+    } catch (error) {
+      // A worker that timed out is no use again; the next photo starts a fresh one.
+      try { if (ocrWorker && ocrWorker.terminate) ocrWorker.terminate(); } catch (ignored) {}
+      ocrWorker = null;
+      throw error;
+    }
   }
 
   function listWords(words) {
@@ -4178,6 +4252,8 @@
     }
     document.getElementById("expense-note").textContent = "Already filed. Take a new photo from Add expense.";
     document.getElementById("expense-save").textContent = "Done";
+    const wipe = document.getElementById("expense-delete");
+    if (wipe) wipe.hidden = !transactions.some((row) => row.id === tx.id);
     show("expense");
   }
 
@@ -4329,6 +4405,8 @@
 
   function openSavedScan(doc) {
     editingScanId = doc.id;
+    const wipe = document.getElementById("scan-delete");
+    if (wipe) wipe.hidden = false;
     invoiceScan = doc.scan
       ? { ok: true, photo: doc.scan, source: doc.scan === "sample" ? "sample" : "photo", kind: "invoice" }
       : null;
@@ -4469,8 +4547,18 @@
         row.querySelector(".name").textContent = file.name;
         row.querySelector(".sub").textContent = file.type;
         row.querySelector(".amt").textContent = "On device";
-        row.onclick = () => setFilesNote(file.name + " stays on this device. It has not been sent.");
-        list.appendChild(row);
+        row.onclick = () => openUpload(file);
+        const line = document.createElement("div");
+        line.className = "file-row";
+        line.appendChild(row);
+        const remove = document.createElement("button");
+        remove.className = "row-x";
+        remove.type = "button";
+        remove.textContent = "\u00d7";
+        remove.setAttribute("aria-label", "Delete " + file.name);
+        remove.onclick = () => deleteUpload(file.id);
+        line.appendChild(remove);
+        list.appendChild(line);
       });
     }
   }
@@ -5629,7 +5717,7 @@
     const open = SA.isOpenInvoice(doc);
     document.getElementById("dv-remind").hidden = !open;
     document.getElementById("dv-paid").hidden = !open;
-    document.getElementById("dv-delete").hidden = !draft;
+    document.getElementById("dv-delete").hidden = false;
     document.getElementById("dv-note").textContent = draft
       ? "Email and Text open your own apps with the invoice filled in. Share PDF attaches it as a PDF. Sending marks it Sent."
       : (open ? "Sent " + shortDate(doc.sentOn) + ". Mark paid when the money arrives." : "Paid in full. You can still email, text, or print a copy.");
@@ -5743,14 +5831,20 @@
     openDoc(doc.id);
   }
 
+  // Any document can be deleted, not only a draft; one that has money against
+  // it says so first, because deleting it changes what the books show as paid.
   function deleteDraftLive() {
     const doc = docs.find(item => item.id === viewingDocId);
-    if (!doc || doc.stored !== "draft") return;
-    if (!window.confirm("Delete draft " + (doc.number || "") + "?")) return;
+    if (!doc) return;
+    const paid = (doc.paidMinor || 0) > 0;
+    const warn = paid ? " It has money recorded against it, so delete it only if it was a mistake." : "";
+    if (!window.confirm("Delete " + (doc.number || doc.name || "this document") + "?" + warn + " This cannot be undone.")) return;
     deletedIds = Object.assign({}, deletedIds, { [doc.id]: Date.now() });
     docs = docs.filter(item => item.id !== doc.id);
+    viewingDocId = null;
     renderAll();
     show("documents");
+    showPull((doc.number || "The document") + " was deleted.");
   }
 
   function renderEmptyStates() {
@@ -6468,6 +6562,73 @@
     });
   }
 
+
+  // ---- Profile, deleting records, and opening a file ----
+  function goProfile() {
+    closeDrawer();
+    if (LIVE) { show("account"); renderAccount(); }
+    else show("settings");
+  }
+
+  function renderProfileIcon() {
+    const letter = (sync.signedIn && sync.email ? sync.email : (bizName() || "")).trim().charAt(0).toUpperCase() || "?";
+    ["hdr-initial", "hdr-initial2", "hdr-initial3", "hdr-initial4", "hdr-initial5"].forEach((id) => {
+      const node = document.getElementById(id);
+      if (node) node.textContent = letter;
+    });
+  }
+
+  // Deleting writes a tombstone as well as removing the record, so the record
+  // cannot come back from another device at the next sync.
+  function tombstone(id) {
+    if (!id) return;
+    deletedIds[String(id)] = Date.now();
+  }
+
+  function deleteExpense() {
+    const id = editingExpenseId;
+    const tx = transactions.find((row) => row.id === id);
+    if (!tx) return;
+    if (!window.confirm("Delete " + (tx.name || "this expense") + " and its photo? This cannot be undone.")) return;
+    transactions = transactions.filter((row) => row.id !== id);
+    tombstone(id);
+    editingExpenseId = null;
+    receiptPhoto = null;
+    renderAll();
+    show("money");
+    showPull("Expense deleted.");
+  }
+
+  function deleteScan() {
+    const id = editingScanId;
+    const doc = docs.find((row) => row.id === id);
+    if (!doc) return;
+    if (!window.confirm("Delete this scan of " + (doc.name || "the invoice") + "? This cannot be undone.")) return;
+    docs = docs.filter((row) => row.id !== id);
+    tombstone(id);
+    editingScanId = null;
+    invoiceScan = null;
+    renderAll();
+    show("files");
+    showPull("Scan deleted.");
+  }
+
+  function deleteUpload(id) {
+    const file = uploads.find((row) => row.id === id);
+    if (!file) return;
+    if (!window.confirm("Delete " + file.name + "? This cannot be undone.")) return;
+    uploads = uploads.filter((row) => row.id !== id);
+    tombstone(id);
+    renderAll();
+    showPull(file.name + " was deleted.");
+  }
+
+  function openUpload(file) {
+    const when = file.addedOn ? " · added " + shortDate(file.addedOn) : "";
+    setFilesNote(file.name + " · " + (file.type || "File") + (file.sizeLabel ? " · " + file.sizeLabel : "")
+      + when + ". It stays on this device unless you are signed in, and it has not been emailed to anyone.");
+  }
+
   function renderAll() {
     runAutopilot();
     renderAccountChrome();
@@ -6482,6 +6643,7 @@
     renderFiles();
     renderClients();
     renderForecast();
+    renderProfileIcon();
     renderDriveList();
     renderRegions();
     renderAuto();

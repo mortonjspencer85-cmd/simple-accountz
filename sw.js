@@ -1,6 +1,6 @@
 // Simple Accountz offline cache. Pages load from the network when online and
 // fall back to the saved copy when the signal drops.
-const CACHE = "simpleaccountz-v14";
+const CACHE = "simpleaccountz-v15";
 const FILES = ["./", "index.html", "app.html", "app-state.js", "print.html", "print.js", "icon.svg", "icon-192.png", "icon-512.png", "manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

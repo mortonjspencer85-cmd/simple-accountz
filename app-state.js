@@ -2151,6 +2151,59 @@ function otsuThreshold(gray) {
 
 // The four corners of the page, as a quadrilateral, or null when the frame does
 // not hold one clearly. gray is one brightness value (0-255) per pixel.
+// The smallest rectangle that still contains every point, found by spinning a
+// pair of calipers around the outline. A page is a rectangle, so this hugs its
+// real edges even when it is held at an angle - far better than guessing the
+// four most extreme points, which slide onto the wrong edges on a straight page.
+function convexHull(points) {
+  const pts = points.slice().sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+  if (pts.length < 3) return pts;
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const build = (list) => {
+    const out = [];
+    for (const pt of list) {
+      while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], pt) <= 0) out.pop();
+      out.push(pt);
+    }
+    out.pop();
+    return out;
+  };
+  return build(pts).concat(build(pts.slice().reverse()));
+}
+
+function minAreaRect(hull) {
+  if (!hull || hull.length < 3) return null;
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i];
+    const b = hull[(i + 1) % hull.length];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-6) continue;
+    const ux = (b.x - a.x) / len;
+    const uy = (b.y - a.y) / len;
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const pt of hull) {
+      const u = pt.x * ux + pt.y * uy;
+      const v = -pt.x * uy + pt.y * ux;
+      if (u < minU) minU = u;
+      if (u > maxU) maxU = u;
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    const area = (maxU - minU) * (maxV - minV);
+    if (best && area >= best.area) continue;
+    const at = (u, v) => ({ x: u * ux - v * uy, y: u * uy + v * ux });
+    best = { area, corners: [at(minU, minV), at(maxU, minV), at(maxU, maxV), at(minU, maxV)] };
+  }
+  if (!best) return null;
+  // Name the corners the way the rest of the app expects: top left first, then clockwise.
+  const mid = best.corners.reduce((sum, pt) => ({ x: sum.x + pt.x / 4, y: sum.y + pt.y / 4 }), { x: 0, y: 0 });
+  const ordered = best.corners.slice().sort((a, b) => Math.atan2(a.y - mid.y, a.x - mid.x) - Math.atan2(b.y - mid.y, b.x - mid.x));
+  let first = 0;
+  ordered.forEach((pt, i) => { if (pt.x + pt.y < ordered[first].x + ordered[first].y) first = i; });
+  return ordered.slice(first).concat(ordered.slice(0, first)).map((pt) => ({ x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10 }));
+}
+
 function findDocumentQuad(gray, width, height) {
   if (!gray || gray.length !== width * height || width < 16 || height < 16) return null;
   const cut = otsuThreshold(gray);
@@ -2167,37 +2220,26 @@ function findDocumentQuad(gray, width, height) {
   const share = light / gray.length;
   if (share < 0.12 || share > 0.97) return null;
 
-  // The extreme points of the bright area give the corners, which works even
-  // when the page is held at an angle.
-  let tl = null, tr = null, br = null, bl = null;
-  let minSum = Infinity, maxSum = -Infinity, minDiff = Infinity, maxDiff = -Infinity;
-  let minX = width, maxX = -1, minY = height, maxY = -1;
+  // The left and right edge of the bright area on every row describe its
+  // outline; the hull of those points is the hull of the whole shape.
+  const edge = [];
   for (let y = 0; y < height; y++) {
+    let first = -1;
+    let last = -1;
     for (let x = 0; x < width; x++) {
-      if (gray[y * width + x] <= cut) continue;
-      const sum = x + y;
-      const diff = x - y;
-      if (sum < minSum) { minSum = sum; tl = { x, y }; }
-      if (sum > maxSum) { maxSum = sum; br = { x, y }; }
-      if (diff > maxDiff) { maxDiff = diff; tr = { x, y }; }
-      if (diff < minDiff) { minDiff = diff; bl = { x, y }; }
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+      if (gray[y * width + x] > cut) { if (first < 0) first = x; last = x; }
     }
+    if (first >= 0) { edge.push({ x: first, y }); if (last !== first) edge.push({ x: last, y }); }
   }
-  if (!tl || !tr || !br || !bl) return null;
-  const corners = [tl, tr, br, bl];
+  if (edge.length < 8) return null;
+  const corners = minAreaRect(convexHull(edge));
+  if (!corners || corners.length !== 4) return null;
   const area = Math.abs(quadArea(corners));
-  const box = (maxX - minX + 1) * (maxY - minY + 1);
-  // Reject blobs that are not solid and rectangular enough to be a page.
-  if (area < box * 0.6) return null;
   if (area < gray.length * 0.10) return null;
   const sides = [0, 1, 2, 3].map((i) => Math.hypot(corners[(i + 1) % 4].x - corners[i].x, corners[(i + 1) % 4].y - corners[i].y));
   if (Math.min.apply(null, sides) < Math.min(width, height) * 0.12) return null;
   // A page is solid: nearly every pixel inside the outline is light. Stripes and
-  // clutter can stretch a quadrilateral across the frame but stay patchy inside.
+  // clutter can stretch a rectangle across the frame but stay patchy inside.
   let inside = 0;
   let bright = 0;
   for (let y = 0; y < height; y += 2) {
@@ -3195,6 +3237,8 @@ const SA = {
   placeText,
   mapLink,
   cleanTrip,
+  convexHull,
+  minAreaRect,
   DEMO_AUTH_CODE,
   RECOVERY_TOKEN
 };
