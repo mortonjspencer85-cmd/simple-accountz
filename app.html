@@ -722,6 +722,19 @@
   @keyframes camSnap { from { opacity: .85; } to { opacity: 0; } }
   .cam-busy { background: rgba(0,0,0,.55); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 
+  /* ---- Drive route map and recent drives ---- */
+  .route-svg { display: block; width: 100%; height: 140px; margin-top: 12px; border-radius: 14px; background: var(--paper); }
+  .route-svg path { fill: none; stroke: var(--forest); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+  .route-svg .dot-start { fill: #34c759; stroke: #fff; stroke-width: 2; }
+  .route-svg .dot-end { fill: #ff3b30; stroke: #fff; stroke-width: 2; }
+  .drive-row { padding: 12px 0; border-bottom: 1px solid var(--fog, #e8ebe6); }
+  .drive-row .route-svg { height: 96px; background: var(--linen); }
+  .drive-row .drive-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+  .drive-row .drive-sub { color: var(--slate, #454745); font-size: 13px; margin-top: 2px; }
+  .run-chip.break { background: var(--lime); color: var(--forest); }
+  .run-chip { white-space: nowrap; }
+  .run-bar { max-width: calc(100% - 24px); flex-wrap: nowrap; }
+
   /* ---- Pull to refresh ---- */
   .ptr { position: absolute; left: 50%; top: calc(8px + env(safe-area-inset-top)); z-index: 70; width: 40px; height: 40px; margin-left: -20px;
     border-radius: 50%; background: var(--paper); box-shadow: 0 6px 18px rgba(0,0,0,.16); display: grid; place-items: center;
@@ -897,12 +910,13 @@
       <div class="drawer-veil" id="drawer-veil" onclick="closeDrawer()"></div>
       <div class="loc-ask" id="loc-ask" role="dialog" aria-label="Allow location" hidden>
         <b>Track business drives automatically?</b>
-        <p>Allow location so Simple Accountz can measure your miles when you tap Start drive. Only the distance is kept, never where you went.</p>
+        <p>Allow location so Simple Accountz can track the route and miles when you tap Start drive. Each drive is saved with its expense as your mileage log, and is never sold or shared.</p>
         <div class="loc-actions"><button class="pill-outline small" onclick="answerLocation(false)">Not now</button><button class="pill small" onclick="answerLocation(true)">Allow location</button></div>
       </div>
       <div class="run-bar" id="run-bar" hidden>
         <button class="run-chip" id="run-timer" onclick="openTimer()" hidden></button>
         <button class="run-chip" id="run-drive" onclick="beginMileage()" hidden></button>
+        <button class="run-chip break" id="run-break" onclick="toggleBreak()" hidden>Take a break</button>
       </div>
       <section class="screen on" id="home">
         <div class="pull" id="pull-note"></div>
@@ -1589,15 +1603,20 @@
       <section class="screen no-tabs" id="mileage">
         <button class="back" onclick="show('money')">Back</button>
         <h2 class="title">Drives</h2>
-        <div class="card" id="drive-card"><h3 class="timer-clock" id="drive-distance">0.0 mi</h3><p id="drive-state">Tap Start when you set off. Keep Simple Accountz open while you drive; it counts the distance by GPS and files the trip when you tap End.</p></div>
-        <div class="stack-btns"><button class="pill" id="drive-toggle" onclick="toggleDrive()">Start drive</button></div>
-        <p class="note">Business driving is a tax deduction. Use the rate your tax office sets; it is remembered on this device. Only the distance is kept: never your route or location.</p>
+        <div class="card" id="drive-card"><h3 class="timer-clock" id="drive-distance">0.0 mi</h3><p id="drive-state">Tap Start when you set off. Keep Simple Accountz open while you drive; it tracks the route and distance by GPS and files the trip when you tap End.</p><svg class="route-svg" id="drive-route" viewBox="0 0 320 140" role="img" aria-label="Map of this drive" hidden></svg></div>
+        <div class="stack-btns">
+          <button class="pill" id="drive-toggle" onclick="toggleDrive()">Start drive</button>
+          <button class="pill-outline" id="drive-pause" onclick="toggleDrivePause()" hidden>Pause for a break</button>
+        </div>
+        <p class="note">Business driving is a tax deduction. Each tracked drive saves its route, start, and end with the expense as your mileage log. Pause for lunch or anything personal and those miles are left out. Use the rate your tax office sets; it is remembered on this device.</p>
         <div class="section-label">Or type a trip</div>
         <div class="field"><label id="mile-label">Miles</label><input id="mile-miles" inputmode="decimal" placeholder="12.5" oninput="mileMath()"></div>
         <div class="field"><label id="mile-rate-label">Rate per mile</label><input id="mile-rate" inputmode="decimal" placeholder="0.70" oninput="mileMath()"></div>
         <div class="field"><label>What for</label><input id="mile-purpose" placeholder="Site visit, supply run" maxlength="80"></div>
         <div class="field"><label>Date</label><input id="mile-date" type="date"></div>
         <p class="note" id="mile-math"></p>
+        <div class="section-label">Recent drives</div>
+        <div id="drive-list"></div>
         <div style="height:88px"></div>
         <div class="sticky">
           <span class="note" id="mile-total"></span>
@@ -1617,6 +1636,7 @@
         <div class="stack-btns">
           <button class="pill" id="timer-toggle" onclick="toggleTimer()">Start</button>
           <button class="pill-outline" onclick="billTimer()">Bill these hours</button>
+          <button class="textlink" id="timer-restore" onclick="restoreBilled()" hidden></button>
           <button class="textlink" onclick="clearTimer()">Clear the timer</button>
         </div>
       </section>
@@ -4512,7 +4532,8 @@
     }
     bindNativeBack();
     loadNotifySettings();
-    if (readDrive()) watchDrive();
+    const openDrive = readDrive();
+    if (openDrive && !openDrive.paused) watchDrive();
     renderRunning();
     setTimeout(maybeAskLocation, 2500);
     if (DEMO) {
@@ -5860,6 +5881,7 @@
     document.getElementById("mile-rate-label").textContent = unit === "km" ? "Rate per km" : "Rate per mile";
     mileMath();
     renderDrive();
+    renderDriveList();
     show("mileage");
     renderRunning();
   }
@@ -5874,6 +5896,7 @@
       rateMinor: rate.value,
       date: document.getElementById("mile-date").value,
       purpose: document.getElementById("mile-purpose").value,
+      trip: pendingTrip,
       currency: businessCurrency,
       unit: SA.distanceUnit(countryCode)
     });
@@ -5890,6 +5913,7 @@
     if (!made.ok) { document.getElementById("mile-math").textContent = "Enter the miles and the rate, using numbers only."; return; }
     try { localStorage.setItem(MILE_RATE_KEY, document.getElementById("mile-rate").value.trim()); } catch (error) {}
     const result = SA.addExpense(transactions, Object.assign({ accountId: SA.expenseAccountId(links, accountKind) }, made.expense), businessCurrency);
+    pendingTrip = null;
     transactions = result.transactions;
     if (result.added) showPull("Drive saved: " + SA.formatMoney(made.expense.amountMinor, businessCurrency) + ".");
     else showPull(result.reason === "duplicate" ? "That drive is already in the books." : "This drive was not added.");
@@ -5926,7 +5950,11 @@
     document.getElementById("timer-state").textContent = timer.startedAt
       ? "Running · " + (SA.hoursFromMs(ms).tenths ? SA.hoursFromMs(ms).text + " so far" : "under 0.1 h so far")
       : (ms ? "Paused · " + SA.hoursFromMs(ms).text + " to bill" : "Not running");
-    document.getElementById("timer-toggle").textContent = timer.startedAt ? "Pause" : (ms ? "Resume" : "Start");
+    document.getElementById("timer-toggle").textContent = timer.startedAt ? "Pause for a break" : (ms ? "Resume" : "Start");
+    const restore = document.getElementById("timer-restore");
+    const billed = timer.lastBilled && !timer.startedAt && !ms ? timer.lastBilled : null;
+    restore.hidden = !billed;
+    if (billed) restore.textContent = "Put the " + SA.hoursFromMs(billed.ms).text + " just billed back on the timer";
   }
 
   function openTimer() {
@@ -5970,7 +5998,10 @@
     const at = Date.now();
     const hours = SA.hoursFromMs(SA.timerElapsed(timer, at));
     if (!hours.tenths) { document.getElementById("timer-state").textContent = "Track at least six minutes before billing."; return; }
-    if (timer.startedAt) { timer.accumulatedMs = SA.timerElapsed(timer, at); timer.startedAt = 0; writeTimer(timer); }
+    // The hours move onto the invoice and the timer resets for the next job; they can be put back if the invoice is not kept.
+    const billedMs = SA.timerElapsed(timer, at);
+    writeTimer(Object.assign({}, timer, { startedAt: 0, accumulatedMs: 0, lastBilled: { ms: billedMs, at } }));
+    clearBreakFor("timer");
     const client = SA.clientSummaries(docs, SA.LEDGER_TODAY).find((row) => row.key === SA.clientKey(timer.client));
     openInvoiceEditor();
     setField("draft-client", timer.client);
@@ -5979,7 +6010,8 @@
     setField("draft-qty", String(hours.tenths / 10));
     setField("draft-rate", timer.rate);
     applyDraftMath();
-    showPull(hours.text + " added to a new invoice. Clear the timer after you save it.");
+    renderRunning();
+    showPull(hours.text + " added to a new invoice. The timer is reset for the next job.");
   }
 
   function renderForecast() {
@@ -6091,7 +6123,15 @@
     if (dist) dist.textContent = driveText(drive);
     const toggle = document.getElementById("drive-toggle");
     if (toggle) toggle.textContent = drive ? "End drive and save" : "Start drive";
-    if (drive) setDriveState("Tracking since " + new Date(drive.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ". Keep Simple Accountz open while you drive.");
+    const pause = document.getElementById("drive-pause");
+    if (pause) {
+      pause.hidden = !drive;
+      pause.textContent = drive && drive.paused ? "Resume drive" : "Pause for a break";
+    }
+    const clock = (at) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (drive && drive.paused) setDriveState("Paused at " + clock(drive.pausedAt || Date.now()) + ". Miles and route are not tracked until you resume.");
+    else if (drive) setDriveState("Tracking since " + clock(drive.startedAt) + (drive.start ? " from " + SA.placeText(drive.start) : "") + ". Keep Simple Accountz open while you drive.");
+    drawRoute(document.getElementById("drive-route"), drive ? drive.route : null);
     renderRunning();
   }
 
@@ -6119,6 +6159,8 @@
       renderDrive();
       return;
     }
+    pendingTrip = SA.driveRecord(drive);
+    clearBreakFor("drive");
     setField("mile-miles", String(hundredths / 100));
     setField("mile-date", SA.todayIso(new Date(drive.startedAt)));
     if (!document.getElementById("mile-rate").value.trim()) {
@@ -6153,15 +6195,22 @@
     const onScreen = (id) => { const node = document.getElementById(id); return !!(node && node.classList.contains("on")); };
     // The full timer and drive screens show the same numbers, so their chip steps aside there.
     if (onScreen("hours")) renderTimer();
-    t.hidden = !timer.startedAt || onScreen("hours");
-    if (timer.startedAt) t.textContent = "Timer " + clockText(SA.timerElapsed(timer, now));
+    const timerMs = SA.timerElapsed(timer, now);
+    const timerPaused = !timer.startedAt && timerMs > 0;
+    t.hidden = !(timer.startedAt || timerPaused) || onScreen("hours");
+    if (!t.hidden) t.textContent = (timerPaused ? "Timer paused " : "Timer ") + clockText(timerMs);
     d.hidden = !drive || onScreen("mileage");
-    if (drive) d.textContent = "Drive " + driveText(drive);
-    bar.hidden = t.hidden && d.hidden;
+    if (drive) d.textContent = (drive.paused ? "Drive paused " : "Drive ") + driveText(drive);
+    const onBreak = readBreak();
+    const working = !!timer.startedAt || !!(drive && !drive.paused);
+    const b = document.getElementById("run-break");
+    b.hidden = !(onBreak || working);
+    b.textContent = onBreak ? "Back to work" : "Take a break";
+    bar.hidden = t.hidden && d.hidden && b.hidden;
     const ht = document.getElementById("home-timer");
-    if (ht) ht.textContent = timer.startedAt ? "Timer running" : "Start job timer";
+    if (ht) ht.textContent = timer.startedAt ? "Timer running" : (timerPaused ? "Timer paused" : "Start job timer");
     const hd = document.getElementById("home-drive");
-    if (hd) hd.textContent = drive ? "Drive running" : "Start drive";
+    if (hd) hd.textContent = drive ? (drive.paused ? "Drive paused" : "Drive running") : "Start drive";
   }
 
   setInterval(renderRunning, 1000);
@@ -6265,6 +6314,160 @@
     saveFile("simple-accountz-lockout-qr.svg", "image/svg+xml", shownRecoveryQr, false);
   }
 
+
+  // ---- Breaks, route map, and recent drives ----
+  const BREAK_KEY = "simpleaccountz.break.v1";
+  let pendingTrip = null;
+
+  function readBreak() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(BREAK_KEY) || "null");
+      return raw && (raw.timer || raw.drive) ? raw : null;
+    } catch (error) { return null; }
+  }
+
+  function writeBreak(value) {
+    try {
+      if (value) localStorage.setItem(BREAK_KEY, JSON.stringify(value));
+      else localStorage.removeItem(BREAK_KEY);
+    } catch (error) {}
+  }
+
+  // When a drive or the timer ends on its own, it is no longer part of a break.
+  function clearBreakFor(which) {
+    const current = readBreak();
+    if (!current) return;
+    current[which] = false;
+    writeBreak(current.timer || current.drive ? current : null);
+  }
+
+  function toggleDrivePause() {
+    const drive = readDrive();
+    if (!drive) return;
+    if (drive.paused) {
+      writeDrive(SA.resumeDrive(drive));
+      clearBreakFor("drive");
+      watchDrive();
+      showPull("Drive resumed.");
+    } else {
+      writeDrive(SA.pauseDrive(drive, Date.now()));
+      stopWatch();
+      showPull("Drive paused. Miles stop counting until you resume.");
+    }
+    renderDrive();
+  }
+
+  // One tap pauses whatever is running (drive and timer) for lunch or anything personal.
+  function toggleBreak() {
+    const now = Date.now();
+    const timer = readTimer();
+    const drive = readDrive();
+    const current = readBreak();
+    if (current) {
+      writeBreak(null);
+      if (current.timer && !timer.startedAt && SA.timerElapsed(timer, now) > 0) writeTimer(Object.assign({}, timer, { startedAt: now }));
+      if (current.drive && drive && drive.paused) { writeDrive(SA.resumeDrive(drive)); watchDrive(); }
+      showPull("Back to work. Tracking again.");
+    } else {
+      const pause = { at: now, timer: !!timer.startedAt, drive: !!(drive && !drive.paused) };
+      if (!pause.timer && !pause.drive) return;
+      if (pause.timer) writeTimer(Object.assign({}, timer, { accumulatedMs: SA.timerElapsed(timer, now), startedAt: 0 }));
+      if (pause.drive) { writeDrive(SA.pauseDrive(drive, now)); stopWatch(); }
+      writeBreak(pause);
+      showPull("On a break. Mileage and hours are paused until you tap Back to work.");
+    }
+    renderTimer();
+    renderDrive();
+  }
+
+  function restoreBilled() {
+    const timer = readTimer();
+    if (!timer.lastBilled || timer.startedAt || SA.timerElapsed(timer, Date.now()) > 0) return;
+    writeTimer(Object.assign({}, timer, { accumulatedMs: timer.lastBilled.ms, lastBilled: null }));
+    renderTimer();
+    renderRunning();
+    showPull("Those hours are back on the timer.");
+  }
+
+  // Draws a route with no map service: the path, a green start, and a red end.
+  function drawRoute(svg, route) {
+    if (!svg) return;
+    const ns = "http://www.w3.org/2000/svg";
+    const box = svg.viewBox.baseVal;
+    const fit = SA.routePaths(route, box.width || 320, box.height || 140, 12);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.hidden = !fit.paths.length;
+    fit.paths.forEach((d) => {
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    });
+    [["dot-start", fit.start], ["dot-end", fit.end]].forEach(([name, point]) => {
+      if (!point) return;
+      const dot = document.createElementNS(ns, "circle");
+      dot.setAttribute("class", name);
+      dot.setAttribute("cx", point.x);
+      dot.setAttribute("cy", point.y);
+      dot.setAttribute("r", 6);
+      svg.appendChild(dot);
+    });
+  }
+
+  function renderDriveList() {
+    const list = document.getElementById("drive-list");
+    if (!list) return;
+    list.innerHTML = "";
+    const drives = transactions.filter((tx) => tx.kind === "out" && tx.mileage)
+      .sort((a, b) => (a.date === b.date ? 0 : (a.date < b.date ? 1 : -1))).slice(0, 10);
+    if (!drives.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = "Drives you track or type show up here, with a map of the route.";
+      list.appendChild(empty);
+      return;
+    }
+    const apple = /iPhone|iPad|Macintosh/.test(navigator.userAgent || "");
+    drives.forEach((tx) => {
+      const row = document.createElement("div");
+      row.className = "drive-row";
+      const top = document.createElement("div");
+      top.className = "drive-top";
+      const name = document.createElement("span");
+      name.textContent = tx.name || "Drive";
+      const amount = document.createElement("span");
+      amount.textContent = SA.formatMoney(tx.amountMinor, tx.currency);
+      top.appendChild(name);
+      top.appendChild(amount);
+      row.appendChild(top);
+      const sub = document.createElement("div");
+      sub.className = "drive-sub";
+      const from = SA.placeText(tx.mileage.start);
+      const to = SA.placeText(tx.mileage.end);
+      sub.textContent = tx.date + (from ? " · from " + from : "") + (to ? " to " + to : "");
+      row.appendChild(sub);
+      if (tx.mileage.route && tx.mileage.route.length) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", "route-svg");
+        svg.setAttribute("viewBox", "0 0 320 96");
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", "Map of this drive");
+        row.appendChild(svg);
+        drawRoute(svg, tx.mileage.route);
+      }
+      const link = SA.mapLink(tx.mileage.start, tx.mileage.end, apple);
+      if (link) {
+        const open = document.createElement("a");
+        open.className = "textlink";
+        open.href = link;
+        open.target = "_blank";
+        open.rel = "noopener";
+        open.textContent = "Open in Maps";
+        row.appendChild(open);
+      }
+      list.appendChild(row);
+    });
+  }
+
   function renderAll() {
     runAutopilot();
     renderAccountChrome();
@@ -6279,6 +6482,7 @@
     renderFiles();
     renderClients();
     renderForecast();
+    renderDriveList();
     renderRegions();
     renderAuto();
     renderEmptyStates();

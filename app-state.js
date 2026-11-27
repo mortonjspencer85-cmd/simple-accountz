@@ -1087,9 +1087,10 @@ function buildWorkbook(sheets) {
 // The workbook an accountant or a tax preparer can use: a summary plus one
 // sheet each for payments in, expenses, and invoices.
 // ---- Drive tracking (GPS) ----
-// Only the running distance is kept: no route and no coordinates leave the
-// device. Fixes that are blurry, jitter in place, or jump faster than a car
-// can go are ignored, so a parked phone does not rack up miles.
+// A tracked drive keeps its distance and its route (the start, the end, and
+// points along the way, in segments split by breaks), so it doubles as a
+// mileage log. Fixes that are blurry, jitter in place, or jump faster than a
+// car can go are ignored, so a parked phone does not rack up miles.
 const MILE_COUNTRIES = ["US", "GB", "LR", "MM"];
 
 function distanceUnit(country) {
@@ -1105,11 +1106,52 @@ function distanceMeters(a, b) {
 }
 
 function newDrive(at) {
-  return { startedAt: at, meters: 0, last: null, fixes: 0 };
+  return { startedAt: at, meters: 0, last: null, fixes: 0, paused: false, route: [[]], start: null, end: null };
+}
+
+const ROUTE_MAX_POINTS = 600;
+const roundCoord = (value) => Math.round(value * 1e5) / 1e5;
+
+// Adds a point to the last route segment, thinning the route if it grows long.
+function addRoutePoint(route, point) {
+  const segments = (Array.isArray(route) && route.length ? route : [[]]).map((segment) => segment.slice());
+  segments[segments.length - 1].push([roundCoord(point.lat), roundCoord(point.lon)]);
+  let total = segments.reduce((sum, segment) => sum + segment.length, 0);
+  while (total > ROUTE_MAX_POINTS) {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (seg.length > 2) segments[i] = seg.filter((pt, k) => k === 0 || k === seg.length - 1 || k % 2 === 0);
+    }
+    const next = segments.reduce((sum, segment) => sum + segment.length, 0);
+    if (next === total) break;
+    total = next;
+  }
+  return segments;
+}
+
+// A break: miles stop counting, and the route starts a new segment on resume
+// so the map never draws a straight line across the time off.
+function pauseDrive(drive, at) {
+  if (!drive || drive.paused) return drive;
+  return Object.assign({}, drive, { paused: true, pausedAt: at });
+}
+
+function resumeDrive(drive) {
+  if (!drive || !drive.paused) return drive;
+  const route = Array.isArray(drive.route) ? drive.route.slice() : [[]];
+  if (!route.length || route[route.length - 1].length) route.push([]);
+  return Object.assign({}, drive, { paused: false, pausedAt: null, last: null, route });
+}
+
+// What gets saved with the expense: start, end, and the route.
+function driveRecord(drive) {
+  if (!drive) return null;
+  const route = (Array.isArray(drive.route) ? drive.route : []).filter((segment) => segment.length);
+  return { start: drive.start || null, end: drive.end || null, route };
 }
 
 function driveStep(drive, fix) {
-  if (!drive || !drive.startedAt || !fix) return drive;
+  if (!drive || !drive.startedAt || !fix || drive.paused) return drive;
   const lat = Number(fix.lat);
   const lon = Number(fix.lon);
   const accuracy = Number(fix.accuracy);
@@ -1117,13 +1159,55 @@ function driveStep(drive, fix) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return drive;
   if (!Number.isFinite(accuracy) || accuracy > 50 || !Number.isFinite(at)) return drive;
   const point = { lat, lon, accuracy, at };
-  if (!drive.last) return Object.assign({}, drive, { last: point, fixes: (drive.fixes || 0) + 1 });
+  const place = { lat: roundCoord(lat), lon: roundCoord(lon), at };
+  if (!drive.last) {
+    return Object.assign({}, drive, {
+      last: point, fixes: (drive.fixes || 0) + 1, start: drive.start || place, end: place, route: addRoutePoint(drive.route, point)
+    });
+  }
   const step = distanceMeters(drive.last, point);
   const seconds = (at - drive.last.at) / 1000;
   if (seconds <= 0) return drive;
   if (step < Math.max(12, accuracy, drive.last.accuracy)) return drive;
   if (step / seconds > 70) return drive;
-  return Object.assign({}, drive, { meters: (drive.meters || 0) + step, last: point, fixes: (drive.fixes || 0) + 1 });
+  return Object.assign({}, drive, {
+    meters: (drive.meters || 0) + step, last: point, fixes: (drive.fixes || 0) + 1, end: place, route: addRoutePoint(drive.route, point)
+  });
+}
+
+// The route as SVG paths fitted into a box, for a small map with no map service.
+function routePaths(route, width, height, pad) {
+  const margin = pad == null ? 10 : pad;
+  const segments = (Array.isArray(route) ? route : []).filter((segment) => Array.isArray(segment) && segment.length);
+  const all = [].concat.apply([], segments);
+  if (!all.length) return { paths: [], start: null, end: null };
+  const midLat = all.reduce((sum, pt) => sum + pt[0], 0) / all.length;
+  const kx = Math.cos(midLat * Math.PI / 180);
+  const xs = all.map((pt) => pt[1] * kx);
+  const ys = all.map((pt) => -pt[0]);
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  const span = Math.max(maxX - minX, maxY - minY, 1e-6);
+  const scale = Math.min((width - 2 * margin) / Math.max(maxX - minX, span * 0.05), (height - 2 * margin) / Math.max(maxY - minY, span * 0.05));
+  const offX = (width - (maxX - minX) * scale) / 2;
+  const offY = (height - (maxY - minY) * scale) / 2;
+  const project = (pt) => ({ x: Math.round((offX + (pt[1] * kx - minX) * scale) * 10) / 10, y: Math.round((offY + (-pt[0] - minY) * scale) * 10) / 10 });
+  const paths = segments.map((segment) => segment.map((pt, i) => { const q = project(pt); return (i ? "L" : "M") + q.x + " " + q.y; }).join(" "));
+  return { paths, start: project(segments[0][0]), end: project(segments[segments.length - 1][segments[segments.length - 1].length - 1]) };
+}
+
+function placeText(place) {
+  return place && Number.isFinite(place.lat) && Number.isFinite(place.lon) ? place.lat.toFixed(5) + ", " + place.lon.toFixed(5) : "";
+}
+
+// Opens the trip in the phone's maps app (Apple Maps on iPhone, Google Maps elsewhere).
+function mapLink(start, end, apple) {
+  const a = placeText(start).replace(" ", "");
+  const b = placeText(end).replace(" ", "");
+  if (!a && !b) return "";
+  if (apple) return "https://maps.apple.com/?" + (a ? "saddr=" + a : "") + (a && b ? "&" : "") + (b ? "daddr=" + b : "");
+  if (a && b) return "https://www.google.com/maps/dir/?api=1&origin=" + a + "&destination=" + b;
+  return "https://www.google.com/maps/search/?api=1&query=" + (a || b);
 }
 
 // Distance in hundredths of the unit, the same scale mileageExpense takes.
@@ -1222,12 +1306,13 @@ function exportWorkbook(docs, transactions, period, today, currency, country, bu
   });
 
   const drives = spent.filter((tx) => tx.mileage && tx.mileage.milesHundredths > 0);
-  const mileage = [head(["Date", "Trip", "Distance", "Unit", "Rate", "Amount"])];
+  const mileage = [head(["Date", "Trip", "Distance", "Unit", "Rate", "Amount", "From", "To", "Map"])];
   let mileageMinor = 0;
   drives.forEach((tx) => {
     mileageMinor += tx.amountMinor;
     mileage.push([tx.date, tx.name || "", { n: String(tx.mileage.milesHundredths / 100) }, tx.mileage.unit === "km" ? "km" : "mi",
-      money(tx.mileage.rateMinor), money(tx.amountMinor)]);
+      money(tx.mileage.rateMinor), money(tx.amountMinor),
+      placeText(tx.mileage.start), placeText(tx.mileage.end), mapLink(tx.mileage.start, tx.mileage.end, false)]);
   });
   mileage.push([{ t: "Total", s: 1 }, "", "", "", "", Object.assign(money(mileageMinor), { s: 3 })]);
 
@@ -2701,9 +2786,31 @@ function mileageExpense(fields) {
       amountMinor,
       currency: f.currency || "USD",
       category: "Car and travel",
-      mileage: { milesHundredths, rateMinor, unit }
+      mileage: Object.assign({ milesHundredths, rateMinor, unit }, cleanTrip(f.trip))
     }
   };
+}
+
+function cleanPlace(place) {
+  if (!place || !Number.isFinite(Number(place.lat)) || !Number.isFinite(Number(place.lon))) return null;
+  const lat = roundCoord(Number(place.lat));
+  const lon = roundCoord(Number(place.lon));
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+function cleanTrip(trip) {
+  if (!trip) return {};
+  const out = {};
+  const start = cleanPlace(trip.start);
+  const end = cleanPlace(trip.end);
+  if (start) out.start = start;
+  if (end) out.end = end;
+  const route = (Array.isArray(trip.route) ? trip.route : [])
+    .map((segment) => (Array.isArray(segment) ? segment : []).map((pt) => cleanPlace({ lat: pt && pt[0], lon: pt && pt[1] })).filter(Boolean).map((pt) => [pt.lat, pt.lon]))
+    .filter((segment) => segment.length);
+  if (route.length) out.route = route;
+  return out;
 }
 
 // Tracked time becomes invoice hours, rounded to the nearest six minutes.
@@ -3080,6 +3187,14 @@ const SA = {
   driveDistance,
   buildOds,
   quadLooksLikePage,
+  addRoutePoint,
+  pauseDrive,
+  resumeDrive,
+  driveRecord,
+  routePaths,
+  placeText,
+  mapLink,
+  cleanTrip,
   DEMO_AUTH_CODE,
   RECOVERY_TOKEN
 };
