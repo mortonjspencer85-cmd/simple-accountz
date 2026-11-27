@@ -6,7 +6,7 @@
 <title>Simple Accountz</title>
 <meta name="description" content="Invoices, expenses, receipt photos, and an assistant that does the bookkeeping for you.">
 <meta name="theme-color" content="#163300">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -167,6 +167,9 @@
     border-radius: 999px; font-weight: 600; font-size: 16px; padding: 11px 18px;
   }
   .pill-outline.small { font-size: 14px; padding: 8px 14px; }
+  .quick-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .stack-btns { display: grid; gap: 10px; margin: 8px 0 16px; }
+  .timer-clock { font-variant-numeric: tabular-nums; font-size: 40px; letter-spacing: -0.02em; }
   .textlink {
     background: none; border: 0; color: var(--forest); font-weight: 600;
     font-size: 16px; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0;
@@ -1204,6 +1207,12 @@
         <div class="card"><h3 id="money-in">$1,640.00 in</h3><p id="money-in-note">Card and check payments this month</p></div>
         <div class="card"><h3 id="money-out">$420.00 out</h3><p>Expenses in USD only</p></div>
         <div class="card"><h3 id="money-profit">$1,220.00 rough profit</h3><p>Calculated from dated payments and expenses. Not a full ledger.</p></div>
+        <div class="card" id="forecast-card"><h3 id="forecast-net">Next 30 days</h3><p id="forecast-note">Open invoices coming in, minus what you usually spend.</p></div>
+        <div class="quick-row">
+          <button class="pill-outline small" onclick="beginMileage()">Log a drive</button>
+          <button class="pill-outline small" onclick="openTimer()">Job timer</button>
+          <button class="pill-outline small biz-only" onclick="show('clients')">Clients</button>
+        </div>
         <p class="note" id="money-fx"></p>
         <p class="note" id="books-note"></p>
         <div class="section-label">Expenses</div>
@@ -1376,7 +1385,7 @@
         <button class="preview-only set-row biz-only" onclick="show('payments')"><span class="name">Get paid</span><span class="sub">Stripe connected · PayPal off</span></button>
         <button class="preview-only set-row biz-only" onclick="show('paywall')"><span class="name">Plan</span><span class="sub">Plus · 10 invoices a month</span></button>
         <button class="set-row biz-only" onclick="show('taxes')"><span class="name">Tax packet</span><span class="sub">Export for your preparer</span></button>
-        <button class="preview-only set-row biz-only" onclick="show('clients')"><span class="name">Clients</span><span class="sub">3 saved</span></button>
+        <button class="set-row biz-only" onclick="show('clients')"><span class="name">Clients</span><span class="sub" id="clients-sub">Balances and statements</span></button>
         <button class="preview-only set-row biz-only"><span class="name">Templates</span><span class="sub">Ledger · 64 original layouts</span></button>
         <button class="preview-only set-row biz-only"><span class="name">Team</span><span class="sub">Just you</span></button>
         <button class="preview-only set-row" onclick="show('security')"><span class="name">Sign-in and recovery</span><span class="sub" id="security-sub">Two-factor off</span></button>
@@ -1421,10 +1430,54 @@
 
       <section class="screen no-tabs" id="clients">
         <button class="back" onclick="show('settings')">Back</button>
-        <div class="top"><h2 class="title">Clients</h2><button class="pill small">Add client</button></div>
-        <button class="doc"><span class="name">Oak Street HOA</span><span class="amt" style="color:var(--overdue-fg)">$1,850</span><span class="sub">1 overdue invoice</span></button>
-        <button class="doc"><span class="name">Maria Chen</span><span class="amt">$2,430</span><span class="sub">Viewed · not paid</span></button>
-        <button class="doc"><span class="name">Harbor Rental</span><span class="amt">$0</span><span class="sub">Estimate signed</span></button>
+        <div class="top"><h2 class="title">Clients</h2><button class="pill small" onclick="openInvoiceEditor()">New invoice</button></div>
+        <p class="note">Built from your invoices. Tap a client to send a statement of what is open.</p>
+        <div id="client-list"></div>
+      </section>
+
+      <section class="screen no-tabs" id="client-detail">
+        <button class="back" onclick="show('clients')">Back</button>
+        <h2 class="title" id="cd-name">Client</h2>
+        <div class="card"><h3 id="cd-owed">All paid up</h3><p id="cd-sub"></p></div>
+        <div class="stack-btns">
+          <button class="pill" id="cd-statement" onclick="sendStatement()">Send statement</button>
+          <button class="pill-outline" onclick="newInvoiceFor()">New invoice</button>
+          <button class="pill-outline" onclick="timeFor()">Track time for this client</button>
+        </div>
+        <div class="section-label">Invoices</div>
+        <div id="cd-docs"></div>
+      </section>
+
+      <section class="screen no-tabs" id="mileage">
+        <button class="back" onclick="show('money')">Back</button>
+        <h2 class="title">Log a drive</h2>
+        <p class="note">Business miles are a tax deduction. Use the rate per mile your tax office sets; it is remembered on this device.</p>
+        <div class="field"><label>Miles</label><input id="mile-miles" inputmode="decimal" placeholder="12.5" oninput="mileMath()"></div>
+        <div class="field"><label>Rate per mile</label><input id="mile-rate" inputmode="decimal" placeholder="0.70" oninput="mileMath()"></div>
+        <div class="field"><label>What for</label><input id="mile-purpose" placeholder="Site visit, supply run" maxlength="80"></div>
+        <div class="field"><label>Date</label><input id="mile-date" type="date"></div>
+        <p class="note" id="mile-math"></p>
+        <div style="height:88px"></div>
+        <div class="sticky">
+          <span class="note" id="mile-total"></span>
+          <button class="pill" onclick="saveMileage()">Save drive</button>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="hours">
+        <button class="back" onclick="show('money')">Back</button>
+        <h2 class="title">Job timer</h2>
+        <p class="note">Start it when you start work. It keeps counting if you close the app, then turns the hours into an invoice.</p>
+        <div class="field"><label>Client</label><input id="timer-client" list="client-names" placeholder="Who is this for" oninput="saveTimerFields()"></div>
+        <datalist id="client-names"></datalist>
+        <div class="field"><label>Work</label><input id="timer-work" placeholder="What you are doing" oninput="saveTimerFields()"></div>
+        <div class="field"><label>Hourly rate</label><input id="timer-rate" inputmode="decimal" placeholder="75.00" oninput="saveTimerFields()"></div>
+        <div class="card"><h3 class="timer-clock" id="timer-clock">0:00:00</h3><p id="timer-state">Not running</p></div>
+        <div class="stack-btns">
+          <button class="pill" id="timer-toggle" onclick="toggleTimer()">Start</button>
+          <button class="pill-outline" onclick="billTimer()">Bill these hours</button>
+          <button class="textlink" onclick="clearTimer()">Clear the timer</button>
+        </div>
       </section>
 
       <section class="screen no-tabs" id="account-setup">
@@ -5395,6 +5448,247 @@
     }
   }
 
+
+  // ---- Clients, statements, mileage, job timer, forecast ----
+  let viewingClientKey = "";
+  const TIMER_KEY = "simpleaccountz.timer.v1";
+  const MILE_RATE_KEY = "simpleaccountz.milerate.v1";
+  let timerTick = null;
+
+  function docRow(name, amount, sub) {
+    const btn = document.createElement("button");
+    btn.className = "doc";
+    btn.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+    btn.querySelector(".name").textContent = name;
+    btn.querySelector(".amt").textContent = amount;
+    btn.querySelector(".sub").textContent = sub;
+    return btn;
+  }
+
+  function renderClients() {
+    const list = document.getElementById("client-list");
+    if (!list) return;
+    const rows = SA.clientSummaries(docs, SA.LEDGER_TODAY);
+    const sub = document.getElementById("clients-sub");
+    if (sub) sub.textContent = rows.length ? rows.length + (rows.length === 1 ? " client" : " clients") : "Balances and statements";
+    const names = document.getElementById("client-names");
+    if (names) {
+      names.innerHTML = "";
+      rows.forEach((row) => { const o = document.createElement("option"); o.value = row.name; names.appendChild(o); });
+    }
+    list.innerHTML = "";
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = "Clients show up here after your first invoice.";
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach((row) => {
+      const owed = SA.owedText(row.owed);
+      const btn = docRow(row.name, owed || "Paid up", row.overdueCount
+        ? row.overdueCount + " overdue · " + row.openCount + " open"
+        : (row.openCount ? row.openCount + " open" : row.invoiceCount + (row.invoiceCount === 1 ? " invoice" : " invoices")));
+      if (row.overdueCount) btn.querySelector(".amt").style.color = "var(--overdue-fg)";
+      btn.onclick = () => openClient(row.key);
+      list.appendChild(btn);
+    });
+  }
+
+  function currentClient() {
+    return SA.clientSummaries(docs, SA.LEDGER_TODAY).find((row) => row.key === viewingClientKey) || null;
+  }
+
+  function openClient(key) {
+    viewingClientKey = key;
+    const row = currentClient();
+    if (!row) { show("clients"); return; }
+    document.getElementById("cd-name").textContent = row.name;
+    const owed = SA.owedText(row.owed);
+    document.getElementById("cd-owed").textContent = owed ? owed + " open" : "All paid up";
+    document.getElementById("cd-sub").textContent = [row.email, row.phone ? SA.formatPhone(row.phone) : "", row.overdueCount ? row.overdueCount + " overdue" : ""].filter(Boolean).join(" · ") || "No email or phone on file yet.";
+    document.getElementById("cd-statement").textContent = row.email ? "Email a statement" : (row.phone ? "Text a statement" : "Share a statement");
+    const list = document.getElementById("cd-docs");
+    list.innerHTML = "";
+    docs.filter((doc) => doc.type === "invoice" && SA.clientKey(doc.name) === key)
+      .sort((a, b) => ((a.created || "") < (b.created || "") ? 1 : -1))
+      .forEach((doc) => {
+        const btn = docRow(doc.number || "Invoice", SA.formatMoney(SA.balanceOf(doc), doc.currency), (doc.display || "") + (doc.due ? " · due " + doc.due : ""));
+        btn.onclick = () => openDoc(doc.id);
+        list.appendChild(btn);
+      });
+    show("client-detail");
+  }
+
+  function sendStatement() {
+    const row = currentClient();
+    if (!row) return;
+    const st = SA.clientStatement(docs, row.name, SA.LEDGER_TODAY, bizName());
+    if (!row.email && row.phone) { window.location.href = SA.smsLink(row.phone, st.subject + "\n\n" + st.body); return; }
+    shareLive(st.subject, st.body, row.email);
+  }
+
+  function setField(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  }
+
+  function newInvoiceFor() {
+    const row = currentClient();
+    openInvoiceEditor();
+    if (!row) return;
+    setField("draft-client", row.name);
+    setField("draft-email", row.email);
+    setField("draft-phone", row.phone);
+  }
+
+  function timeFor() {
+    const row = currentClient();
+    const timer = readTimer();
+    if (row && !timer.startedAt && !timer.accumulatedMs) { timer.client = row.name; writeTimer(timer); }
+    openTimer();
+  }
+
+  function beginMileage() {
+    let rate = "";
+    try { rate = localStorage.getItem(MILE_RATE_KEY) || ""; } catch (error) {}
+    setField("mile-miles", "");
+    setField("mile-purpose", "");
+    setField("mile-rate", rate || "0.70");
+    setField("mile-date", SA.LEDGER_TODAY);
+    mileMath();
+    show("mileage");
+  }
+
+  function mileFields() {
+    const exponent = SA.CURRENCIES[businessCurrency] ? SA.CURRENCIES[businessCurrency].exponent : 2;
+    const miles = SA.parseDecimalToScale(document.getElementById("mile-miles").value, 2);
+    const rate = SA.parseDecimalToScale(document.getElementById("mile-rate").value, exponent);
+    if (!miles.ok || !rate.ok) return { ok: false };
+    return SA.mileageExpense({
+      milesHundredths: miles.value,
+      rateMinor: rate.value,
+      date: document.getElementById("mile-date").value,
+      purpose: document.getElementById("mile-purpose").value,
+      currency: businessCurrency
+    });
+  }
+
+  function mileMath() {
+    const made = mileFields();
+    document.getElementById("mile-total").textContent = made.ok ? SA.formatMoney(made.expense.amountMinor, businessCurrency) : "";
+    document.getElementById("mile-math").textContent = made.ok ? "Files as a Car and travel expense." : "Enter the miles and the rate.";
+  }
+
+  function saveMileage() {
+    const made = mileFields();
+    if (!made.ok) { document.getElementById("mile-math").textContent = "Enter the miles and the rate, using numbers only."; return; }
+    try { localStorage.setItem(MILE_RATE_KEY, document.getElementById("mile-rate").value.trim()); } catch (error) {}
+    const result = SA.addExpense(transactions, Object.assign({ accountId: SA.expenseAccountId(links, accountKind) }, made.expense), businessCurrency);
+    transactions = result.transactions;
+    if (result.added) showPull("Drive saved: " + SA.formatMoney(made.expense.amountMinor, businessCurrency) + ".");
+    else showPull(result.reason === "duplicate" ? "That drive is already in the books." : "This drive was not added.");
+    renderAll();
+    show("money");
+  }
+
+  function readTimer() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(TIMER_KEY) || "null");
+      if (raw && typeof raw === "object") return raw;
+    } catch (error) {}
+    return { client: "", work: "", rate: "", startedAt: 0, accumulatedMs: 0 };
+  }
+
+  function writeTimer(timer) {
+    try { localStorage.setItem(TIMER_KEY, JSON.stringify(timer)); } catch (error) {}
+  }
+
+  function clockText(ms) {
+    const total = Math.floor(ms / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    return h + ":" + String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+  }
+
+  function renderTimer() {
+    const clock = document.getElementById("timer-clock");
+    if (!clock) return;
+    const timer = readTimer();
+    const ms = SA.timerElapsed(timer, Date.now());
+    clock.textContent = clockText(ms);
+    document.getElementById("timer-state").textContent = timer.startedAt
+      ? "Running · " + SA.hoursFromMs(ms).text + " so far"
+      : (ms ? "Paused · " + SA.hoursFromMs(ms).text + " to bill" : "Not running");
+    document.getElementById("timer-toggle").textContent = timer.startedAt ? "Pause" : (ms ? "Resume" : "Start");
+  }
+
+  function openTimer() {
+    const timer = readTimer();
+    setField("timer-client", timer.client);
+    setField("timer-work", timer.work);
+    setField("timer-rate", timer.rate);
+    renderTimer();
+    if (!timerTick) timerTick = setInterval(() => { if (document.getElementById("hours").classList.contains("on")) renderTimer(); }, 1000);
+    show("hours");
+  }
+
+  function saveTimerFields() {
+    const timer = readTimer();
+    timer.client = document.getElementById("timer-client").value.slice(0, 120);
+    timer.work = document.getElementById("timer-work").value.slice(0, 120);
+    timer.rate = document.getElementById("timer-rate").value.slice(0, 20);
+    writeTimer(timer);
+  }
+
+  function toggleTimer() {
+    saveTimerFields();
+    const timer = readTimer();
+    const at = Date.now();
+    if (timer.startedAt) { timer.accumulatedMs = SA.timerElapsed(timer, at); timer.startedAt = 0; }
+    else timer.startedAt = at;
+    writeTimer(timer);
+    renderTimer();
+  }
+
+  function clearTimer() {
+    const timer = readTimer();
+    if (SA.timerElapsed(timer, Date.now()) > 60000 && !window.confirm("Clear the tracked time? This cannot be undone.")) return;
+    writeTimer({ client: timer.client || "", work: timer.work || "", rate: timer.rate || "", startedAt: 0, accumulatedMs: 0 });
+    renderTimer();
+  }
+
+  function billTimer() {
+    saveTimerFields();
+    const timer = readTimer();
+    const at = Date.now();
+    const hours = SA.hoursFromMs(SA.timerElapsed(timer, at));
+    if (!hours.tenths) { document.getElementById("timer-state").textContent = "Track at least six minutes before billing."; return; }
+    if (timer.startedAt) { timer.accumulatedMs = SA.timerElapsed(timer, at); timer.startedAt = 0; writeTimer(timer); }
+    const client = SA.clientSummaries(docs, SA.LEDGER_TODAY).find((row) => row.key === SA.clientKey(timer.client));
+    openInvoiceEditor();
+    setField("draft-client", timer.client);
+    if (client) { setField("draft-email", client.email); setField("draft-phone", client.phone); }
+    setField("draft-desc", timer.work || "Labor");
+    setField("draft-qty", String(hours.tenths / 10));
+    setField("draft-rate", timer.rate);
+    applyDraftMath();
+    showPull(hours.text + " added to a new invoice. Clear the timer after you save it.");
+  }
+
+  function renderForecast() {
+    const net = document.getElementById("forecast-net");
+    if (!net) return;
+    const fc = SA.cashForecast(docs, transactions, SA.LEDGER_TODAY, 30, businessCurrency);
+    const money = (v) => SA.formatMoney(Math.abs(v), businessCurrency);
+    net.textContent = (fc.netMinor < 0 ? "−" + money(fc.netMinor) : money(fc.netMinor)) + " next 30 days";
+    const parts = [money(fc.inMinor) + " due in"];
+    if (fc.overdueMinor) parts.push(money(fc.overdueMinor) + " overdue to chase");
+    parts.push("about " + money(fc.outMinor) + " out, based on your last 90 days");
+    document.getElementById("forecast-note").textContent = parts.join(" · ");
+  }
+
   function renderAll() {
     runAutopilot();
     renderAccountChrome();
@@ -5407,6 +5701,8 @@
     renderPrices();
     renderInvoiceLocale();
     renderFiles();
+    renderClients();
+    renderForecast();
     renderAuto();
     renderEmptyStates();
     saveBooks();

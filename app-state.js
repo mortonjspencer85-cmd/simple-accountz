@@ -2478,6 +2478,133 @@ function autopilot(docs, transactions, today, options) {
   return { docs: nextDocs, transactions: nextTx, done, waiting: open };
 }
 
+// ---- Clients, statements, mileage, time, and cash forecast ----
+
+function clientKey(name) {
+  return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// One row per client, built from the invoices themselves, so the list is
+// never out of step with the books.
+function clientSummaries(docs, today) {
+  const day = today || todayIso();
+  const map = {};
+  (docs || []).forEach((doc) => {
+    if (!doc || (doc.type !== "invoice" && doc.type !== "estimate")) return;
+    const key = clientKey(doc.name);
+    if (!key) return;
+    const row = map[key] || (map[key] = {
+      key, name: String(doc.name).trim(), email: "", phone: "",
+      owed: {}, openCount: 0, overdueCount: 0, invoiceCount: 0, last: ""
+    });
+    if (doc.email && !row.email) row.email = doc.email;
+    if (doc.phone && !row.phone) row.phone = doc.phone;
+    const date = doc.created || "";
+    if (date > row.last) row.last = date;
+    if (doc.type !== "invoice") return;
+    row.invoiceCount += 1;
+    if (isOpenInvoice(doc)) {
+      const owe = balanceOf(doc);
+      row.owed[doc.currency] = (row.owed[doc.currency] || 0) + owe;
+      row.openCount += 1;
+      if (doc.due && doc.due < day) row.overdueCount += 1;
+    }
+  });
+  return Object.keys(map).map((k) => map[k]).sort((a, b) => {
+    if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
+    const ao = Object.keys(a.owed).reduce((t, c) => t + a.owed[c], 0);
+    const bo = Object.keys(b.owed).reduce((t, c) => t + b.owed[c], 0);
+    if (bo !== ao) return bo - ao;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function owedText(owed) {
+  const keys = Object.keys(owed || {}).filter((c) => owed[c] > 0);
+  return keys.length ? keys.map((c) => formatMoney(owed[c], c)).join(" + ") : "";
+}
+
+// A plain statement a client can read in an email or a text.
+function clientStatement(docs, name, today, businessName) {
+  const day = today || todayIso();
+  const key = clientKey(name);
+  const open = (docs || []).filter((doc) => doc && doc.type === "invoice" && clientKey(doc.name) === key && isOpenInvoice(doc))
+    .sort((a, b) => (a.due < b.due ? -1 : (a.due > b.due ? 1 : 0)));
+  const from = String(businessName || "").trim() || "Simple Accountz";
+  const subject = "Statement from " + from;
+  if (!open.length) {
+    return { ok: true, open: 0, subject, body: "Hi " + String(name || "").trim() + ",\n\nYou are all paid up with " + from + ". Thank you.\n\n" + from };
+  }
+  const owed = {};
+  const lines = open.map((doc) => {
+    const owe = balanceOf(doc);
+    owed[doc.currency] = (owed[doc.currency] || 0) + owe;
+    const late = doc.due && doc.due < day ? " (overdue " + daysBetween(doc.due, day) + " days)" : "";
+    return "- " + (doc.number || "Invoice") + ": " + formatMoney(owe, doc.currency) + " due " + (doc.due || "now") + late;
+  });
+  const body = "Hi " + String(name || "").trim() + ",\n\nHere is what is open with " + from + " as of " + day + ":\n\n"
+    + lines.join("\n") + "\n\nTotal: " + owedText(owed) + "\n\nThank you,\n" + from;
+  return { ok: true, open: open.length, owed, subject, body };
+}
+
+// A drive becomes an expense: miles times the rate, rounded to the cent.
+function mileageExpense(fields) {
+  const f = fields || {};
+  const milesHundredths = f.milesHundredths;
+  const rateMinor = f.rateMinor;
+  if (!Number.isSafeInteger(milesHundredths) || milesHundredths <= 0) return { ok: false, error: "miles" };
+  if (!Number.isSafeInteger(rateMinor) || rateMinor <= 0) return { ok: false, error: "rate" };
+  const amountMinor = Number(divRoundHalfUp(BigInt(milesHundredths) * BigInt(rateMinor), 100n));
+  const miles = String(milesHundredths / 100);
+  const purpose = String(f.purpose || "").trim().slice(0, 80);
+  return {
+    ok: true,
+    expense: {
+      date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.date || "")) ? f.date : todayIso(),
+      name: "Mileage: " + miles + " mi" + (purpose ? " · " + purpose : ""),
+      amountMinor,
+      currency: f.currency || "USD",
+      category: "Car and travel",
+      mileage: { milesHundredths, rateMinor }
+    }
+  };
+}
+
+// Tracked time becomes invoice hours, rounded to the nearest six minutes.
+function hoursFromMs(ms) {
+  const tenths = Math.round(Math.max(0, Number(ms) || 0) / 360000);
+  return { tenths, qtyBps: tenths * 1000, text: (tenths / 10).toFixed(1) + " h" };
+}
+
+function timerElapsed(timer, nowMs) {
+  if (!timer) return 0;
+  const base = Math.max(0, Number(timer.accumulatedMs) || 0);
+  return timer.startedAt ? base + Math.max(0, nowMs - timer.startedAt) : base;
+}
+
+// Money expected in, and likely out, over the next few weeks.
+function cashForecast(docs, transactions, today, days, currency) {
+  const day = today || todayIso();
+  const span = days || 30;
+  const end = shiftDate(day, span);
+  let inMinor = 0;
+  let overdueMinor = 0;
+  let count = 0;
+  (docs || []).forEach((doc) => {
+    if (!isOpenInvoice(doc) || doc.currency !== currency) return;
+    const owe = balanceOf(doc);
+    if (doc.due && doc.due < day) { overdueMinor += owe; count += 1; return; }
+    if (!doc.due || doc.due <= end) { inMinor += owe; count += 1; }
+  });
+  const since = shiftDate(day, -90);
+  let spent = 0;
+  (transactions || []).forEach((tx) => {
+    if (tx && tx.kind === "out" && tx.currency === currency && tx.date > since && tx.date <= day) spent += tx.amountMinor || 0;
+  });
+  const outMinor = Number(divRoundHalfUp(BigInt(spent) * BigInt(span), 90n));
+  return { days: span, inMinor, overdueMinor, outMinor, netMinor: inMinor + overdueMinor - outMinor, invoices: count };
+}
+
 const SA = {
   CURRENCIES,
   switchAccountBooks,
@@ -2605,6 +2732,14 @@ const SA = {
   utf8Binary,
   platformRevenue,
   subscriptionCharges,
+  clientKey,
+  clientSummaries,
+  owedText,
+  clientStatement,
+  mileageExpense,
+  hoursFromMs,
+  timerElapsed,
+  cashForecast,
   DEMO_AUTH_CODE,
   RECOVERY_TOKEN
 };
