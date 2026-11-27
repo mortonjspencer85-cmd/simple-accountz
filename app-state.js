@@ -1612,8 +1612,16 @@ function recordCustomerPayment(docs, transactions, invoiceId, today) {
 }
 
 function parseDecimalToScale(text, scale) {
-  const raw = String(text == null ? "" : text).trim().replace(/[$,\s]/g, "");
-  if (raw === "") return { ok: true, value: 0 };
+  const cleaned = String(text == null ? "" : text).trim();
+  if (cleaned === "") return { ok: true, value: 0 };
+  if (cleaned.charAt(0) === "-") return { ok: false, error: "bad_amount" };
+  // Drop a currency sign or a three-letter code ("$", "£", "USD") and thousands
+  // separators. Nothing else is stripped: a typo like "15o" or "1O" is refused,
+  // never quietly read as $15 or $1.
+  const raw = cleaned.replace(/[\s,]/g, "")
+    .replace(/^(?:[A-Za-z]{3})?[$£€¥₹₦₱₩₫₺₴₸₽₪₵₲₡₭₮₼₾৳฿៛]?/, "")
+    .replace(/(?:[A-Za-z]{3})$/, "");
+  if (raw === "") return { ok: false, error: "bad_amount" };
   if (!/^(\d+(\.\d*)?|\.\d+)$/.test(raw)) return { ok: false, error: "bad_amount" };
   const bits = raw.split(".");
   if (bits[0] === "") bits[0] = "0";
@@ -2204,53 +2212,99 @@ function minAreaRect(hull) {
   return ordered.slice(first).concat(ordered.slice(0, first)).map((pt) => ({ x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10 }));
 }
 
+// Finds the page by what it is not: the edges of the picture show the table,
+// desk, or hand behind it, and the page is the solid shape that differs from
+// that. Works for a white receipt on a dark table, on a wooden desk, or on a
+// light counter, as long as the paper is a little brighter or darker than it.
+// A light page on an equally light surface has no edge to find, so nothing is
+// returned rather than a box around the whole picture.
 function findDocumentQuad(gray, width, height) {
   if (!gray || gray.length !== width * height || width < 16 || height < 16) return null;
-  const cut = otsuThreshold(gray);
-  // Paper must be clearly brighter than what it sits on.
-  let light = 0;
-  let lightSum = 0;
-  let darkSum = 0;
-  let dark = 0;
-  for (let i = 0; i < gray.length; i++) {
-    if (gray[i] > cut) { light += 1; lightSum += gray[i]; } else { dark += 1; darkSum += gray[i]; }
+  const n = width * height;
+  const median = (list) => { const sorted = list.slice().sort((a, b) => a - b); return sorted[sorted.length >> 1]; };
+  const ring = Math.max(2, Math.round(Math.min(width, height) * 0.02));
+  const top = [], bottom = [], left = [], right = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const v = gray[y * width + x];
+      if (y < ring) top.push(v);
+      else if (y >= height - ring) bottom.push(v);
+      if (x < ring) left.push(v);
+      else if (x >= width - ring) right.push(v);
+    }
   }
-  if (!light || !dark) return null;
-  if (lightSum / light - darkSum / dark < 28) return null;
-  const share = light / gray.length;
-  if (share < 0.12 || share > 0.97) return null;
+  const all = top.concat(bottom, left, right);
+  const center = median(all);
+  const spread = median(all.map((v) => Math.abs(v - center)));
+  const cut = Math.max(16, Math.min(60, spread * 4.5 + 6));
+  // A side mostly covered by the page itself falls back to the whole ring.
+  const side = (list) => { const m = median(list); return Math.abs(m - center) > cut ? center : m; };
+  const T = side(top), B = side(bottom), L = side(left), R = side(right);
 
-  // The left and right edge of the bright area on every row describe its
-  // outline; the hull of those points is the hull of the whole shape.
+  // Mark what differs from the background, allowing for light that fades across the picture.
+  const fg = new Uint8Array(n);
+  for (let y = 0; y < height; y++) {
+    const v = y / (height - 1);
+    for (let x = 0; x < width; x++) {
+      const u = x / (width - 1);
+      const bg = ((1 - v) * T + v * B + (1 - u) * L + u * R) / 2;
+      if (Math.abs(gray[y * width + x] - bg) > cut) fg[y * width + x] = 1;
+    }
+  }
+
+  // The page is the largest connected shape.
+  const label = new Int32Array(n);
+  const queue = new Int32Array(n);
+  let best = 0, bestSize = 0, next = 0;
+  for (let i = 0; i < n; i++) {
+    if (!fg[i] || label[i]) continue;
+    next += 1;
+    let head = 0, tail = 0, size = 0;
+    queue[tail++] = i;
+    label[i] = next;
+    while (head < tail) {
+      const at = queue[head++];
+      size += 1;
+      const x = at % width;
+      if (x > 0 && fg[at - 1] && !label[at - 1]) { label[at - 1] = next; queue[tail++] = at - 1; }
+      if (x < width - 1 && fg[at + 1] && !label[at + 1]) { label[at + 1] = next; queue[tail++] = at + 1; }
+      if (at >= width && fg[at - width] && !label[at - width]) { label[at - width] = next; queue[tail++] = at - width; }
+      if (at < n - width && fg[at + width] && !label[at + width]) { label[at + width] = next; queue[tail++] = at + width; }
+    }
+    if (size > bestSize) { bestSize = size; best = next; }
+  }
+  if (!best || bestSize < n * 0.06 || bestSize > n * 0.97) return null;
+
+  // Its left and right edge on every row is its outline.
   const edge = [];
   for (let y = 0; y < height; y++) {
-    let first = -1;
-    let last = -1;
+    let first = -1, last = -1;
     for (let x = 0; x < width; x++) {
-      if (gray[y * width + x] > cut) { if (first < 0) first = x; last = x; }
+      if (label[y * width + x] === best) { if (first < 0) first = x; last = x; }
     }
     if (first >= 0) { edge.push({ x: first, y }); if (last !== first) edge.push({ x: last, y }); }
   }
   if (edge.length < 8) return null;
-  const corners = minAreaRect(convexHull(edge));
-  if (!corners || corners.length !== 4) return null;
+  const rect = minAreaRect(convexHull(edge));
+  if (!rect || rect.length !== 4) return null;
+  const margin = Math.max(2, Math.round(Math.min(width, height) * 0.015));
+  const touches = rect.some((c) => c.x <= margin || c.y <= margin || c.x >= width - 1 - margin || c.y >= height - 1 - margin);
+  const corners = rect.map((c) => ({ x: Math.max(0, Math.min(width - 1, c.x)), y: Math.max(0, Math.min(height - 1, c.y)) }));
   const area = Math.abs(quadArea(corners));
-  if (area < gray.length * 0.10) return null;
+  if (area < n * 0.08) return null;
   const sides = [0, 1, 2, 3].map((i) => Math.hypot(corners[(i + 1) % 4].x - corners[i].x, corners[(i + 1) % 4].y - corners[i].y));
   if (Math.min.apply(null, sides) < Math.min(width, height) * 0.12) return null;
-  // A page is solid: nearly every pixel inside the outline is light. Stripes and
-  // clutter can stretch a rectangle across the frame but stay patchy inside.
-  let inside = 0;
-  let bright = 0;
+  // A page fills its outline. A hand, a shadow, or a pattern does not.
+  let inside = 0, hit = 0;
   for (let y = 0; y < height; y += 2) {
     for (let x = 0; x < width; x += 2) {
       if (!pointInQuad(x, y, corners)) continue;
       inside += 1;
-      if (gray[y * width + x] > cut) bright += 1;
+      if (label[y * width + x] === best) hit += 1;
     }
   }
-  if (!inside || bright / inside < 0.82) return null;
-  return { corners, area, fill: area / gray.length, solid: bright / inside, threshold: cut };
+  if (!inside || hit / inside < 0.72) return null;
+  return { corners, area, fill: area / n, solid: hit / inside, threshold: cut, touches };
 }
 
 function pointInQuad(px, py, corners) {
@@ -2302,10 +2356,67 @@ function quadLooksLikePage(quad, width, height) {
 }
 
 function quadIsSteady(a, b, tolerance) {
-  if (!a || !b) return false;
+  if (!a || !b || !a.corners || !b.corners) return false;
   const limit = tolerance == null ? 0.02 : tolerance;
   return a.corners.every((corner, i) =>
     Math.hypot(corner.x - b.corners[i].x, corner.y - b.corners[i].y) <= limit * 100);
+}
+
+// The live finder shows any page it sees, even one running off the edge (so it
+// can say "move back"). A photo is only straightened by a page that is wholly
+// in the picture; otherwise the whole photo is kept as it is.
+function quadForScan(gray, width, height) {
+  return findDocumentQuad(gray, width, height) || pageFillsFrame(gray, width, height);
+}
+
+// A receipt held right up to the lens has no background to compare with. It
+// counts only when the picture is paper all the way round AND print shows up
+// across the whole picture, right to all four edges. A receipt lying on an
+// equally light counter keeps its print in the middle, so it is not mistaken
+// for one filling the frame (that mistake drew a box around the whole room).
+function pageFillsFrame(gray, width, height) {
+  if (!gray || gray.length !== width * height || width < 16 || height < 16) return null;
+  const n = width * height;
+  const sorted = Array.from(gray).sort((a, b) => a - b);
+  const paper = sorted[Math.floor(n * 0.7)];
+  if (paper < 150) return null;
+  const ring = [];
+  const band = Math.max(2, Math.round(Math.min(width, height) * 0.03));
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (x < band || y < band || x >= width - band || y >= height - band) ring.push(gray[y * width + x]);
+    }
+  }
+  ring.sort((a, b) => a - b);
+  if (ring[ring.length >> 1] < paper - 25) return null;
+  const inkCut = paper - 70;
+  let ink = 0;
+  const cells = new Uint8Array(16);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (gray[y * width + x] >= inkCut) continue;
+      ink += 1;
+      cells[Math.min(3, Math.floor(y * 4 / height)) * 4 + Math.min(3, Math.floor(x * 4 / width))] = 1;
+    }
+  }
+  if (ink < n * 0.01 || ink > n * 0.35) return null;
+  let used = 0;
+  for (let i = 0; i < 16; i++) used += cells[i];
+  const edgeCells = [0, 1, 2, 3, 4, 7, 8, 11, 12, 13, 14, 15].reduce((sum, i) => sum + cells[i], 0);
+  if (used < 13 || edgeCells < 10) return null;
+  const margin = Math.max(3, Math.round(Math.min(width, height) * 0.04));
+  const corners = [
+    { x: margin, y: margin },
+    { x: width - 1 - margin, y: margin },
+    { x: width - 1 - margin, y: height - 1 - margin },
+    { x: margin, y: height - 1 - margin }
+  ];
+  return { corners, area: (width - margin * 2) * (height - margin * 2), fill: 1, solid: 1, filled: true, touches: false };
+}
+
+function quadForStill(gray, width, height) {
+  const found = findDocumentQuad(gray, width, height);
+  return found && !found.touches && quadLooksLikePage(found, width, height) ? found : null;
 }
 
 // The transform that pulls a slanted page into a straight rectangle.
@@ -2418,12 +2529,104 @@ function parseLooseDate(text, today, dayFirst) {
   return "";
 }
 
-const TOTAL_WORDS = /\b(grand\s*total|balance\s*due|amount\s*due|total\s*due|total)\b/i;
-const SKIP_TOTAL = /\b(sub\s*-?total|tax|vat|gst|tip|change|cash|tendered|discount)\b/i;
+// "Balance to Pay" and "Amount payable" are the amount to pay, like "Total".
+const TOTAL_WORDS = /\b(grand\s*total|balance\s*due|amount\s*due|total\s*due|balance\s*to\s*pay|amount\s*to\s*pay|total\s*to\s*pay|amount\s*payable|total\s*payable|total)\b/i;
+// Savings, promotions, rewards, and item counts are never the amount paid, even
+// when the line says "Total" ("Total Savings today is $2.40").
+const SKIP_TOTAL = /\b(sub\s*-?total|tax|vat|gst|tip|change|cash|tendered|discount|sav(?:e|ed|ing|ings)|promo(?:tion)?s?|coupons?|rewards?|points|items?|qty|quantity|count|units?)\b/i;
 const NOT_A_NAME = /^[\s\d\W]*$/;
 
 function cleanLines(text) {
-  return String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  return String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean)
+    .map((line) => line.replace(/\bT[0O]TAL\b/gi, "TOTAL").replace(/\bAM0UNT\b/gi, "AMOUNT"));
+}
+
+// grand = the amount to pay. skip = tax, subtotal, tender. total = a plain total.
+function lineTotalKind(line) {
+  if (/grand\s*total|balance\s*due|amount\s*due|total\s*due|balance\s*to\s*pay|amount\s*to\s*pay|total\s*to\s*pay|amount\s*payable|total\s*payable|incl(?:uding)?\.?\s*(?:tax|vat|gst)|inc\.?\s*(?:tax|vat|gst)/i.test(line)) return "grand";
+  if (SKIP_TOTAL.test(line)) return "skip";
+  if (TOTAL_WORDS.test(line)) return "total";
+  return "";
+}
+
+function isCardLine(line) {
+  return /[*xX#]{2,}\s*\d|\b(?:visa|mastercard|amex|american express|discover)\b/i.test(line);
+}
+
+// A price, not a card, a year, or a long item code. Bare 45 is $45. Bare 1884 is not.
+function priceTokens(line, allowLarge) {
+  if (isCardLine(line)) return [];
+  return findMoney(line).filter((item) => {
+    const raw = String(item.raw || "");
+    if (/[$£€¥]/.test(raw) || /[.,]\d{1,2}$/.test(raw)) return true;
+    const digits = raw.replace(/\D/g, "");
+    if (/^20\d{2}$/.test(digits)) return false;
+    return digits.length > 0 && digits.length <= (allowLarge ? 6 : 3);
+  });
+}
+
+function amountAfterLabel(lines, index) {
+  const here = priceTokens(lines[index], true);
+  if (here.length) return here[here.length - 1].minor;
+  for (let step = 1; step <= 2; step++) {
+    const next = lines[index + step];
+    if (!next) break;
+    const kind = lineTotalKind(next);
+    if (kind === "grand" || kind === "total") break;
+    if (kind === "skip") continue;
+    const money = priceTokens(next, true);
+    if (money.length) return money[money.length - 1].minor;
+    if (/[A-Za-z]{3,}/.test(next) && !/^(usd|eur|gbp|cad|aud|dollars?)$/i.test(next)) break;
+  }
+  return 0;
+}
+
+// The labelled amount to pay. A later grand total beats an earlier plain total.
+function readLabeledTotal(lines) {
+  let best = null;
+  lines.forEach((line, index) => {
+    const kind = lineTotalKind(line);
+    if (kind !== "grand" && kind !== "total") return;
+    const minor = amountAfterLabel(lines, index);
+    if (!minor) return;
+    const rank = kind === "grand" ? 2 : 1;
+    if (!best || rank > best.rank || (rank === best.rank && index >= best.index)) best = { minor, rank, index };
+  });
+  return best ? best.minor : 0;
+}
+
+const STREET = /\b(road|rd|street|st|avenue|ave|blvd|boulevard|drive|dr|lane|ln|way|court|ct|suite|ste|apt|unit)\b/i;
+const NOT_MERCHANT = /\b(receipt|invoice|order|www\.|https?:|tel|phone|welcome|thank\s*you|thanks|customer\s*copy|store\s*copy|merchant\s*copy|cashier|terminal|approved|subtotal)\b|\bsale\b|\d{3}[-.\s]\d{4}/i;
+
+function looksLikeAddress(line) {
+  if (/^\d{1,6}\s+\S/.test(line)) return true;
+  if (/\b(po box|p\.?o\.?\s*box)\b/i.test(line)) return true;
+  if (STREET.test(line) && /\d/.test(line)) return true;
+  if (/\b\d{5}(?:-\d{4})?\b/.test(line)) return true;
+  return false;
+}
+
+// "DOLLAR GENERAL STORE #31889" names the shop; the store number is not part of it.
+function merchantName(line) {
+  return String(line || "")
+    .replace(/#\s*\d+/g, " ")
+    .replace(/\b(?:store|branch|location|loc|shop)\s*(?:no\.?|number|#)?\s*\d+\b/gi, " ")
+    .replace(/\s+(?:store|branch|location)\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function merchantLine(line) {
+  if (!line || line.length < 3 || line.length > 40) return false;
+  if (NOT_A_NAME.test(line)) return false;
+  if (lineTotalKind(line)) return false;
+  if (NOT_MERCHANT.test(line)) return false;
+  if (looksLikeAddress(line)) return false;
+  if (parseLooseDate(line)) return false;
+  if (isCardLine(line)) return false;
+  if (/\b\d{4,}\b/.test(line)) return false;
+  if (priceTokens(line, false).length) return false;
+  return (line.match(/[A-Za-z]/g) || []).length >= 3;
 }
 
 // Pulls merchant, total, and date off a shop receipt.
@@ -2432,31 +2635,24 @@ function parseReceiptText(text, today, dayFirst) {
   const found = { merchant: "", totalMinor: 0, date: "", category: "", fields: 0 };
   if (!lines.length) return found;
 
-  let best = null;
-  lines.forEach((line, index) => {
-    if (!TOTAL_WORDS.test(line) || SKIP_TOTAL.test(line)) return;
-    const money = findMoney(line);
-    if (!money.length) return;
-    const amount = money[money.length - 1];
-    const grand = /grand\s*total|balance\s*due|amount\s*due|total\s*due/i.test(line);
-    const score = (grand ? 1000000 : 0) + index + amount.minor / 1e9;
-    if (!best || score > best.score) best = { minor: amount.minor, score };
-  });
-  if (!best) {
-    // No labelled total: the largest amount on the receipt is the usual answer.
-    const all = lines.reduce((list, line) => list.concat(findMoney(line)), []);
-    if (all.length) best = { minor: all.reduce((top, item) => Math.max(top, item.minor), 0) };
+  let totalMinor = readLabeledTotal(lines);
+  if (!totalMinor) {
+    // No labelled total: the largest real price, never a card, a year, or a street number.
+    lines.forEach((line) => {
+      if (lineTotalKind(line) === "skip") return;
+      if (parseLooseDate(line) && !/[$£€¥]/.test(line)) return;
+      if (looksLikeAddress(line) || isCardLine(line)) return;
+      priceTokens(line, false).forEach((item) => { if (item.minor > totalMinor) totalMinor = item.minor; });
+    });
   }
-  if (best && best.minor > 0) { found.totalMinor = best.minor; found.fields += 1; }
+  if (totalMinor > 0) { found.totalMinor = totalMinor; found.fields += 1; }
 
   for (let i = 0; i < lines.length && !found.date; i++) {
     const date = parseLooseDate(lines[i], today, dayFirst);
     if (date) { found.date = date; found.fields += 1; }
   }
 
-  const header = lines.slice(0, 6).find((line) =>
-    line.length >= 3 && line.length <= 40 && !NOT_A_NAME.test(line) && !TOTAL_WORDS.test(line)
-    && !/receipt|invoice|order|www\.|http|@|tel|phone|\d{3}-\d{4}/i.test(line));
+  const header = lines.slice(0, 8).map(merchantName).find(merchantLine);
   if (header) {
     found.merchant = header.replace(/[*#|]+/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
     found.fields += 1;
@@ -2484,16 +2680,8 @@ function parseInvoiceText(text, today, dayFirst) {
     if (clean) { found.phone = clean; found.fields += 1; }
   }
 
-  let best = null;
-  lines.forEach((line, index) => {
-    if (!TOTAL_WORDS.test(line) || SKIP_TOTAL.test(line)) return;
-    const money = findMoney(line);
-    if (!money.length) return;
-    const grand = /balance\s*due|amount\s*due|total\s*due|grand\s*total/i.test(line);
-    const score = (grand ? 1000000 : 0) + index;
-    if (!best || score > best.score) best = { minor: money[money.length - 1].minor, score };
-  });
-  if (best && best.minor > 0) { found.totalMinor = best.minor; found.fields += 1; }
+  const totalMinor = readLabeledTotal(lines);
+  if (totalMinor > 0) { found.totalMinor = totalMinor; found.fields += 1; }
 
   const dueLine = lines.find((line) => /\bdue\b/i.test(line) && parseLooseDate(line, today, dayFirst));
   if (dueLine) { found.due = parseLooseDate(dueLine, today, dayFirst); found.fields += 1; }
@@ -3229,6 +3417,9 @@ const SA = {
   driveDistance,
   buildOds,
   quadLooksLikePage,
+  quadForScan,
+  quadForStill,
+  pageFillsFrame,
   addRoutePoint,
   pauseDrive,
   resumeDrive,
