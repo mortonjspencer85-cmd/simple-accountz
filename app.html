@@ -1627,7 +1627,7 @@
         <p class="note">Turn on an authenticator app. If you are locked out, use the email on the account or the recovery QR you saved.</p>
         <div class="card"><h3 id="twofactor-state">Two-factor is off</h3><p>Scan the QR with a verification app, then enter its code.</p></div>
         <img class="qr" alt="Authenticator QR for Simple Accountz" src="authenticator-qr.svg">
-        <div class="field"><label>Code from the app</label><input id="auth-code" inputmode="numeric" placeholder="6-digit code"></div>
+        <div class="field"><label>Code from the app</label><input id="twofa-code" inputmode="numeric" placeholder="6-digit code"></div>
         <p class="note">This preview accepts 482913 so you can finish setup without a live code. A real build checks the rotating code from the QR.</p>
         <button class="pill" onclick="enableTwoFactor()">Turn on two-factor</button>
         <button class="textlink" onclick="show('recovery-qr')">Save recovery QR</button>
@@ -2840,7 +2840,7 @@
   }
 
   function enableTwoFactor() {
-    const result = SA.confirmTwoFactor(document.getElementById("auth-code").value.trim());
+    const result = SA.confirmTwoFactor(document.getElementById("twofa-code").value.trim());
     const state = document.getElementById("twofactor-state");
     if (!result.ok) {
       state.textContent = "That code did not match.";
@@ -3269,13 +3269,13 @@
     cam.auto = camEl("cam-auto").checked;
     camEl("cam").classList.add("on");
     camEl("cam-hint").textContent = mode === "invoice" ? "Point at the paper invoice" : "Point at the receipt";
-    setBusy(false);
+    camBusy(false);
     startCamStream();
   }
 
   function closeCamera() {
     camEl("cam").classList.remove("on");
-    setBusy(false);
+    camBusy(false);
     if (cam.raf) cancelAnimationFrame(cam.raf);
     cam.raf = 0;
     if (cam.timer) clearTimeout(cam.timer);
@@ -3455,7 +3455,7 @@
     });
   }
 
-  function setBusy(on, text, progress) {
+  function camBusy(on, text, progress) {
     const busy = camEl("cam-busy");
     busy.classList.toggle("on", !!on);
     if (text) camEl("cam-busy-text").textContent = text;
@@ -3481,7 +3481,7 @@
       full.getContext("2d").drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, full.width, full.height);
       const quad = automatic ? cam.last : null;
       const shot = straighten(full, quad, 160);
-      setBusy(true, "Tidying the picture…", 0.15);
+      camBusy(true, "Tidying the picture…", 0.15);
       const dataUrl = shot.toDataURL("image/jpeg", 0.85);
       stopStream();
       await handleShot(dataUrl, shot);
@@ -3580,8 +3580,8 @@
     let scan = null;
     if (cam.auto) {
       try {
-        setBusy(true, "Reading the page…", 0.2);
-        const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9), (p) => setBusy(true, "Reading the page…", 0.2 + p * 0.75));
+        camBusy(true, "Reading the page…", 0.2);
+        const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9), (p) => camBusy(true, "Reading the page…", 0.2 + p * 0.75));
         scan = mode === "invoice"
           ? SA.parseInvoiceText(text, SA.LEDGER_TODAY, countryCode !== "US")
           : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US");
@@ -3589,7 +3589,7 @@
         scan = null;
       }
     }
-    setBusy(false);
+    camBusy(false);
     camEl("cam").classList.remove("on");
     if (mode === "invoice") acceptInvoicePhoto(dataUrl, scan);
     else acceptReceiptPhoto(dataUrl, scan);
@@ -5485,7 +5485,6 @@
   let viewingClientKey = "";
   const TIMER_KEY = "simpleaccountz.timer.v1";
   const MILE_RATE_KEY = "simpleaccountz.milerate.v1";
-  let timerTick = null;
 
   function docRow(name, amount, sub) {
     const btn = document.createElement("button");
@@ -5594,6 +5593,7 @@
     mileMath();
     renderDrive();
     show("mileage");
+    renderRunning();
   }
 
   function mileFields() {
@@ -5656,7 +5656,7 @@
     const ms = SA.timerElapsed(timer, Date.now());
     clock.textContent = clockText(ms);
     document.getElementById("timer-state").textContent = timer.startedAt
-      ? "Running · " + SA.hoursFromMs(ms).text + " so far"
+      ? "Running · " + (SA.hoursFromMs(ms).tenths ? SA.hoursFromMs(ms).text + " so far" : "under 0.1 h so far")
       : (ms ? "Paused · " + SA.hoursFromMs(ms).text + " to bill" : "Not running");
     document.getElementById("timer-toggle").textContent = timer.startedAt ? "Pause" : (ms ? "Resume" : "Start");
   }
@@ -5667,8 +5667,8 @@
     setField("timer-work", timer.work);
     setField("timer-rate", timer.rate);
     renderTimer();
-    if (!timerTick) timerTick = setInterval(() => { if (document.getElementById("hours").classList.contains("on")) renderTimer(); }, 1000);
     show("hours");
+    renderRunning();
   }
 
   function saveTimerFields() {
@@ -5881,9 +5881,13 @@
     const drive = readDrive();
     const t = document.getElementById("run-timer");
     const d = document.getElementById("run-drive");
-    t.hidden = !timer.startedAt;
-    if (timer.startedAt) t.textContent = "Timer " + clockText(SA.timerElapsed(timer, Date.now()));
-    d.hidden = !drive;
+    const now = Date.now();
+    const onScreen = (id) => { const node = document.getElementById(id); return !!(node && node.classList.contains("on")); };
+    // The full timer and drive screens show the same numbers, so their chip steps aside there.
+    if (onScreen("hours")) renderTimer();
+    t.hidden = !timer.startedAt || onScreen("hours");
+    if (timer.startedAt) t.textContent = "Timer " + clockText(SA.timerElapsed(timer, now));
+    d.hidden = !drive || onScreen("mileage");
     if (drive) d.textContent = "Drive " + driveText(drive);
     bar.hidden = t.hidden && d.hidden;
     const ht = document.getElementById("home-timer");
