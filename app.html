@@ -682,6 +682,77 @@
   .cam-busy { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 28px;
     background: rgba(0,0,0,.8); color: #fff; font-size: 15px; font-weight: 600; }
   .cam-busy.on { display: grid; }
+  /* ---- Camera, reimagined: glass controls, iPhone-style shutter and zoom ---- */
+  .cam-top { padding: calc(10px + env(safe-area-inset-top)) 16px 30px; background: linear-gradient(rgba(0,0,0,.55), transparent); }
+  .cam-icon { width: 44px; height: 44px; border-radius: 50%; border: 0; display: grid; place-items: center; flex: none;
+    background: rgba(28,28,30,.55); color: #fff; cursor: pointer; -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
+  .cam-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .cam-icon.big { width: 52px; height: 52px; }
+  .cam-icon.on { background: #ffd60a; color: #1c1c1e; }
+  .cam-icon:active { transform: scale(.92); }
+  .cam-icon:disabled { opacity: .35; }
+  .cam-hint { flex: 0 1 auto; margin: 0 auto; padding: 9px 16px; border-radius: 999px; max-width: 64%;
+    background: rgba(28,28,30,.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    font-size: 14px; font-weight: 600; letter-spacing: -.01em; text-shadow: none;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .25s, color .25s; }
+  .cam.ready .cam-hint { background: var(--lime); color: var(--forest); }
+  .cam-bottom { padding: 18px 22px calc(20px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.78) 45%); }
+  .cam-zoom { display: none; }
+  .cam-zooms { display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; min-height: 38px; }
+  .cam-zooms button { min-width: 38px; height: 38px; padding: 0 9px; border-radius: 999px; border: 0; cursor: pointer;
+    background: rgba(28,28,30,.6); color: #fff; font: 700 13px/1 inherit; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    transition: transform .15s ease, color .15s; }
+  .cam-zooms button.on { color: #ffd60a; transform: scale(1.12); }
+  .cam-row { margin-top: 0; padding: 0 6px; }
+  .shutter { width: 80px; height: 80px; border: 4px solid #fff; background: transparent; padding: 4px; display: grid; place-items: center;
+    transition: transform .12s ease, border-color .25s; }
+  .shutter i { display: block; width: 100%; height: 100%; border-radius: 50%; background: #fff; transition: transform .12s ease, background .25s; }
+  .shutter:active { transform: none; }
+  .shutter:active i { transform: scale(.86); }
+  .shutter.armed { border-color: var(--lime); background: transparent; }
+  .shutter.armed i { background: var(--lime); }
+  .cam-auto { margin-top: 16px; gap: 10px; font-size: 14px; }
+  .cam-auto input { appearance: none; -webkit-appearance: none; width: 44px; height: 26px; margin: 0; border-radius: 999px;
+    background: rgba(255,255,255,.28); position: relative; cursor: pointer; transition: background .2s; }
+  .cam-auto input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s; }
+  .cam-auto input:checked { background: #34c759; }
+  .cam-auto input:checked::after { transform: translateX(18px); }
+  .cam.snap::after { content: ""; position: absolute; inset: 0; background: #fff; pointer-events: none; z-index: 6; animation: camSnap .3s ease-out forwards; }
+  @keyframes camSnap { from { opacity: .85; } to { opacity: 0; } }
+  .cam-busy { background: rgba(0,0,0,.55); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+
+  /* ---- Pull to refresh ---- */
+  .ptr { position: absolute; left: 50%; top: calc(8px + env(safe-area-inset-top)); z-index: 70; width: 40px; height: 40px; margin-left: -20px;
+    border-radius: 50%; background: var(--paper); box-shadow: 0 6px 18px rgba(0,0,0,.16); display: grid; place-items: center;
+    transform: translateY(-70px); opacity: 0; pointer-events: none; transition: transform .2s ease, opacity .2s ease; }
+  .ptr svg { width: 22px; height: 22px; fill: none; stroke: var(--forest); stroke-width: 2.4; stroke-linecap: round; transition: transform .15s; }
+  .ptr.pulling { transition: none; opacity: 1; }
+  .ptr.armed svg { transform: rotate(180deg); }
+  .ptr.busy { opacity: 1; transform: translateY(14px); }
+  .ptr.busy svg { animation: ptrSpin .8s linear infinite; }
+  @keyframes ptrSpin { to { transform: rotate(360deg); } }
+
+  /* ---- Sidebar menu (every device) ---- */
+  .drawer-veil { position: absolute; inset: 0; z-index: 80; background: rgba(14,15,12,.38); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .drawer { position: absolute; top: 0; bottom: 0; left: 0; z-index: 81; width: min(300px, 84%); background: var(--paper);
+    padding: calc(18px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom)); overflow-y: auto;
+    transform: translateX(-105%); transition: transform .24s ease; box-shadow: 12px 0 40px rgba(0,0,0,.18); display: flex; flex-direction: column; gap: 2px; }
+  .drawer.open { transform: none; }
+  .drawer.open + .drawer-veil, .drawer-veil.open { opacity: 1; pointer-events: auto; }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 12px; font-size: 18px; }
+  .drawer-x { border: 0; background: var(--linen); width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; color: var(--forest); }
+  .drawer .go { border: 0; background: transparent; text-align: left; padding: 13px 12px; border-radius: 14px; font: 600 16px/1.2 inherit; color: var(--obsidian, #0e0f0c); cursor: pointer; }
+  .drawer .go:hover, .drawer .go:focus-visible { background: var(--linen); }
+  .drawer .go.on { background: var(--lime); color: var(--forest); }
+  .drawer .drawer-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--pebble, #868685); padding: 14px 12px 4px; }
+
+  /* ---- Location prompt ---- */
+  .loc-ask { position: absolute; left: 12px; right: 12px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 65; max-width: 460px; margin: 0 auto;
+    background: var(--paper); border-radius: 22px; padding: 16px 18px; box-shadow: 0 16px 44px rgba(0,0,0,.22); }
+  .loc-ask b { display: block; font-size: 16px; margin-bottom: 4px; }
+  .loc-ask p { margin: 0 0 12px; font-size: 14px; color: var(--slate, #454745); line-height: 1.4; }
+  .loc-ask .loc-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .cam-busy .bar { width: 200px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); margin: 14px auto 0; overflow: hidden; }
   .cam-busy .bar i { display: block; height: 100%; width: 0; background: var(--lime); transition: width .2s ease; }
   .scan-note { background: linear-gradient(135deg, #e4ffd1, #d8fff1); border-radius: 12px; padding: 10px 12px;
@@ -781,18 +852,19 @@
         <video id="cam-video" playsinline autoplay muted></video>
         <canvas class="cam-guide" id="cam-guide"></canvas>
         <div class="cam-top">
-          <button class="cam-chip" onclick="closeCamera()">Cancel</button>
+          <button class="cam-icon" onclick="closeCamera()" aria-label="Close camera"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
           <span class="cam-hint" id="cam-hint">Point at the page</span>
-          <button class="cam-chip" id="cam-torch" onclick="toggleTorch()" hidden>Flash</button>
+          <button class="cam-icon" id="cam-torch" onclick="toggleTorch()" aria-label="Flash" hidden><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
         </div>
         <div class="cam-bottom">
+          <div class="cam-zooms" id="cam-zooms" aria-label="Zoom"></div>
           <div class="cam-zoom"><span id="cam-zoom-label">1.0x</span><input id="cam-zoom" type="range" min="1" max="6" step="0.1" value="1" aria-label="Zoom"></div>
           <div class="cam-row">
-            <button class="cam-chip" onclick="pickFromLibrary()">Photos</button>
-            <button class="shutter" id="cam-shot" onclick="shoot(false)" aria-label="Take photo"></button>
-            <button class="cam-chip" id="cam-flip" onclick="flipCamera()">Flip</button>
+            <button class="cam-icon big" onclick="pickFromLibrary()" aria-label="Choose from photos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg></button>
+            <button class="shutter" id="cam-shot" onclick="shoot(false)" aria-label="Take photo"><i></i></button>
+            <button class="cam-icon big" id="cam-flip" onclick="flipCamera()" aria-label="Switch camera"><svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14.5-3.5L20 8M20 14a8 8 0 0 1-14.5 3.5L4 16"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></button>
           </div>
-          <label class="cam-auto"><input type="checkbox" id="cam-auto" checked onchange="setAutoScan(this.checked)"> Scan and fill in automatically</label>
+          <label class="cam-auto"><input type="checkbox" id="cam-auto" checked onchange="setAutoScan(this.checked)"><span>Auto scan and fill in</span></label>
         </div>
         <div class="cam-busy" id="cam-busy"><div><span id="cam-busy-text">Reading the page…</span><div class="bar"><i id="cam-busy-bar"></i></div></div></div>
       </div>
@@ -800,6 +872,34 @@
       <div class="island"></div>
       <div class="statusbar"><span>9:41</span><span id="status-shell">iOS</span></div>
 
+      <div class="ptr" id="ptr" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+      <nav class="drawer" id="drawer" aria-label="All sections" aria-hidden="true">
+        <div class="drawer-head"><b>Simple Accountz</b><button class="drawer-x" onclick="closeDrawer()" aria-label="Close menu">×</button></div>
+        <button class="go" data-go="home" onclick="goFromDrawer('home')">Home</button>
+        <button class="go" data-go="documents" onclick="goFromDrawer('documents')">Invoices and estimates</button>
+        <button class="go" data-go="money" onclick="goFromDrawer('money')">Money</button>
+        <button class="go" data-go="assistant" onclick="goFromDrawer('assistant')">Assistant</button>
+        <button class="go live-only" data-go="activity" onclick="goFromDrawer('activity')">Activity</button>
+        <div class="drawer-label">Work</div>
+        <button class="go biz-only" data-go="clients" onclick="goFromDrawer('clients')">Clients</button>
+        <button class="go" data-go="hours" onclick="goFromDrawer('hours')">Job timer</button>
+        <button class="go" data-go="mileage" onclick="goFromDrawer('mileage')">Drives</button>
+        <button class="go" data-go="camera" onclick="goFromDrawer('camera')">Scan a receipt</button>
+        <div class="drawer-label">Books</div>
+        <button class="go" data-go="reports" onclick="goFromDrawer('reports')">Reports and spreadsheets</button>
+        <button class="go biz-only" data-go="taxes" onclick="goFromDrawer('taxes')">Tax packet</button>
+        <button class="go" data-go="banks" onclick="goFromDrawer('banks')">Banks and cards</button>
+        <div class="drawer-label">You</div>
+        <button class="go live-only" data-go="account" onclick="goFromDrawer('account')">Account and sign-in</button>
+        <button class="go" data-go="settings" onclick="goFromDrawer('settings')">Settings</button>
+        <button class="go" data-go="refresh" onclick="goFromDrawer('refresh')">Refresh now</button>
+      </nav>
+      <div class="drawer-veil" id="drawer-veil" onclick="closeDrawer()"></div>
+      <div class="loc-ask" id="loc-ask" role="dialog" aria-label="Allow location" hidden>
+        <b>Track business drives automatically?</b>
+        <p>Allow location so Simple Accountz can measure your miles when you tap Start drive. Only the distance is kept, never where you went.</p>
+        <div class="loc-actions"><button class="pill-outline small" onclick="answerLocation(false)">Not now</button><button class="pill small" onclick="answerLocation(true)">Allow location</button></div>
+      </div>
       <div class="run-bar" id="run-bar" hidden>
         <button class="run-chip" id="run-timer" onclick="openTimer()" hidden></button>
         <button class="run-chip" id="run-drive" onclick="beginMileage()" hidden></button>
@@ -1026,6 +1126,7 @@
             </div>
             <div class="acct-section">Security</div>
             <div class="acct-item"><div><b>2-step sign-in <span class="badge off" id="totp-badge">Off</span></b><span id="totp-sub">Use an authenticator app for codes, and to reset a forgotten password.</span></div><button class="btn-small" id="totp-btn" onclick="toggleTotp()">Turn on</button></div>
+            <div class="acct-item"><div><b>Sign in on another device</b><span>Show a QR code and scan it with the other phone or computer's camera. It works once, for 2 minutes.</span></div><button class="btn-small" onclick="showLoginQr()">Show QR</button></div>
             <div class="acct-item"><div><b>Password</b><span>Changing it signs you out on other devices.</span></div><button class="btn-small" onclick="askConfirm('change')">Change</button></div>
             <div class="acct-item"><div><b>Delete account</b><span>Removes your account and its cloud copy for good.</span></div><button class="btn-small danger" onclick="askConfirm('delete')">Delete</button></div>
             <p class="auth-msg" id="acct-msg" role="alert"></p>
@@ -1034,7 +1135,7 @@
           <div class="auth-card acct-view" data-view="totp-setup">
             <h2 class="auth-title">Set up your authenticator</h2>
             <ol class="steps-list">
-              <li>Open Google Authenticator, Microsoft Authenticator, Authy, or 1Password.</li>
+              <li>Open Duo Mobile, Google Authenticator, Microsoft Authenticator, Authy, 1Password, or any authenticator app.</li>
               <li>Scan this QR code, or type the key below.</li>
               <li>Enter the 6-digit code the app shows.</li>
             </ol>
@@ -1047,10 +1148,26 @@
             <p class="auth-center"><button class="auth-link" onclick="setAcctView('home')">Cancel</button></p>
           </div>
 
+          <div class="auth-card acct-view" data-view="qr-login">
+            <h2 class="auth-title">Scan to sign in</h2>
+            <p class="auth-sub">Point the other device's camera at this code. It signs in there once, and stops working in 2 minutes.</p>
+            <img class="qr-box" id="login-qr" alt="Sign-in QR code">
+            <p class="auth-sub" id="login-qr-time"></p>
+            <div class="acct-actions">
+              <button class="btn-secondary" onclick="showLoginQr()">New code</button>
+              <button class="btn-primary" onclick="setAcctView('home')"><span class="spinner"></span><span class="btn-label">Done</span></button>
+            </div>
+            <p class="auth-msg" id="qr-msg" role="alert"></p>
+          </div>
           <div class="auth-card acct-view" data-view="recovery">
             <h2 class="auth-title">Save your backup codes</h2>
             <p class="auth-sub">If you lose your phone, each code signs you in or resets your password once. They are shown only now.</p>
             <ul class="codes" id="recovery-list"></ul>
+            <div id="recovery-qr-box" hidden>
+              <p class="auth-sub"><b>Lockout QR.</b> Print it or keep it off this phone. Scanning it opens the password reset with your email and backup code 1 filled in.</p>
+              <img class="qr-box" id="lockout-qr" alt="Lockout recovery QR code">
+              <button class="btn-secondary" onclick="saveRecoveryQr()">Save the QR</button>
+            </div>
             <div class="acct-actions">
               <button class="btn-secondary" onclick="copyRecovery()">Copy codes</button>
               <button class="btn-primary" onclick="setAcctView('home')"><span class="spinner"></span><span class="btn-label">I saved them</span></button>
@@ -1699,6 +1816,10 @@
         <button class="tab" data-screen="settings">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.8 6.8l1.6 1.6M17.6 15.6l1.6 1.6M3.5 12h2.2M18.3 12H20.5M4.8 17.2l1.6-1.6M17.6 8.4l1.6-1.6"/></svg>
           Settings
+        </button>
+        <button class="tab" id="tab-menu" onclick="openDrawer()" aria-label="Menu">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          Menu
         </button>
       </nav>
 
@@ -2823,20 +2944,68 @@
     showPull(synced.synced.length ? "Updated. " + synced.synced.length + " draft synced." : "Updated just now.");
   }
 
-  function bindPull(screenId) {
-    const screen = document.getElementById(screenId);
-    let startY = null;
-    screen.addEventListener("pointerdown", (event) => {
-      const scroller = screen.querySelector(".scroller") || screen;
-      if (scroller.scrollTop > 4) return;
-      startY = event.clientY;
+  // Pull down from the top of any screen to refresh. Touch events, because
+  // phone browsers cancel pointer events as soon as the page starts to scroll.
+  function setPtr(distance, armed) {
+    const ptr = document.getElementById("ptr");
+    if (!ptr || ptr.classList.contains("busy")) return;
+    ptr.classList.toggle("pulling", distance > 0);
+    ptr.classList.toggle("armed", !!armed);
+    ptr.style.transform = distance > 0 ? "translateY(" + (Math.min(distance * 0.5, 90) - 56) + "px)" : "";
+  }
+
+  function bindPullAll() {
+    const THRESHOLD = 70;
+    document.querySelectorAll(".screen").forEach((screen) => {
+      let startY = null;
+      let distance = 0;
+      screen.addEventListener("touchstart", (event) => {
+        const camOpen = document.getElementById("cam").classList.contains("on");
+        if (event.touches.length !== 1 || screen.scrollTop > 0 || camOpen) { startY = null; return; }
+        startY = event.touches[0].clientY;
+        distance = 0;
+      }, { passive: true });
+      screen.addEventListener("touchmove", (event) => {
+        if (startY == null) return;
+        distance = event.touches[0].clientY - startY;
+        if (distance <= 0 || screen.scrollTop > 0) { setPtr(0, false); return; }
+        setPtr(distance, SA.pullRefresh(distance * 0.5, THRESHOLD * 0.5));
+      }, { passive: true });
+      const end = () => {
+        if (startY == null) return;
+        const pulled = distance;
+        startY = null;
+        distance = 0;
+        setPtr(0, false);
+        if (SA.pullRefresh(pulled, THRESHOLD)) pullToRefresh();
+      };
+      screen.addEventListener("touchend", end, { passive: true });
+      screen.addEventListener("touchcancel", () => { startY = null; distance = 0; setPtr(0, false); }, { passive: true });
     });
-    screen.addEventListener("pointerup", (event) => {
-      if (startY == null) return;
-      const distance = event.clientY - startY;
-      startY = null;
-      if (SA.pullRefresh(distance, 64)) refreshFromPull();
-    });
+  }
+
+  let refreshing = false;
+  async function pullToRefresh() {
+    if (refreshing) return;
+    refreshing = true;
+    const ptr = document.getElementById("ptr");
+    ptr.style.transform = "";
+    ptr.classList.add("busy");
+    try {
+      if (!LIVE) { refreshFromPull(); return; }
+      if (navigator.onLine === false) { showPull("No signal. Pull again when you are online."); return; }
+      SA.LEDGER_TODAY = SA.todayIso();
+      if (sync.signedIn) {
+        await syncNow(true);
+        await loadBanks();
+        await syncBanks(true);
+      }
+      renderAll();
+      showPull(sync.signedIn ? "Updated just now." : "Up to date. Create a free account to sync your devices.");
+    } finally {
+      refreshing = false;
+      setTimeout(() => { ptr.classList.remove("busy", "pulling", "armed"); }, 350);
+    }
   }
 
   function enableTwoFactor() {
@@ -3265,6 +3434,7 @@
     cam.mode = mode;
     cam.steady = 0;
     cam.last = null;
+    cam.shown = null;
     cam.shooting = false;
     cam.auto = camEl("cam-auto").checked;
     camEl("cam").classList.add("on");
@@ -3315,6 +3485,7 @@
     slider.min = "1";
     slider.max = String(cam.nativeZoom ? Math.min(8, cam.nativeZoom.max / (cam.nativeZoom.min || 1)) : 6);
     slider.value = "1";
+    buildZoomChips(Number(slider.max));
     applyZoom(1);
     camEl("cam-torch").hidden = !(able && able.torch);
     cam.torch = false;
@@ -3330,6 +3501,7 @@
   function applyZoom(value) {
     cam.zoom = Math.max(1, Number(value) || 1);
     camEl("cam-zoom-label").textContent = cam.zoom.toFixed(1) + "x";
+    updateZoomChips();
     if (cam.nativeZoom && cam.track) {
       const min = cam.nativeZoom.min || 1;
       const want = Math.min(cam.nativeZoom.max, min * cam.zoom);
@@ -3410,48 +3582,110 @@
     for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
       gray[i] = (pixels[p] * 77 + pixels[p + 1] * 150 + pixels[p + 2] * 29) >> 8;
     }
-    const quad = SA.findDocumentQuad(gray, width, height);
+    const found = SA.findDocumentQuad(gray, width, height);
+    // Only outline something that can really be a page: not a shape running off the frame or bent out of square.
+    const quad = SA.quadLooksLikePage(found, width, height) ? found : null;
     drawGuide(quad, width, height);
     if (!cam.auto) return;
     if (quad && cam.last && SA.quadIsSteady(quad, cam.last, 0.015 * Math.max(width, height) / 100)) cam.steady += 1;
     else cam.steady = quad ? 1 : 0;
     cam.last = quad;
     camEl("cam-shot").classList.toggle("armed", cam.steady >= 2);
+    camEl("cam").classList.toggle("ready", cam.steady >= 2);
     if (quad) camEl("cam-hint").textContent = cam.steady >= 2 ? "Hold it…" : "Page found. Hold still.";
     else camEl("cam-hint").textContent = "Move so the whole page is in view";
     if (cam.steady >= 4) shoot(true);
   }
 
+  // The outline drawn over the camera picture: sharp on high-density screens,
+  // gliding between frames, dimming what is not the page, with corner brackets.
   function drawGuide(quad, width, height) {
     const overlay = camEl("cam");
     const canvas = camEl("cam-guide");
     const box = overlay.getBoundingClientRect();
-    if (canvas.width !== Math.round(box.width) || canvas.height !== Math.round(box.height)) {
-      canvas.width = Math.round(box.width);
-      canvas.height = Math.round(box.height);
-    }
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const W = Math.round(box.width * dpr);
+    const H = Math.round(box.height * dpr);
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!quad) return;
-    const kx = canvas.width / width;
-    const ky = canvas.height / height;
+    ctx.clearRect(0, 0, W, H);
+    if (!quad) { cam.shown = null; return; }
+    const kx = W / width;
+    const ky = H / height;
+    const target = quad.corners.map((corner) => ({ x: corner.x * kx, y: corner.y * ky }));
+    cam.shown = cam.shown
+      ? cam.shown.map((point, i) => ({ x: point.x + (target[i].x - point.x) * 0.5, y: point.y + (target[i].y - point.y) * 0.5 }))
+      : target;
+    const pts = cam.shown;
+    const ready = cam.steady >= 2;
+    const trace = () => pts.forEach((point, i) => (i ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
     ctx.beginPath();
-    quad.corners.forEach((corner, i) => {
-      const x = corner.x * kx;
-      const y = corner.y * ky;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
+    ctx.rect(0, 0, W, H);
+    trace();
     ctx.closePath();
-    ctx.fillStyle = "rgba(180,255,106,0.14)";
+    ctx.fillStyle = "rgba(0,0,0,0.38)";
+    ctx.fill("evenodd");
+    ctx.beginPath();
+    trace();
+    ctx.closePath();
+    ctx.fillStyle = ready ? "rgba(180,255,106,0.12)" : "rgba(255,255,255,0.05)";
     ctx.fill();
-    ctx.strokeStyle = cam.steady >= 2 ? "#b4ff6a" : "rgba(255,255,255,0.9)";
-    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.strokeStyle = ready ? "rgba(180,255,106,0.95)" : "rgba(255,255,255,0.7)";
     ctx.stroke();
-    ctx.fillStyle = ctx.strokeStyle;
-    quad.corners.forEach((corner) => {
+    ctx.lineWidth = 4 * dpr;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = ready ? "#b4ff6a" : "#ffffff";
+    const arm = 22 * dpr;
+    pts.forEach((point, i) => {
+      const toward = (other) => {
+        const dx = other.x - point.x;
+        const dy = other.y - point.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const reach = Math.min(arm, len * 0.3);
+        return { x: point.x + dx / len * reach, y: point.y + dy / len * reach };
+      };
+      const a = toward(pts[(i + 3) % 4]);
+      const b = toward(pts[(i + 1) % 4]);
       ctx.beginPath();
-      ctx.arc(corner.x * kx, corner.y * ky, 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(point.x, point.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    });
+  }
+
+  // iPhone-style zoom buttons (1x, 2x, 3x…) up to what the camera can do. Pinch still works.
+  function buildZoomChips(max) {
+    const box = camEl("cam-zooms");
+    if (!box) return;
+    box.innerHTML = "";
+    const steps = [1, 2, 3, 5].filter((step) => step <= max + 0.01);
+    if (steps.length > 1 || max > 1.2) {
+      if (steps.length === 1) steps.push(Math.round(max * 10) / 10);
+      steps.forEach((step) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.zoom = String(step);
+        button.setAttribute("aria-label", "Zoom " + step + " times");
+        button.onclick = () => { camEl("cam-zoom").value = String(step); applyZoom(step); };
+        box.appendChild(button);
+      });
+    }
+    updateZoomChips();
+  }
+
+  function updateZoomChips() {
+    const box = camEl("cam-zooms");
+    if (!box) return;
+    const chips = Array.from(box.children);
+    let active = null;
+    chips.forEach((chip) => { if (Number(chip.dataset.zoom) <= cam.zoom + 0.01) active = chip; });
+    chips.forEach((chip) => {
+      const step = Number(chip.dataset.zoom);
+      chip.classList.toggle("on", chip === active);
+      chip.textContent = chip === active && Math.abs(cam.zoom - step) > 0.05 ? cam.zoom.toFixed(1) + "×" : step + "×";
     });
   }
 
@@ -3470,6 +3704,11 @@
       return;
     }
     cam.shooting = true;
+    const flash = camEl("cam");
+    flash.classList.remove("snap");
+    void flash.offsetWidth;
+    flash.classList.add("snap");
+    setTimeout(() => flash.classList.remove("snap"), 320);
     if (cam.timer) clearTimeout(cam.timer);
     try {
       const box = camEl("cam").getBoundingClientRect();
@@ -4275,6 +4514,7 @@
     loadNotifySettings();
     if (readDrive()) watchDrive();
     renderRunning();
+    setTimeout(maybeAskLocation, 2500);
     if (DEMO) {
       const screen = /[?&]screen=([a-z-]+)/.exec(location.search);
       if (screen && document.getElementById(screen[1])) setTimeout(() => show(screen[1]), 0);
@@ -5033,6 +5273,31 @@
   }
 
   function handleEmailLink() {
+    const qr = /^#login=([a-f0-9]{64})$/.exec(location.hash || "");
+    if (qr) {
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (error) {}
+      if (sync.signedIn) { setTimeout(() => showPull("This device is already signed in."), 0); return; }
+      call("POST", "/api/qr/redeem", { token: qr[1] }).then((result) => {
+        if (result.status === 200 && result.body) finishSignIn(result.body, "Signed in with the QR code.");
+        else showPull("That sign-in code has expired. Show a new one on your other device.");
+      });
+      return;
+    }
+    const lockout = /^#recover=([A-Za-z0-9_-]+)\.([0-9A-Fa-f]{5}-[0-9A-Fa-f]{5})$/.exec(location.hash || "");
+    if (lockout) {
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (error) {}
+      const email = decodeRecoveryEmail(lockout[1]);
+      acctView = "reset-app";
+      setTimeout(() => {
+        show("account");
+        renderAccount();
+        el("ra-email").value = email;
+        el("ra-code").value = lockout[2].toUpperCase();
+        if (el("ra-pass")) el("ra-pass").focus();
+        showPull("Your backup code is filled in. Choose a new password.");
+      }, 0);
+      return;
+    }
     if (location.hash === "#signin") {
       try { history.replaceState(null, "", location.pathname + location.search); } catch (error) {}
       setTimeout(() => { show("account"); renderAccount(); }, 0);
@@ -5135,6 +5400,9 @@
     applyProfile(result.body);
     saveSync();
     shownRecovery = result.body.recoveryCodes || [];
+    shownRecoveryQr = String(result.body.recoveryQr || "");
+    el("recovery-qr-box").hidden = !shownRecoveryQr;
+    if (shownRecoveryQr) el("lockout-qr").src = "data:image/svg+xml;base64," + btoa(shownRecoveryQr);
     const list = el("recovery-list");
     list.innerHTML = "";
     shownRecovery.forEach((item) => {
@@ -5169,7 +5437,7 @@
     const signedIn = sync.signedIn;
     let view = acctView;
     if (signedIn && (view === "signin" || view === "signup" || view === "forgot" || view === "reset-app")) view = "home";
-    if (!signedIn && (view === "home" || view === "totp-setup" || view === "recovery" || view === "confirm")) view = "signin";
+    if (!signedIn && (view === "home" || view === "totp-setup" || view === "recovery" || view === "confirm" || view === "qr-login")) view = "signin";
     const card = view === "signin" || view === "signup" ? "auth" : view;
     document.querySelectorAll("#account .acct-view").forEach((node) => { node.hidden = node.dataset.view !== card; });
     const signup = view === "signup";
@@ -5901,6 +6169,102 @@
     if (document.visibilityState === "visible" && driveWatch != null) holdScreen();
   });
 
+
+  // ---- Sidebar menu: the same on phones, tablets, and computers ----
+  function openDrawer() {
+    const drawer = document.getElementById("drawer");
+    const current = document.querySelector(".screen.on");
+    drawer.querySelectorAll(".go").forEach((item) => item.classList.toggle("on", !!current && item.dataset.go === current.id));
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+    document.getElementById("drawer-veil").classList.add("open");
+  }
+
+  function closeDrawer() {
+    document.getElementById("drawer").classList.remove("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "true");
+    document.getElementById("drawer-veil").classList.remove("open");
+  }
+
+  function goFromDrawer(target) {
+    closeDrawer();
+    if (target === "hours") openTimer();
+    else if (target === "mileage") beginMileage();
+    else if (target === "camera") beginReceipt();
+    else if (target === "refresh") pullToRefresh();
+    else if (target === "account") { show("account"); renderAccount(); }
+    else show(target);
+  }
+
+  // ---- Ask once (and again a week after "Not now") to use location for drives ----
+  const LOC_KEY = "simpleaccountz.locask.v1";
+  async function maybeAskLocation() {
+    if (!navigator.geolocation) return;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LOC_KEY) || "null"); } catch (error) { saved = null; }
+    if (saved && (saved.answer !== "later" || Date.now() - Number(saved.at || 0) < 7 * 86400000)) return;
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const state = await navigator.permissions.query({ name: "geolocation" });
+        if (state.state !== "prompt") return;
+      }
+    } catch (error) {}
+    document.getElementById("loc-ask").hidden = false;
+  }
+
+  function answerLocation(yes) {
+    document.getElementById("loc-ask").hidden = true;
+    try { localStorage.setItem(LOC_KEY, JSON.stringify({ answer: yes ? "asked" : "later", at: Date.now() })); } catch (error) {}
+    if (!yes) return;
+    navigator.geolocation.getCurrentPosition(
+      () => showPull("Location is on. Tap Start drive to track a trip."),
+      (error) => showPull(error && error.code === 1
+        ? "Location stays off. You can turn it on later in your phone or browser settings."
+        : "Location is on. Tap Start drive to track a trip."),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
+  }
+
+  // ---- QR codes: sign in on another device, and get back in when locked out ----
+  let shownRecoveryQr = "";
+  let loginQrTimer = null;
+  async function showLoginQr() {
+    acctView = "qr-login";
+    renderAccount();
+    setMsg("qr-msg", "");
+    el("login-qr").removeAttribute("src");
+    el("login-qr-time").textContent = "Making a code…";
+    const made = await call("POST", "/api/qr/create", {});
+    if (made.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (made.status !== 200 || !made.body || !made.body.qr) {
+      el("login-qr-time").textContent = "";
+      setMsg("qr-msg", made.status === 429 ? "Too many codes. Wait a few minutes." : "Could not make a code just now. Try again.");
+      return;
+    }
+    el("login-qr").src = "data:image/svg+xml;base64," + btoa(made.body.qr);
+    const until = Date.now() + Math.max(0, Number(made.body.expiresAt) - Date.now() || 120000);
+    if (loginQrTimer) clearInterval(loginQrTimer);
+    const tick = () => {
+      const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+      el("login-qr-time").textContent = left ? "Works for " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") + " more." : "This code expired. Tap New code.";
+      if (!left || acctView !== "qr-login") { clearInterval(loginQrTimer); loginQrTimer = null; }
+    };
+    tick();
+    loginQrTimer = setInterval(tick, 1000);
+  }
+
+  function decodeRecoveryEmail(part) {
+    try {
+      const b64 = String(part).replace(/-/g, "+").replace(/_/g, "/");
+      const binary = atob(b64 + "=".repeat((4 - b64.length % 4) % 4));
+      return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+    } catch (error) { return ""; }
+  }
+
+  function saveRecoveryQr() {
+    if (!shownRecoveryQr) return;
+    saveFile("simple-accountz-lockout-qr.svg", "image/svg+xml", shownRecoveryQr, false);
+  }
+
   function renderAll() {
     runAutopilot();
     renderAccountChrome();
@@ -5966,7 +6330,7 @@
   });
   wrapFooters();
   bindCamera();
-  bindPull("home");
+  bindPullAll();
   if (LIVE) startLive();
   renderAll();
   if (LIVE) fitLiveShell(); else setShell("ios");

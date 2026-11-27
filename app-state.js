@@ -2148,6 +2148,32 @@ function quadArea(corners) {
 
 // True when two readings of the page sit in almost the same place, which means
 // the hand has stopped moving and the shot is worth taking.
+// A found outline is only shown when it can really be a page: no corner on the
+// frame edge (that means the page runs off screen or the edge is background),
+// opposite sides of similar length, and every corner roughly square.
+function quadLooksLikePage(quad, width, height) {
+  if (!quad || !Array.isArray(quad.corners) || quad.corners.length !== 4) return false;
+  const c = quad.corners;
+  if (c.some((p) => !p || !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
+  const edge = Math.max(2, Math.round(Math.min(width, height) * 0.015));
+  if (c.some((p) => p.x <= edge || p.y <= edge || p.x >= width - 1 - edge || p.y >= height - 1 - edge)) return false;
+  const len = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const sides = [len(c[0], c[1]), len(c[1], c[2]), len(c[2], c[3]), len(c[3], c[0])];
+  if (Math.min(...sides) < Math.min(width, height) * 0.12) return false;
+  if (Math.min(sides[0], sides[2]) / Math.max(sides[0], sides[2]) < 0.6) return false;
+  if (Math.min(sides[1], sides[3]) / Math.max(sides[1], sides[3]) < 0.6) return false;
+  for (let i = 0; i < 4; i++) {
+    const p = c[i];
+    const a = c[(i + 3) % 4];
+    const b = c[(i + 1) % 4];
+    const v1x = a.x - p.x, v1y = a.y - p.y, v2x = b.x - p.x, v2y = b.y - p.y;
+    const cos = (v1x * v2x + v1y * v2y) / ((Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y)) || 1);
+    const degrees = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+    if (degrees < 55 || degrees > 125) return false;
+  }
+  return true;
+}
+
 function quadIsSteady(a, b, tolerance) {
   if (!a || !b) return false;
   const limit = tolerance == null ? 0.02 : tolerance;
@@ -3053,6 +3079,7 @@ const SA = {
   driveStep,
   driveDistance,
   buildOds,
+  quadLooksLikePage,
   DEMO_AUTH_CODE,
   RECOVERY_TOKEN
 };
