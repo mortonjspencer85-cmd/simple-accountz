@@ -168,6 +168,8 @@
   }
   .pill-outline.small { font-size: 14px; padding: 8px 14px; }
   .quick-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .run-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 60; display: flex; gap: 8px; }
+  .run-chip { border: 0; border-radius: 999px; padding: 9px 16px; background: var(--forest); color: var(--lime); font: 700 14px/1.2 inherit; font-variant-numeric: tabular-nums; box-shadow: 0 8px 22px rgba(0,0,0,.22); cursor: pointer; }
   .stack-btns { display: grid; gap: 10px; margin: 8px 0 16px; }
   .timer-clock { font-variant-numeric: tabular-nums; font-size: 40px; letter-spacing: -0.02em; }
   .textlink {
@@ -798,6 +800,10 @@
       <div class="island"></div>
       <div class="statusbar"><span>9:41</span><span id="status-shell">iOS</span></div>
 
+      <div class="run-bar" id="run-bar" hidden>
+        <button class="run-chip" id="run-timer" onclick="openTimer()" hidden></button>
+        <button class="run-chip" id="run-drive" onclick="beginMileage()" hidden></button>
+      </div>
       <section class="screen on" id="home">
         <div class="pull" id="pull-note"></div>
         <div class="top">
@@ -807,6 +813,10 @@
             <button class="pill-outline small" id="signal" onclick="toggleSignal()">Online</button>
             <button class="pill small biz-only" onclick="openSheet('new')">New</button>
           </span>
+        </div>
+        <div class="quick-row">
+          <button class="pill-outline small" id="home-timer" onclick="quickTimer()">Start job timer</button>
+          <button class="pill-outline small" id="home-drive" onclick="quickDrive()">Start drive</button>
         </div>
         <button class="biz" onclick="show('account-setup')"><span class="dot"></span> <span id="biz-label">Field &amp; Co. · United States</span></button>
         <button class="sync-chip live-only" id="sync-status" onclick="show('account')"><span class="dot"></span><span id="sync-status-text">Sign up free to back up and sync</span></button>
@@ -1209,7 +1219,7 @@
         <div class="card"><h3 id="money-profit">$1,220.00 rough profit</h3><p>Calculated from dated payments and expenses. Not a full ledger.</p></div>
         <div class="card" id="forecast-card"><h3 id="forecast-net">Next 30 days</h3><p id="forecast-note">Open invoices coming in, minus what you usually spend.</p></div>
         <div class="quick-row">
-          <button class="pill-outline small" onclick="beginMileage()">Log a drive</button>
+          <button class="pill-outline small" onclick="beginMileage()">Drives</button>
           <button class="pill-outline small" onclick="openTimer()">Job timer</button>
           <button class="pill-outline small biz-only" onclick="show('clients')">Clients</button>
         </div>
@@ -1319,7 +1329,7 @@
         <button class="back" onclick="show('money')">Back</button>
         <div class="top">
           <h2 class="title">Reports</h2>
-          <span style="display:flex;gap:6px"><button class="pill small" onclick="downloadBooks('report')">Spreadsheet</button><button class="pill-outline small" onclick="downloadBooks('report', 'csv')">CSV</button></span>
+          <span style="display:flex;gap:6px"><button class="pill small" onclick="downloadBooks('report')">Spreadsheet</button><button class="pill-outline small" onclick="downloadBooks('report', 'csv')">CSV</button><button class="pill-outline small" onclick="downloadBooks('report', 'ods')">ODS</button></span>
         </div>
         <div class="seg lime" id="report-period">
           <button data-period="last_month">Last month</button>
@@ -1377,6 +1387,7 @@
           <span class="note" id="tax-range">This year</span>
           <button class="pill" onclick="downloadBooks('tax')">Export tax packet</button>
           <button class="pill-outline small" onclick="downloadBooks('tax', 'csv')">CSV</button>
+          <button class="pill-outline small" onclick="downloadBooks('tax', 'ods')">ODS</button>
         </div>
       </section>
 
@@ -1460,10 +1471,13 @@
 
       <section class="screen no-tabs" id="mileage">
         <button class="back" onclick="show('money')">Back</button>
-        <h2 class="title">Log a drive</h2>
-        <p class="note">Business miles are a tax deduction. Use the rate per mile your tax office sets; it is remembered on this device.</p>
-        <div class="field"><label>Miles</label><input id="mile-miles" inputmode="decimal" placeholder="12.5" oninput="mileMath()"></div>
-        <div class="field"><label>Rate per mile</label><input id="mile-rate" inputmode="decimal" placeholder="0.70" oninput="mileMath()"></div>
+        <h2 class="title">Drives</h2>
+        <div class="card" id="drive-card"><h3 class="timer-clock" id="drive-distance">0.0 mi</h3><p id="drive-state">Tap Start when you set off. Keep Simple Accountz open while you drive; it counts the distance by GPS and files the trip when you tap End.</p></div>
+        <div class="stack-btns"><button class="pill" id="drive-toggle" onclick="toggleDrive()">Start drive</button></div>
+        <p class="note">Business driving is a tax deduction. Use the rate your tax office sets; it is remembered on this device. Only the distance is kept: never your route or location.</p>
+        <div class="section-label">Or type a trip</div>
+        <div class="field"><label id="mile-label">Miles</label><input id="mile-miles" inputmode="decimal" placeholder="12.5" oninput="mileMath()"></div>
+        <div class="field"><label id="mile-rate-label">Rate per mile</label><input id="mile-rate" inputmode="decimal" placeholder="0.70" oninput="mileMath()"></div>
         <div class="field"><label>What for</label><input id="mile-purpose" placeholder="Site visit, supply run" maxlength="80"></div>
         <div class="field"><label>Date</label><input id="mile-date" type="date"></div>
         <p class="note" id="mile-math"></p>
@@ -2704,7 +2718,7 @@
     const languageByCountry = { US: "en", GB: "en", DE: "de", AU: "en", JP: "ja", BR: "pt", MX: "es" };
     customerLang = languageByCountry[code] || "en";
     syncCustomerControls();
-    renderHome();
+    renderAll();
     renderInvoiceLocale();
     show("home");
   }
@@ -3109,12 +3123,12 @@
     const csv = format === "csv";
     const book = csv
       ? SA.exportBooks(docs, transactions, period, SA.LEDGER_TODAY, businessCurrency, countryCode)
-      : SA.exportWorkbook(docs, transactions, period, SA.LEDGER_TODAY, businessCurrency, countryCode, bizName());
+      : SA.exportWorkbook(docs, transactions, period, SA.LEDGER_TODAY, businessCurrency, countryCode, bizName(), format === "ods" ? "ods" : "xlsx");
     if (!book.ok) return;
     saveFile(book.filename, csv ? "text/csv" : book.mime, csv ? book.csv : book.data, !csv);
     const note = document.getElementById(which === "tax" ? "tax-export-note" : "report-export-note");
     if (note) note.textContent = (window.SA_NATIVE ? "Shared " : "Saved ") + book.filename
-      + (csv ? ". A plain CSV for any program." : ". Opens in Excel, Google Sheets, Numbers, and LibreOffice.")
+      + (csv ? ". A plain CSV for any program." : (format === "ods" ? ". OpenDocument: LibreOffice, OpenOffice, and Google Sheets." : ". Opens in Excel, Google Sheets, Numbers, and LibreOffice."))
       + " This does not file the return.";
   }
 
@@ -4253,14 +4267,14 @@
     try { saved = SA.restoreBooks(localStorage.getItem(SA.BOOKS_KEY)); } catch (error) { saved = SA.emptyBooks(); }
     if (DEMO) saved = demoBooks(SA.LEDGER_TODAY);
     applyBooksState(saved);
-    const hint = document.getElementById("draft-hint");
-    if (hint) hint.textContent = "Save invoice keeps it on this device. Send it from the invoice screen.";
     window.addEventListener("resize", fitLiveShell);
     if ("serviceWorker" in navigator && !window.SA_NATIVE) {
       navigator.serviceWorker.register("sw.js").catch(() => {});
     }
     bindNativeBack();
     loadNotifySettings();
+    if (readDrive()) watchDrive();
+    renderRunning();
     if (DEMO) {
       const screen = /[?&]screen=([a-z-]+)/.exec(location.search);
       if (screen && document.getElementById(screen[1])) setTimeout(() => show(screen[1]), 0);
@@ -4567,7 +4581,7 @@
     if (!LIVE || !sync.signedIn) { bankState = { configured: false, items: [], loaded: true }; renderBankLinks(); return; }
     const got = await call("GET", "/api/bank/accounts");
     if (got.status === 401) { signedOutByServer(); renderAccount(); return; }
-    if (got.status === 200 && got.body) bankState = { configured: !!got.body.configured, items: got.body.items || [], loaded: true };
+    if (got.status === 200 && got.body) bankState = { configured: !!got.body.configured, items: got.body.items || [], loaded: true, mode: got.body.mode || "" };
     renderBankLinks();
   }
 
@@ -4669,7 +4683,9 @@
         ? "Create a free account to link a bank or card. You sign in at your bank; Simple Accountz never sees your bank password and can only read."
         : (bankState.loaded && !bankState.configured
           ? "Bank linking is not switched on for this app yet. You can still add expenses with a receipt photo."
-          : "You sign in at your bank. Simple Accountz never sees your bank password, and it can only read: it cannot move money.");
+          : (bankState.mode === "sandbox"
+            ? "Test mode: real banks connect once Plaid approves Simple Accountz for live use. Until then only Plaid's sample bank works (user name user_good, password pass_good)."
+            : "You sign in at your bank. Simple Accountz never sees your bank password, and it can only read: it cannot move money."));
     }
     bankState.items.forEach((item) => {
       const head = document.createElement("div");
@@ -5572,7 +5588,11 @@
     setField("mile-purpose", "");
     setField("mile-rate", rate || "0.70");
     setField("mile-date", SA.LEDGER_TODAY);
+    const unit = SA.distanceUnit(countryCode);
+    document.getElementById("mile-label").textContent = unit === "km" ? "Kilometres" : "Miles";
+    document.getElementById("mile-rate-label").textContent = unit === "km" ? "Rate per km" : "Rate per mile";
     mileMath();
+    renderDrive();
     show("mileage");
   }
 
@@ -5586,7 +5606,8 @@
       rateMinor: rate.value,
       date: document.getElementById("mile-date").value,
       purpose: document.getElementById("mile-purpose").value,
-      currency: businessCurrency
+      currency: businessCurrency,
+      unit: SA.distanceUnit(countryCode)
     });
   }
 
@@ -5735,6 +5756,146 @@
     if (note) note.textContent = (window.SA_NATIVE ? "Shared " : "Saved ") + file.filename + " · " + file.count
       + (file.count === 1 ? " item" : " items") + " in " + businessCurrency + ". Check the account and tax codes when you import.";
   }
+
+
+  // ---- GPS drive tracking and one-tap timer ----
+  const DRIVE_KEY = "simpleaccountz.drive.v1";
+  let driveWatch = null;
+  let driveLock = null;
+
+  function readDrive() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(DRIVE_KEY) || "null");
+      return raw && raw.startedAt ? raw : null;
+    } catch (error) { return null; }
+  }
+
+  function writeDrive(drive) {
+    try {
+      if (drive) localStorage.setItem(DRIVE_KEY, JSON.stringify(drive));
+      else localStorage.removeItem(DRIVE_KEY);
+    } catch (error) {}
+  }
+
+  function driveText(drive) {
+    const unit = SA.distanceUnit(countryCode);
+    return (SA.driveDistance(drive, unit) / 100).toFixed(1) + " " + unit;
+  }
+
+  async function holdScreen() {
+    try { if (navigator.wakeLock && !driveLock) driveLock = await navigator.wakeLock.request("screen"); } catch (error) { driveLock = null; }
+  }
+
+  function releaseScreen() {
+    try { if (driveLock) driveLock.release(); } catch (error) {}
+    driveLock = null;
+  }
+
+  function setDriveState(text) {
+    const node = document.getElementById("drive-state");
+    if (node) node.textContent = text;
+  }
+
+  function watchDrive() {
+    if (driveWatch != null || !navigator.geolocation) return;
+    driveWatch = navigator.geolocation.watchPosition((pos) => {
+      const drive = readDrive();
+      if (!drive) return;
+      writeDrive(SA.driveStep(drive, { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy, at: pos.timestamp || Date.now() }));
+      renderDrive();
+    }, (error) => {
+      setDriveState(error && error.code === 1
+        ? "Location is off for Simple Accountz. Allow location in your settings to track drives."
+        : "Waiting for a GPS signal…");
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+    holdScreen();
+  }
+
+  function stopWatch() {
+    if (driveWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(driveWatch);
+    driveWatch = null;
+    releaseScreen();
+  }
+
+  function renderDrive() {
+    const drive = readDrive();
+    const dist = document.getElementById("drive-distance");
+    if (dist) dist.textContent = driveText(drive);
+    const toggle = document.getElementById("drive-toggle");
+    if (toggle) toggle.textContent = drive ? "End drive and save" : "Start drive";
+    if (drive) setDriveState("Tracking since " + new Date(drive.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ". Keep Simple Accountz open while you drive.");
+    renderRunning();
+  }
+
+  function toggleDrive() {
+    if (readDrive()) { endDrive(); return; }
+    if (!navigator.geolocation) { setDriveState("This device cannot share its location, so type the trip below."); return; }
+    writeDrive(SA.newDrive(Date.now()));
+    watchDrive();
+    renderDrive();
+    showPull("Drive started. Keep Simple Accountz open while you drive.");
+  }
+
+  function quickDrive() {
+    if (!readDrive()) toggleDrive();
+    beginMileage();
+  }
+
+  function endDrive() {
+    const drive = readDrive();
+    stopWatch();
+    writeDrive(null);
+    const hundredths = SA.driveDistance(drive, SA.distanceUnit(countryCode));
+    if (hundredths < 10) {
+      showPull("That drive was under 0.1 " + SA.distanceUnit(countryCode) + ", so nothing was filed.");
+      renderDrive();
+      return;
+    }
+    setField("mile-miles", String(hundredths / 100));
+    setField("mile-date", SA.todayIso(new Date(drive.startedAt)));
+    if (!document.getElementById("mile-rate").value.trim()) {
+      let rate = "";
+      try { rate = localStorage.getItem(MILE_RATE_KEY) || ""; } catch (error) {}
+      setField("mile-rate", rate || "0.70");
+    }
+    mileMath();
+    saveMileage();
+    renderDrive();
+  }
+
+  function quickTimer() {
+    const timer = readTimer();
+    if (!timer.startedAt) {
+      timer.startedAt = Date.now();
+      writeTimer(timer);
+      showPull("Job timer started.");
+    }
+    openTimer();
+    renderRunning();
+  }
+
+  function renderRunning() {
+    const bar = document.getElementById("run-bar");
+    if (!bar) return;
+    const timer = readTimer();
+    const drive = readDrive();
+    const t = document.getElementById("run-timer");
+    const d = document.getElementById("run-drive");
+    t.hidden = !timer.startedAt;
+    if (timer.startedAt) t.textContent = "Timer " + clockText(SA.timerElapsed(timer, Date.now()));
+    d.hidden = !drive;
+    if (drive) d.textContent = "Drive " + driveText(drive);
+    bar.hidden = t.hidden && d.hidden;
+    const ht = document.getElementById("home-timer");
+    if (ht) ht.textContent = timer.startedAt ? "Timer running" : "Start job timer";
+    const hd = document.getElementById("home-drive");
+    if (hd) hd.textContent = drive ? "Drive running" : "Start drive";
+  }
+
+  setInterval(renderRunning, 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && driveWatch != null) holdScreen();
+  });
 
   function renderAll() {
     runAutopilot();

@@ -1086,7 +1086,91 @@ function buildWorkbook(sheets) {
 
 // The workbook an accountant or a tax preparer can use: a summary plus one
 // sheet each for payments in, expenses, and invoices.
-function exportWorkbook(docs, transactions, period, today, currency, country, businessName) {
+// ---- Drive tracking (GPS) ----
+// Only the running distance is kept: no route and no coordinates leave the
+// device. Fixes that are blurry, jitter in place, or jump faster than a car
+// can go are ignored, so a parked phone does not rack up miles.
+const MILE_COUNTRIES = ["US", "GB", "LR", "MM"];
+
+function distanceUnit(country) {
+  return MILE_COUNTRIES.indexOf(country) !== -1 ? "mi" : "km";
+}
+
+function distanceMeters(a, b) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLon = (b.lon - a.lon) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function newDrive(at) {
+  return { startedAt: at, meters: 0, last: null, fixes: 0 };
+}
+
+function driveStep(drive, fix) {
+  if (!drive || !drive.startedAt || !fix) return drive;
+  const lat = Number(fix.lat);
+  const lon = Number(fix.lon);
+  const accuracy = Number(fix.accuracy);
+  const at = Number(fix.at);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return drive;
+  if (!Number.isFinite(accuracy) || accuracy > 50 || !Number.isFinite(at)) return drive;
+  const point = { lat, lon, accuracy, at };
+  if (!drive.last) return Object.assign({}, drive, { last: point, fixes: (drive.fixes || 0) + 1 });
+  const step = distanceMeters(drive.last, point);
+  const seconds = (at - drive.last.at) / 1000;
+  if (seconds <= 0) return drive;
+  if (step < Math.max(12, accuracy, drive.last.accuracy)) return drive;
+  if (step / seconds > 70) return drive;
+  return Object.assign({}, drive, { meters: (drive.meters || 0) + step, last: point, fixes: (drive.fixes || 0) + 1 });
+}
+
+// Distance in hundredths of the unit, the same scale mileageExpense takes.
+function driveDistance(drive, unit) {
+  const meters = Math.max(0, Number(drive && drive.meters) || 0);
+  return Math.round(meters / (unit === "km" ? 1000 : 1609.344) * 100);
+}
+
+// ---- OpenDocument spreadsheet (LibreOffice, OpenOffice, Calligra) ----
+function odsCell(cell) {
+  if (cell == null || cell === "") return "<table:table-cell/>";
+  const style = cell.s === 2 ? ' table:style-name="m"' : (cell.s === 3 ? ' table:style-name="mb"' : (cell.s === 1 || cell.s === 4 ? ' table:style-name="b"' : ""));
+  if (cell.n != null) {
+    return '<table:table-cell' + style + ' office:value-type="float" office:value="' + xmlEscape(cell.n) + '"><text:p>' + xmlEscape(cell.n) + "</text:p></table:table-cell>";
+  }
+  return '<table:table-cell' + style + ' office:value-type="string"><text:p>' + xmlEscape(cell.t != null ? cell.t : cell) + "</text:p></table:table-cell>";
+}
+
+function buildOds(sheets) {
+  const tables = sheets.map((sheet, i) => {
+    const rows = (sheet.rows || []).map((row) => "<table:table-row>" + ((row && row.length) ? row.map(odsCell).join("") : "<table:table-cell/>") + "</table:table-row>").join("");
+    return '<table:table table:name="' + xmlEscape(safeSheetName(sheet.name, "Sheet" + (i + 1))) + '">' + rows + "</table:table>";
+  }).join("");
+  const content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"'
+    + ' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"'
+    + ' xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" office:version="1.2">'
+    + '<office:automatic-styles>'
+    + '<number:number-style style:name="N2"><number:number number:decimal-places="2" number:min-integer-digits="1" number:grouping="true"/></number:number-style>'
+    + '<style:style style:name="b" style:family="table-cell"><style:text-properties fo:font-weight="bold"/></style:style>'
+    + '<style:style style:name="m" style:family="table-cell" style:data-style-name="N2"/>'
+    + '<style:style style:name="mb" style:family="table-cell" style:data-style-name="N2"><style:text-properties fo:font-weight="bold"/></style:style>'
+    + '</office:automatic-styles><office:body><office:spreadsheet>' + tables + "</office:spreadsheet></office:body></office:document-content>";
+  const manifest = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">'
+    + '<manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/>'
+    + '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>'
+    + "</manifest:manifest>";
+  // The mimetype entry must come first and be stored uncompressed; zipArchive stores everything.
+  return zipArchive([
+    { name: "mimetype", data: "application/vnd.oasis.opendocument.spreadsheet" },
+    { name: "META-INF/manifest.xml", data: manifest },
+    { name: "content.xml", data: content }
+  ]);
+}
+
+function exportWorkbook(docs, transactions, period, today, currency, country, businessName, format) {
   const packet = taxPacket(transactions, period, today, currency, country);
   if (!packet) return { ok: false, error: "bad_period" };
   const money = (minor) => ({ n: decimalAmount(minor, currency), s: 2 });
@@ -1137,16 +1221,35 @@ function exportWorkbook(docs, transactions, period, today, currency, country, bu
     ]);
   });
 
+  const drives = spent.filter((tx) => tx.mileage && tx.mileage.milesHundredths > 0);
+  const mileage = [head(["Date", "Trip", "Distance", "Unit", "Rate", "Amount"])];
+  let mileageMinor = 0;
+  drives.forEach((tx) => {
+    mileageMinor += tx.amountMinor;
+    mileage.push([tx.date, tx.name || "", { n: String(tx.mileage.milesHundredths / 100) }, tx.mileage.unit === "km" ? "km" : "mi",
+      money(tx.mileage.rateMinor), money(tx.amountMinor)]);
+  });
+  mileage.push([{ t: "Total", s: 1 }, "", "", "", "", Object.assign(money(mileageMinor), { s: 3 })]);
+
+  const clients = [head(["Client", "Email", "Phone", "Open invoices", "Overdue", "Owed"])];
+  clientSummaries(docs, today).forEach((row) => clients.push([
+    row.name, row.email || "", row.phone || "", { n: String(row.openCount) }, { n: String(row.overdueCount) }, money(row.owed[currency] || 0)
+  ]));
+
+  const sheets = [
+    { name: "Summary", rows: summary },
+    { name: "Payments in", rows: payments },
+    { name: "Expenses", rows: expenses },
+    { name: "Invoices", rows: invoices },
+    { name: "Mileage", rows: mileage },
+    { name: "Clients", rows: clients }
+  ];
+  const ods = format === "ods";
   return {
     ok: true,
-    filename: "simple-accountz-books-" + packet.start + "-to-" + packet.end + ".xlsx",
-    mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    data: buildWorkbook([
-      { name: "Summary", rows: summary },
-      { name: "Payments in", rows: payments },
-      { name: "Expenses", rows: expenses },
-      { name: "Invoices", rows: invoices }
-    ]),
+    filename: "simple-accountz-books-" + packet.start + "-to-" + packet.end + (ods ? ".ods" : ".xlsx"),
+    mime: ods ? "application/vnd.oasis.opendocument.spreadsheet" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    data: ods ? buildOds(sheets) : buildWorkbook(sheets),
     start: packet.start,
     end: packet.end,
     packet
@@ -2562,16 +2665,17 @@ function mileageExpense(fields) {
   if (!Number.isSafeInteger(rateMinor) || rateMinor <= 0) return { ok: false, error: "rate" };
   const amountMinor = Number(divRoundHalfUp(BigInt(milesHundredths) * BigInt(rateMinor), 100n));
   const miles = String(milesHundredths / 100);
+  const unit = f.unit === "km" ? "km" : "mi";
   const purpose = String(f.purpose || "").trim().slice(0, 80);
   return {
     ok: true,
     expense: {
       date: /^\d{4}-\d{2}-\d{2}$/.test(String(f.date || "")) ? f.date : todayIso(),
-      name: "Mileage: " + miles + " mi" + (purpose ? " · " + purpose : ""),
+      name: "Mileage: " + miles + " " + unit + (purpose ? " · " + purpose : ""),
       amountMinor,
       currency: f.currency || "USD",
       category: "Car and travel",
-      mileage: { milesHundredths, rateMinor }
+      mileage: { milesHundredths, rateMinor, unit }
     }
   };
 }
@@ -2943,6 +3047,12 @@ const SA = {
   currencyDigits,
   ACCOUNTING_FORMATS,
   accountingExport,
+  distanceUnit,
+  distanceMeters,
+  newDrive,
+  driveStep,
+  driveDistance,
+  buildOds,
   DEMO_AUTH_CODE,
   RECOVERY_TOKEN
 };
