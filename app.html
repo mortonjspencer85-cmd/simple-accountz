@@ -6328,8 +6328,47 @@
     return Uint8Array.from(raw, (c) => c.charCodeAt(0));
   }
 
+  // The store apps get notifications through Firebase. The phone hands us a token; the server
+  // sends to it. Nothing here runs in a browser, which uses Web Push below instead.
+  let phonePushReady = false;
+  function phonePush() {
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    return window.SA_NATIVE && plugins && plugins.PushNotifications ? plugins.PushNotifications : null;
+  }
+
+  async function registerPhonePush() {
+    const push = phonePush();
+    if (!push || !LIVE || !sync.signedIn || !notifyOn || idState.suspended) return false;
+    try {
+      let allowed = (await push.checkPermissions()).receive === "granted";
+      if (!allowed) allowed = (await push.requestPermissions()).receive === "granted";
+      if (!allowed) return false;
+      if (!phonePushReady) {
+        phonePushReady = true;
+        push.addListener("registration", (item) => {
+          const token = item && item.value;
+          if (token) call("POST", "/api/push/phone", { token });
+        });
+        push.addListener("registrationError", () => {});
+        // Tapping a notification opens the app; this brings the right screen forward.
+        push.addListener("pushNotificationActionPerformed", () => { try { syncNow(false); } catch (error) {} });
+      }
+      await push.register();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async function forgetPhonePush() {
+    const push = phonePush();
+    if (!push) return;
+    try { await push.unregister(); } catch (error) {}
+  }
+
   // Tells the server about this device, so it can send to it. Safe to call as often as you like.
   async function registerPush() {
+    if (phonePush()) return registerPhonePush();
     if (!LIVE || !sync.signedIn || !notifyOn || !pushReady() || Notification.permission !== "granted" || idState.suspended) return false;
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -6346,6 +6385,7 @@
 
   async function forgetPush() {
     try {
+      if (phonePush()) { await forgetPhonePush(); return; }
       if (!pushReady()) return;
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
@@ -6360,16 +6400,17 @@
     const say = (text) => { if (sub) sub.textContent = text; };
     if (!notifyOn) { say("Turn on notifications first (the row below)."); return; }
     const plugins = window.Capacitor && window.Capacitor.Plugins;
-    if (window.SA_NATIVE && plugins && plugins.LocalNotifications) {
-      try {
-        await plugins.LocalNotifications.schedule({ notifications: [{ id: 9100, title: "Simple Accountz", body: "Notifications are working on this phone.", schedule: { at: new Date(Date.now() + 1500) } }] });
-        say("Sent. It should appear in a moment.");
-      } catch (error) { say("This phone refused it. Check notification settings for Simple Accountz."); }
-      return;
-    }
     if (!sync.signedIn) { say("Sign in first, so the server knows this device."); return; }
     say("Sending…");
-    if (!(await registerPush())) { say(pushReady() ? "This device is not registered yet. Allow notifications, then try again." : "This browser cannot receive push. On iPhone, add Simple Accountz to your Home Screen first."); return; }
+    if (!(await registerPush())) {
+      if (phonePush()) { say("This phone refused notifications. Turn them on for Simple Accountz in your phone's settings."); return; }
+      say(pushReady() ? "This device is not registered yet. Allow notifications, then try again." : "This browser cannot receive push. On iPhone, add Simple Accountz to your Home Screen first.");
+      return;
+    }
+    if (window.SA_NATIVE && plugins && plugins.LocalNotifications) {
+      // Give the phone a moment to hand its token to the server before asking for a test.
+      await new Promise((done) => setTimeout(done, 1200));
+    }
     const done = await call("POST", "/api/push/test", {});
     if (done.status === 200 && done.body && done.body.sent > 0) say("Sent to " + done.body.sent + (done.body.sent === 1 ? " device" : " devices") + ". It should arrive in a moment.");
     else if (done.status === 403) say("Your account is suspended, so notifications are paused.");
@@ -6414,7 +6455,7 @@
     const sw = document.getElementById("notify-switch");
     const sub = document.getElementById("notify-sub");
     const blocked = !window.SA_NATIVE && typeof Notification === "function" && Notification.permission === "denied";
-    const iphoneWeb = !window.SA_NATIVE && /iPhone|iPad/.test(navigator.userAgent || "") && !pushReady();
+    const iphoneWeb = !window.SA_NATIVE && !phonePush() && /iPhone|iPad/.test(navigator.userAgent || "") && !pushReady();
     if (sw) sw.classList.toggle("off", !notifyOn);
     if (sub) sub.textContent = notifyOn
       ? "On · overdue invoices, payments, and assistant activity"
@@ -7262,7 +7303,7 @@
   const DEVICE_KEY = "simpleaccountz.device.v1";
   const SHARE_KEY = "simpleaccountz.share";
   const PING_KEY = "simpleaccountz.devping";
-  const BUILD = "web-v25";
+  const BUILD = "web-v26";
   const PLATFORM_NAMES = { "ios-app": "iPhone/iPad app", "android-app": "Android app", "ios-web": "iPhone/iPad web", "android-web": "Android web", windows: "Windows", mac: "Mac", linux: "Linux", other: "Other" };
 
   function sharingOn() {
