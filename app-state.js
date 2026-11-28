@@ -2445,6 +2445,31 @@ function quadIsSteady(a, b, tolerance) {
 // The live finder shows any page it sees, even one running off the edge (so it
 // can say "move back"). A photo is only straightened by a page that is wholly
 // in the picture; otherwise the whole photo is kept as it is.
+// The finder sees a slightly different shape in every frame, and now and then a wrong one.
+// This only believes a shape several recent frames agree on, and returns the middle of what
+// they saw. That, not the drawing, is what stops the box jumping about.
+function quadConsensus(recent, width, height, tolerance, need) {
+  const list = (Array.isArray(recent) ? recent : []).filter((quad) => quad && Array.isArray(quad.corners) && quad.corners.length === 4);
+  const want = Math.max(2, need || 3);
+  if (list.length < want) return null;
+  const span = Math.hypot(width, height) * (tolerance || 0.05);
+  const apart = (a, b) => Math.max.apply(null, a.corners.map((p, i) => Math.hypot(p.x - b.corners[i].x, p.y - b.corners[i].y)));
+  // The newest shape is the one to confirm: the outline should follow the page, not lag behind it.
+  const latest = list[list.length - 1];
+  const agree = list.filter((quad) => apart(quad, latest) <= span);
+  if (agree.length < want) return null;
+  const middle = (values) => {
+    const sorted = values.slice().sort((a, b) => a - b);
+    const half = sorted.length >> 1;
+    return sorted.length % 2 ? sorted[half] : (sorted[half - 1] + sorted[half]) / 2;
+  };
+  const corners = [0, 1, 2, 3].map((i) => ({
+    x: middle(agree.map((quad) => quad.corners[i].x)),
+    y: middle(agree.map((quad) => quad.corners[i].y))
+  }));
+  return Object.assign({}, latest, { corners, agreed: agree.length });
+}
+
 function quadForScan(gray, width, height) {
   return findDocumentQuad(gray, width, height) || pageFillsFrame(gray, width, height);
 }
@@ -4292,12 +4317,14 @@ function canAfford(transactions, budget, today, currency, kind, amountMinor) {
 // ---- Plans: what each one includes, when the free plan runs out, and how to say so ----
 // One place for every limit, so changing what Free gets is a one-line edit.
 const PLAN_ORDER = ["free", "essentials", "plus", "premium"];
-const PLAN_NAMES = { free: "Free", essentials: "Essentials", plus: "Plus", premium: "Premium" };
+const PLAN_NAMES = { free: "Free", essentials: "Essentials", plus: "Plus", premium: "Premium", owner: "Owner" };
 const PLAN_LIMITS = {
   free: { scans: 8, budgetLines: 4, goals: 1, tips: 2, chartMonths: 3, questions: 8, exportBooks: false },
   essentials: { scans: 40, budgetLines: 8, goals: 3, tips: 5, chartMonths: 6, questions: 40, exportBooks: true },
   plus: { scans: 200, budgetLines: 99, goals: 10, tips: 99, chartMonths: 12, questions: 999, exportBooks: true },
-  premium: { scans: 9999, budgetLines: 99, goals: 20, tips: 99, chartMonths: 12, questions: 9999, exportBooks: true }
+  premium: { scans: 9999, budgetLines: 99, goals: 20, tips: 99, chartMonths: 12, questions: 9999, exportBooks: true },
+  // The owner's own account: everything Premium has, without limits, plus the admin area.
+  owner: { scans: Infinity, budgetLines: Infinity, goals: Infinity, tips: Infinity, chartMonths: 12, questions: Infinity, exportBooks: true }
 };
 // Extras that can be bought on their own, once store purchases are connected.
 const ADDONS = [
@@ -4311,6 +4338,7 @@ function planLimits(tier) { return PLAN_LIMITS[tier] || PLAN_LIMITS.free; }
 // Can this tier do it? `used` is how many have been used (or how many exist, for budget lines and goals).
 // When it cannot, `need` is the cheapest plan that can.
 function planGate(tier, feature, used, extra) {
+  if (tier === "owner") return { ok: true, limit: Infinity, need: "owner" };
   const have = planLimits(tier);
   const bonus = Number(extra) || 0;
   const allowedAt = (name) => {
@@ -4543,7 +4571,7 @@ const SA = {
   resumeDrive,
   driveRecord,
   routePaths,
-  routeMapView, cleanAddress,
+  routeMapView, cleanAddress, quadConsensus,
   PLAN_ORDER, PLAN_NAMES, PLAN_LIMITS, ADDONS, planLimits, planGate, annualSaving, trialDaysLeft, upgradeCopy,
   PERSONAL_CATEGORIES, BUSINESS_CATEGORIES, FLEXIBLE_CATEGORIES, budgetCategories, guessPersonalCategory, categoryOf, cleanBudget, cleanBudgets, budgetStatus, suggestBudget, findRecurring, goalProgress, budgetCoach, canAfford, mergeBudgets,
   textLooksReadable, mergeScans, scanIsComplete, fixLabelWords, consistentTotal,

@@ -687,6 +687,33 @@
   .rv-panel { margin-top: 10px; padding: 10px; border-radius: 12px; background: rgba(127,127,127,.1); }
   .rv-panel select, .rv-panel input { margin: 8px 0; }
   #rv-filter { margin: 10px 0; flex-wrap: wrap; }
+  #ad-tabs, #rv-filter { flex-wrap: wrap; margin: 10px 0; }
+  .ad-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  @media (max-width: 520px) { .ad-tiles { grid-template-columns: repeat(2, 1fr); } }
+  .ad-tiles .tile { padding: 12px 6px; border-radius: 14px; background: rgba(127,127,127,.1); text-align: center; }
+  .ad-tiles .tile b { display: block; font-size: 22px; line-height: 1.1; }
+  .ad-tiles .tile span { font-size: 11px; opacity: .75; }
+  .p-card { border: 1px solid rgba(127,127,127,.25); border-radius: 16px; margin: 8px 0; overflow: hidden; background: var(--paper, #fff); }
+  .p-card.suspended { border-color: #d4573b; }
+  .p-head { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 12px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .p-head.static { cursor: default; }
+  .p-ava { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--forest, #163300); color: #fff; font-weight: 800; font-size: 14px; }
+  .p-main b { display: block; }
+  .p-mail { display: block; font-size: 12px; opacity: .7; }
+  .p-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .chip { font-style: normal; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(127,127,127,.18); }
+  .chip.ok { background: rgba(47,163,107,.18); color: #1b6e49; }
+  .chip.bad { background: rgba(212,87,59,.18); color: #9c3418; }
+  .chip.role { background: rgba(59,120,216,.18); color: #27508f; }
+  .p-when { font-size: 11px; opacity: .6; }
+  .p-detail { padding: 0 12px 12px; display: grid; gap: 3px; }
+  .p-detail span { font-size: 13px; }
+  .p-detail .p-meta, .p-detail .p-dev { font-size: 12px; opacity: .75; }
+  .p-detail .p-bad { color: #d4573b; font-weight: 700; }
+  .p-detail .p-why { opacity: .9; }
+  .p-detail .quick-row { margin-top: 8px; }
+  .rights { display: grid; gap: 4px; padding: 0 12px 8px; }
+  .right-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .rv-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
   .rv-summary .tile { padding: 10px 6px; border-radius: 12px; background: rgba(127,127,127,.1); text-align: center; }
   .rv-summary .tile b { display: block; font-size: 20px; }
@@ -917,6 +944,8 @@
     background: var(--paper); border-radius: 22px; padding: 16px 18px; box-shadow: 0 16px 44px rgba(0,0,0,.22); }
   .loc-ask b { display: block; font-size: 16px; margin-bottom: 4px; }
   .loc-ask p { margin: 0 0 12px; font-size: 14px; color: var(--slate, #454745); line-height: 1.4; }
+  .loc-list { margin: 8px 0 0; padding-left: 18px; font-size: 13px; opacity: .9; }
+  .loc-list li { margin: 4px 0; }
   .loc-ask .loc-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .cam-busy .bar { width: 200px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); margin: 14px auto 0; overflow: hidden; }
   .cam-busy .bar i { display: block; height: 100%; width: 0; background: var(--lime); transition: width .2s ease; }
@@ -1054,6 +1083,9 @@
         <button class="go" data-go="reports" onclick="goFromDrawer('reports')">Reports and spreadsheets</button>
         <button class="go biz-only" data-go="taxes" onclick="goFromDrawer('taxes')">Tax packet</button>
         <button class="go" data-go="banks" onclick="goFromDrawer('banks')">Banks and cards</button>
+        <div class="drawer-label" data-admin hidden>Admin</div>
+        <button class="go" data-admin hidden onclick="closeDrawer(); openAdmin('overview')">Admin area</button>
+        <button class="go" data-admin hidden onclick="closeDrawer(); openAdmin('people')">People</button>
         <div class="drawer-label">You</div>
         <button class="go live-only" data-go="account" onclick="goFromDrawer('account')">Account and sign-in</button>
         <button class="go" data-go="settings" onclick="goFromDrawer('settings')">Settings</button>
@@ -1061,9 +1093,14 @@
       </nav>
       <div class="drawer-veil" id="drawer-veil" onclick="closeDrawer()"></div>
       <div class="loc-ask" id="loc-ask" role="dialog" aria-label="Allow location" hidden>
-        <b>Track business drives automatically?</b>
-        <p>Allow location so Simple Accountz can track the route and miles when you tap Start drive. Each drive is saved with its expense as your mileage log, and is never sold or shared.</p>
-        <div class="loc-actions"><button class="pill-outline small" onclick="answerLocation(false)">Not now</button><button class="pill small" onclick="answerLocation(true)">Allow location</button></div>
+        <b>Simple Accountz collects location to log your business drives</b>
+        <p id="loc-ask-body">This happens only after you tap Start drive, and stops when you tap End drive. It is never collected when no drive is running, and it is never sold or shared.</p>
+        <ul class="loc-list" id="loc-ask-list">
+          <li>What it records: the route you take, where the drive started and ended, and the distance.</li>
+          <li>What it is for: the mileage log saved with that drive&rsquo;s expense, for your own records and taxes.</li>
+          <li>You can pause a drive for breaks, and delete any drive afterwards.</li>
+        </ul>
+        <div class="loc-actions"><button class="pill-outline small" onclick="answerLocation(false)">Not now</button><button class="pill small" id="loc-ask-yes" onclick="answerLocation(true)">Continue</button></div>
       </div>
       <div class="run-bar" id="run-bar" hidden>
         <button class="run-chip" id="run-timer" onclick="openTimer()" hidden></button>
@@ -1302,7 +1339,7 @@
             <div class="acct-section">You</div>
             <div class="acct-item"><div><b>Your details <span class="badge off" id="details-badge">Needed</span></b><span id="details-sub">Your legal name, home address, and phone. Needed before banking.</span></div><button class="btn-small" onclick="openDetails()">Edit</button></div>
             <div class="acct-item"><div><b>Identity <span class="badge off" id="idv-badge">Not checked</span></b><span id="idv-sub">Joining is free. To link a bank or card, check your ID once: a photo of your driver&rsquo;s license and a selfie, handled by Plaid. Simple Accountz never stores your license.</span></div><button class="btn-small" id="idv-btn" onclick="startIdentity()">Verify</button></div>
-            <div class="acct-item" id="reviews-row" hidden><div><b>Identity reviews</b><span id="reviews-sub">Approve or deny people the automatic check could not settle.</span></div><button class="btn-small" onclick="openReviews()">Open</button></div>
+            <div class="acct-item" data-admin hidden><div><b>Admin area</b><span id="admin-sub">Overview, people, and your team</span></div><button class="btn-small" onclick="openAdmin()">Open</button></div>
             <div class="acct-section">Security</div>
             <div class="acct-item"><div><b>2-step sign-in <span class="badge off" id="totp-badge">Off</span></b><span id="totp-sub">Use an authenticator app for codes, and to reset a forgotten password.</span></div><button class="btn-small" id="totp-btn" onclick="toggleTotp()">Turn on</button></div>
             <div class="acct-item"><div><b>Sign in on another device</b><span>Show a QR code and scan it with the other phone or computer's camera. It works once, for 2 minutes.</span></div><button class="btn-small" onclick="showLoginQr()">Show QR</button></div>
@@ -1331,16 +1368,6 @@
             <p class="auth-msg" id="dt-msg" role="alert"></p>
           </div>
 
-          <div class="auth-card acct-view" data-view="reviews">
-            <h2 class="auth-title" id="rv-title">Identity reviews</h2>
-            <p class="auth-sub" id="rv-report">Loading&hellip;</p>
-            <div class="rv-summary" id="rv-summary" hidden></div>
-            <input class="auth-input" id="rv-search" type="search" autocomplete="off" placeholder="Search by name or email" oninput="renderReviews()">
-            <div class="seg lime" id="rv-filter"><button data-filter="all" class="on">Everyone</button><button data-filter="waiting">Waiting</button><button data-filter="denied">Denied</button><button data-filter="suspended">Suspended</button><button data-filter="active" class="owner-only">Active this week</button><button data-filter="paid" class="owner-only">Paid or trial</button></div>
-            <div id="rv-list"></div>
-            <button class="btn-secondary" onclick="setAcctView('home')">Back</button>
-            <p class="auth-msg" id="rv-msg" role="alert"></p>
-          </div>
 
           <div class="auth-card acct-view" data-view="totp-setup">
             <h2 class="auth-title">Set up your authenticator</h2>
@@ -2016,6 +2043,23 @@
           <button class="textlink" onclick="closeUpgrade()">Not now</button>
         </div>
       </div>
+
+      <section class="screen no-tabs" id="admin">
+        <button class="back" onclick="show('settings')">Back</button>
+        <div class="top"><h2 class="title">Admin</h2><span><button class="pill-outline small" onclick="loadAdmin()">Refresh</button></span></div>
+        <p class="note" id="ad-role"></p>
+        <div class="seg lime" id="ad-tabs"><button data-tab="overview" class="on">Overview</button><button data-tab="people">People</button><button data-tab="team">Team</button></div>
+        <div class="ad-pane" id="ad-overview"></div>
+        <div class="ad-pane" id="ad-people" hidden>
+          <input class="auth-input" id="rv-search" type="search" autocomplete="off" placeholder="Search by name or email" oninput="renderAdminPeople()">
+          <div class="seg lime" id="rv-filter"><button data-filter="all" class="on">Everyone</button><button data-filter="waiting">Waiting</button><button data-filter="denied">Denied</button><button data-filter="suspended">Suspended</button><button data-filter="active">Active</button><button data-filter="paid">Paid</button></div>
+          <p class="note" id="rv-count"></p>
+          <div id="rv-list"></div>
+        </div>
+        <div class="ad-pane" id="ad-team" hidden></div>
+        <p class="auth-msg" id="rv-msg" role="alert"></p>
+        <div style="height:88px"></div>
+      </section>
 
       <section class="screen no-tabs" id="budget">
         <button class="back" onclick="show(budgetFrom || 'money')">Back</button>
@@ -3288,25 +3332,39 @@
     if (!ptr || ptr.classList.contains("busy")) return;
     ptr.classList.toggle("pulling", distance > 0);
     ptr.classList.toggle("armed", !!armed);
-    ptr.style.transform = distance > 0 ? "translateY(" + (Math.min(distance * 0.5, 90) - 56) + "px)" : "";
+    ptr.style.transform = distance > 0 ? "translateY(" + (Math.min(distance * 0.45, 90) - 56) + "px)" : "";
   }
 
   function bindPullAll() {
-    const THRESHOLD = 70;
+    // A refresh takes a long, deliberate, downward pull. A short drag, a sideways swipe, or a
+    // drag that starts on a map, a chart, or a slider never triggers one.
+    const THRESHOLD = 130;
+    const DEAD_ZONE = 24;
+    const NO_PULL = ".smap, .chart, .pz-stage, .donut-wrap, input[type=range], .seg, textarea";
     document.querySelectorAll(".screen").forEach((screen) => {
       let startY = null;
+      let startX = 0;
       let distance = 0;
+      let sideways = false;
       screen.addEventListener("touchstart", (event) => {
         const camOpen = document.getElementById("cam").classList.contains("on");
-        if (event.touches.length !== 1 || screen.scrollTop > 0 || camOpen) { startY = null; return; }
+        const onWidget = event.target && event.target.closest && event.target.closest(NO_PULL);
+        if (event.touches.length !== 1 || screen.scrollTop > 0 || camOpen || onWidget) { startY = null; return; }
         startY = event.touches[0].clientY;
+        startX = event.touches[0].clientX;
         distance = 0;
+        sideways = false;
       }, { passive: true });
       screen.addEventListener("touchmove", (event) => {
         if (startY == null) return;
-        distance = event.touches[0].clientY - startY;
+        const down = event.touches[0].clientY - startY;
+        const across = Math.abs(event.touches[0].clientX - startX);
+        // Decide once whether this is a sideways gesture, and then leave it alone.
+        if (!sideways && across > 12 && across > Math.abs(down)) sideways = true;
+        if (sideways) { distance = 0; setPtr(0, false); return; }
+        distance = Math.max(0, down - DEAD_ZONE);
         if (distance <= 0 || screen.scrollTop > 0) { setPtr(0, false); return; }
-        setPtr(distance, SA.pullRefresh(distance * 0.5, THRESHOLD * 0.5));
+        setPtr(distance, SA.pullRefresh(distance, THRESHOLD));
       }, { passive: true });
       const end = () => {
         if (startY == null) return;
@@ -3314,7 +3372,7 @@
         startY = null;
         distance = 0;
         setPtr(0, false);
-        if (SA.pullRefresh(pulled, THRESHOLD)) pullToRefresh();
+        if (!sideways && SA.pullRefresh(pulled, THRESHOLD)) pullToRefresh();
       };
       screen.addEventListener("touchend", end, { passive: true });
       screen.addEventListener("touchcancel", () => { startY = null; distance = 0; setPtr(0, false); }, { passive: true });
@@ -4561,6 +4619,7 @@
     cam.prev = null;
     cam.last = null;
     cam.readyAt = 0;
+    cam.recent = [];
     cam.shown = null;
     cam.want = null;
     cam.cand = null;
@@ -4743,7 +4802,10 @@
     for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
       gray[i] = (pixels[p] * 77 + pixels[p + 1] * 150 + pixels[p + 2] * 29) >> 8;
     }
-    const found = SA.quadForScan(gray, width, height);
+    // Believe a shape only when several frames in a row agree on it.
+    const seen = SA.quadForScan(gray, width, height);
+    cam.recent = (cam.recent || []).concat([seen]).slice(-5);
+    const found = SA.quadConsensus(cam.recent, width, height, 0.05, 3);
     // Count misses in every mode, so an outline never stays on screen after the page has gone.
     if (found) { cam.misses = 0; cam.last = found; }
     else cam.misses = (cam.misses || 0) + 1;
@@ -4763,7 +4825,7 @@
     camEl("cam-shot").classList.toggle("armed", armed);
     camEl("cam").classList.toggle("ready", whole);
     let hint;
-    if (!showQuad) hint = cam.misses > 12 ? "Can\u2019t see the edges. Try a darker surface behind it." : "Point at the receipt";
+    if (!showQuad) hint = cam.misses > 10 ? "Line it up inside the frame and tap the button" : "Point at the receipt";
     else if (!whole) hint = "Move back so the whole page fits";
     else if (!cam.auto) hint = "Page found. Tap the button.";
     else hint = armed ? "Hold it\u2026" : "Page found. Hold still.";
@@ -4787,7 +4849,8 @@
     if (!quad) { cam.want = null; cam.cand = null; cam.candN = 0; paintSoon(); return; }
     const next = quad.corners.map((corner) => ({ x: corner.x / width, y: corner.y / height }));
     const apart = (a, b) => Math.max.apply(null, a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
-    if (cam.want && apart(next, cam.want) < GUIDE_NEAR) {
+    if (!cam.want) { cam.want = next; cam.cand = null; cam.candN = 0; paintSoon(); return; }
+    if (apart(next, cam.want) < GUIDE_NEAR) {
       cam.want = next;
       cam.cand = null;
       cam.candN = 0;
@@ -4830,6 +4893,26 @@
     return Math.max.apply(null, a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
   }
 
+  // When no page can be made out, show a frame to line the receipt up inside, so the camera is
+  // always usable. The shutter works either way; this is only something to aim at.
+  function drawStaticFrame(ctx, W, H, dpr, alpha) {
+    if (alpha <= 0.02) return;
+    const inset = { x: W * 0.1, y: H * 0.08 };
+    const w = W - inset.x * 2;
+    const h = H - inset.y * 2;
+    const r = 18 * dpr;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.setLineDash([14 * dpr, 12 * dpr]);
+    ctx.lineWidth = 2 * dpr;
+    ctx.strokeStyle = "rgba(255,255,255,0.75)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(inset.x, inset.y, w, h, r);
+    else ctx.rect(inset.x, inset.y, w, h);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function renderGuide(shown, alpha) {
     const overlay = camEl("cam");
     const canvas = camEl("cam-guide");
@@ -4840,7 +4923,8 @@
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
-    if (!shown || alpha <= 0) return;
+    if (!shown || alpha <= 0) { drawStaticFrame(ctx, W, H, dpr, 1 - (alpha || 0)); return; }
+    drawStaticFrame(ctx, W, H, dpr, 1 - alpha);
     const pts = shown.map((p) => ({ x: p.x * W, y: p.y * H }));
     const ready = cam.steady >= 2;
     ctx.globalAlpha = alpha;
@@ -6586,14 +6670,15 @@
   }
 
   // Identity and role come from the server on every sign-in; they are never trusted from this device.
-  let idState = { verified: false, enabled: false, status: "none", note: "", hasDetails: false, role: "", suspended: false, suspendReason: "" };
+  let idState = { verified: false, enabled: false, status: "none", note: "", hasDetails: false, role: "", suspended: false, suspendReason: "", rights: [] };
   function applyProfile(profile) {
     if (!profile) return;
     takePlan(profile.plan);
     idState = {
       verified: !!profile.identityVerified, enabled: !!profile.identityEnabled, status: String(profile.identityStatus || "none"),
       note: String(profile.identityNote || ""), hasDetails: !!profile.hasDetails, role: profile.role === "owner" || profile.role === "admin" ? profile.role : "",
-      suspended: !!profile.suspended, suspendReason: String(profile.suspendReason || "")
+      suspended: !!profile.suspended, suspendReason: String(profile.suspendReason || ""),
+      rights: Array.isArray(profile.rights) ? profile.rights.slice() : []
     };
     sync.email = profile.email || sync.email;
     sync.emailVerified = !!profile.emailVerified;
@@ -7104,7 +7189,7 @@
     el("acct-suspended-text").textContent = "Your account is suspended" + (idState.suspendReason ? ": " + idState.suspendReason : "") + ". Your books are safe on this device. Contact support@simpleaccountz.com or (215) 664-2407 to have it reviewed.";
     el("details-badge").textContent = idState.hasDetails ? "Saved" : "Needed";
     el("details-badge").className = "badge " + (idState.hasDetails ? "on" : "off");
-    el("reviews-row").hidden = !idState.role;
+    renderAdminEntry();
   }
 
   async function openDetails() {
@@ -7177,7 +7262,7 @@
   const DEVICE_KEY = "simpleaccountz.device.v1";
   const SHARE_KEY = "simpleaccountz.share";
   const PING_KEY = "simpleaccountz.devping";
-  const BUILD = "web-v24";
+  const BUILD = "web-v25";
   const PLATFORM_NAMES = { "ios-app": "iPhone/iPad app", "android-app": "Android app", "ios-web": "iPhone/iPad web", "android-web": "Android web", windows: "Windows", mac: "Mac", linux: "Linux", other: "Other" };
 
   function sharingOn() {
@@ -7277,84 +7362,143 @@
   }
 
   // Spencer's overview: who is on, where, and how active.
-  function renderPeopleSummary(r) {
-    const host = el("rv-summary");
-    host.innerHTML = "";
-    host.hidden = !(r && r.platforms);
-    if (host.hidden) return;
-    const tile = (big, small) => { const d = document.createElement("div"); d.className = "tile"; const b = document.createElement("b"); b.textContent = big; const s2 = document.createElement("span"); s2.textContent = small; d.appendChild(b); d.appendChild(s2); host.appendChild(d); };
-    tile(String(r.users), "people");
-    tile(String(r.active24h), "active today");
-    tile(String(r.active7d), "active this week");
-    tile(String((r.plans.plus || 0) + (r.plans.premium || 0) + (r.plans.essentials || 0)), "on a paid plan or trial");
-    const plat = document.createElement("div");
-    plat.className = "plat";
-    const total = Math.max(1, Object.keys(r.platforms).reduce((sum, key) => sum + r.platforms[key], 0));
-    Object.keys(r.platforms).sort((a, b) => r.platforms[b] - r.platforms[a]).forEach((key) => {
-      const row = document.createElement("div");
-      row.className = "plat-row";
-      row.innerHTML = '<span class="n"></span><span class="bar"><i></i></span><b class="v"></b>';
-      row.querySelector(".n").textContent = PLATFORM_NAMES[key] || key;
-      row.querySelector(".bar i").style.width = Math.round(r.platforms[key] / total * 100) + "%";
-      row.querySelector(".v").textContent = String(r.platforms[key]);
-      plat.appendChild(row);
-    });
-    host.appendChild(plat);
-    const spark = document.createElement("div");
-    spark.className = "spark";
-    const top = Math.max(1, Math.max.apply(null, r.signups.map((d) => d.n)));
-    r.signups.forEach((d) => { const bar = document.createElement("i"); bar.style.height = Math.max(3, Math.round(d.n / top * 100)) + "%"; bar.title = d.day + ": " + d.n + " new"; spark.appendChild(bar); });
-    const cap = document.createElement("small");
-    cap.textContent = "New people, last 14 days";
-    host.appendChild(spark);
-    host.appendChild(cap);
-  }
-
-  function renderPersonExtras(row, item) {
-    const line = (text, cls) => { const s2 = document.createElement("span"); s2.textContent = text; if (cls) s2.className = cls; row.appendChild(s2); };
-    line("Joined " + new Date(item.joined).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) + " · last active " + agoText(item.last) + " · " + (item.plan.tier === "free" ? "Free" : SA.PLAN_NAMES[item.plan.tier] + (item.plan.source === "trial" ? " trial" : "")) + (item.push ? " · push on " + item.push + (item.push === 1 ? " device" : " devices") : ""), "rv-meta");
-    if (!item.share) line("Has turned off device and usage sharing.", "rv-meta");
-    (item.devices || []).forEach((d) => line((PLATFORM_NAMES[d.p] || d.p) + (d.m ? " · " + d.m : "") + (d.os ? " · " + d.os : "") + (d.br ? " · " + d.br : "") + (d.app ? " · " + d.app : "") + (d.inst ? " · installed" : "") + " · seen " + agoText(d.seen) + " · " + d.n + " check-ins", "rv-dev"));
-    if (item.stats) line(item.stats.docs + " invoices and documents · " + item.stats.expenses + " expenses · " + item.stats.drives + " drives · " + item.stats.budgets + " budget lines · " + item.stats.goals + " goals", "rv-meta");
-  }
-
-  async function setPlanFor(userId, tier, days) {
-    el("rv-msg").textContent = "Saving…";
-    const done = await call("POST", "/api/admin/plan", { userId, tier, days });
-    if (done.status !== 200) { el("rv-msg").textContent = "That did not go through."; return; }
-    rvOpen = "";
-    await openReviews();
-    el("rv-msg").textContent = tier === "free" ? "Plan removed." : SA.PLAN_NAMES[tier] + " granted for " + days + " days.";
-  }
-
-  // ---- Identity reviews: approve, deny, ask for more, suspend, activate. Always with a reason. ----
+  // ---- The admin area: Spencer's overview, the people, and his team ----
+  // Spencer holds every right, always. An admin holds only the rights Spencer has given, and the
+  // screen shows only what their rights allow. The server checks every one of these again.
   let rvItems = [];
   let rvReasons = { deny: {}, info: {}, suspend: {} };
+  let rvRightNames = {};
   let rvFilter = "all";
   let rvOpen = "";
+  let adTab = "overview";
+  let adReport = null;
 
-  async function openReviews() {
-    setAcctView("reviews");
-    el("rv-msg").textContent = "";
-    const [report, queue] = await Promise.all([call("GET", "/api/admin/report"), call("GET", "/api/admin/identity")]);
-    el("rv-title").textContent = idState.role === "owner" ? "People" : "Identity reviews";
-    document.querySelectorAll("#rv-filter .owner-only").forEach((node) => { node.hidden = idState.role !== "owner"; });
-    if (report.status === 200 && report.body) {
-      const r = report.body;
-      renderPeopleSummary(idState.role === "owner" ? r : null);
-      el("rv-report").textContent = r.users + " people · " + r.verified + " verified · " + r.waiting + " waiting · " + r.denied + " denied · " + r.suspended + " suspended";
-    } else el("rv-report").textContent = "Only Spencer and his admins can see this.";
-    rvItems = queue.status === 200 && queue.body ? queue.body.items || [] : [];
-    if (queue.body && queue.body.reasons) rvReasons = queue.body.reasons;
-    renderReviews();
+  function isOwner() { return idState.role === "owner"; }
+  function mayAdmin(right) { return isOwner() || (idState.rights || []).indexOf(right) !== -1; }
+
+  function openAdmin(tab) {
+    if (tab) adTab = tab;
+    show("admin");
+    renderAdminTabs();
+    loadAdmin();
   }
 
-  const RV_FILTERS = [["all", "Everyone"], ["waiting", "Waiting"], ["denied", "Denied"], ["suspended", "Suspended"]];
+  function renderAdminTabs() {
+    document.querySelectorAll("#ad-tabs button").forEach((button) => {
+      const name = button.dataset.tab;
+      const allowed = name === "overview" ? mayAdmin("reports") || mayAdmin("people") : name === "team" ? isOwner() : true;
+      button.hidden = !allowed;
+      button.classList.toggle("on", name === adTab);
+      button.onclick = () => { adTab = name; renderAdminTabs(); renderAdmin(); };
+    });
+    if (document.querySelector("#ad-tabs button[data-tab='" + adTab + "']") && document.querySelector("#ad-tabs button[data-tab='" + adTab + "']").hidden) adTab = "people";
+    ["overview", "people", "team"].forEach((name) => { el("ad-" + name).hidden = name !== adTab; });
+  }
 
-  function rvMatches(item) {
+  async function loadAdmin() {
+    el("rv-msg").textContent = "";
+    const wants = [call("GET", "/api/admin/identity")];
+    wants.push(mayAdmin("reports") ? call("GET", "/api/admin/report") : Promise.resolve({ status: 0 }));
+    const [queue, report] = await Promise.all(wants);
+    if (queue.status === 403) { el("rv-msg").textContent = "You do not have admin access."; rvItems = []; renderAdmin(); return; }
+    rvItems = queue.status === 200 && queue.body ? queue.body.items || [] : [];
+    if (queue.body && queue.body.reasons) rvReasons = queue.body.reasons;
+    if (queue.body && queue.body.rightNames) rvRightNames = queue.body.rightNames;
+    adReport = report.status === 200 ? report.body : null;
+    renderAdminTabs();
+    renderAdmin();
+  }
+
+  function renderAdmin() {
+    el("ad-role").textContent = isOwner() ? "Owner. You can do everything here, and decide what each admin can do."
+      : "Admin. You can " + (idState.rights || []).map((r) => (rvRightNames[r] || r).toLowerCase()).join(", ") + ".";
+    if (adTab === "overview") renderAdminOverview();
+    else if (adTab === "people") renderAdminPeople();
+    else renderTeam();
+  }
+
+  function tile(host, big, small) {
+    const box = document.createElement("div");
+    box.className = "tile";
+    const b = document.createElement("b");
+    b.textContent = big;
+    const s = document.createElement("span");
+    s.textContent = small;
+    box.appendChild(b);
+    box.appendChild(s);
+    host.appendChild(box);
+  }
+
+  function renderAdminOverview() {
+    const host = el("ad-overview");
+    host.innerHTML = "";
+    if (!adReport) { host.appendChild(Object.assign(document.createElement("p"), { className: "note", textContent: "The overview needs the reports right." })); return; }
+    const r = adReport;
+    const tiles = document.createElement("div");
+    tiles.className = "ad-tiles";
+    tile(tiles, String(r.users), "people");
+    tile(tiles, String(r.verified), "verified");
+    tile(tiles, String(r.waiting), "waiting on you");
+    tile(tiles, String(r.suspended), "suspended");
+    if (r.active24h != null) { tile(tiles, String(r.active24h), "active today"); tile(tiles, String(r.active7d), "active this week"); }
+    if (r.plans) tile(tiles, String((r.plans.plus || 0) + (r.plans.premium || 0) + (r.plans.essentials || 0)), "paid or trial");
+    if (r.push != null) tile(tiles, String(r.push), "can get notifications");
+    host.appendChild(tiles);
+
+    if (r.waiting > 0 || r.denied > 0) {
+      const go = document.createElement("button");
+      go.className = "pill small";
+      go.textContent = "Review the " + r.waiting + " waiting";
+      go.onclick = () => { adTab = "people"; rvFilter = "waiting"; renderAdminTabs(); renderAdmin(); };
+      host.appendChild(go);
+    }
+    if (mayAdmin("reports")) {
+      const send = document.createElement("button");
+      send.className = "pill-outline small";
+      send.textContent = "Email the report now";
+      send.onclick = async () => {
+        el("rv-msg").textContent = "Sending…";
+        const done = await call("POST", "/api/admin/report/send", {});
+        el("rv-msg").textContent = done.status === 200 ? "Sent to " + done.body.sent + (done.body.sent === 1 ? " person." : " people.") : "Could not send it.";
+      };
+      host.appendChild(send);
+    }
+
+    if (r.platforms) {
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = "What people use";
+      host.appendChild(label);
+      const total = Math.max(1, Object.keys(r.platforms).reduce((sum, key) => sum + r.platforms[key], 0));
+      Object.keys(r.platforms).sort((a, b) => r.platforms[b] - r.platforms[a]).forEach((key) => {
+        const row = document.createElement("div");
+        row.className = "plat-row";
+        row.innerHTML = '<span class="n"></span><span class="bar"><i></i></span><b class="v"></b>';
+        row.querySelector(".n").textContent = PLATFORM_NAMES[key] || key;
+        row.querySelector(".bar i").style.width = Math.round(r.platforms[key] / total * 100) + "%";
+        row.querySelector(".v").textContent = String(r.platforms[key]);
+        host.appendChild(row);
+      });
+    }
+    if (r.signups) {
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = "New people, last 14 days";
+      host.appendChild(label);
+      const spark = document.createElement("div");
+      spark.className = "spark";
+      const top = Math.max(1, Math.max.apply(null, r.signups.map((d) => d.n)));
+      r.signups.forEach((d) => { const bar = document.createElement("i"); bar.style.height = Math.max(3, Math.round(d.n / top * 100)) + "%"; bar.title = d.day + ": " + d.n; spark.appendChild(bar); });
+      host.appendChild(spark);
+    }
+  }
+
+  const PERSON_FILTERS = [["all", "Everyone"], ["waiting", "Waiting"], ["denied", "Denied"], ["suspended", "Suspended"], ["active", "Active"], ["paid", "Paid"]];
+
+  function personMatches(item) {
     const q = el("rv-search").value.trim().toLowerCase();
     if (q && (item.email + " " + ((item.details || {}).name || "")).toLowerCase().indexOf(q) === -1) return false;
-    if (rvFilter === "waiting") return item.decision === "review" || item.decision === "pending" || item.decision === "info" || item.decision === "none";
+    if (rvFilter === "waiting") return ["review", "pending", "info", "none"].indexOf(item.decision) !== -1;
     if (rvFilter === "denied") return item.decision === "denied";
     if (rvFilter === "suspended") return item.suspended;
     if (rvFilter === "active") return !!item.last && Date.now() - item.last < 7 * 86400000;
@@ -7362,7 +7506,20 @@
     return true;
   }
 
-  function rvButton(label, danger, handler) {
+  function chip(host, text, kind) {
+    const i = document.createElement("i");
+    i.className = "chip" + (kind ? " " + kind : "");
+    i.textContent = text;
+    host.appendChild(i);
+  }
+
+  function initialsOf(item) {
+    const name = ((item.details || {}).name || item.email || "?").trim();
+    const parts = name.split(/[\s@._-]+/).filter(Boolean);
+    return ((parts[0] || "?")[0] + (parts.length > 1 ? parts[1][0] : "")).toUpperCase();
+  }
+
+  function adButton(label, danger, handler) {
     const button = document.createElement("button");
     button.className = "pill-outline small" + (danger ? " danger-link" : "");
     button.textContent = label;
@@ -7370,7 +7527,95 @@
     return button;
   }
 
-  function rvPanel(item, kind) {
+  function renderAdminPeople() {
+    document.querySelectorAll("#rv-filter button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.filter === rvFilter);
+      button.hidden = (button.dataset.filter === "active" || button.dataset.filter === "paid") && !mayAdmin("people");
+      button.onclick = () => { rvFilter = button.dataset.filter; renderAdminPeople(); };
+    });
+    const list = el("rv-list");
+    list.innerHTML = "";
+    const shown = rvItems.filter(personMatches);
+    if (mayAdmin("people")) shown.sort((a, b) => (b.last || 0) - (a.last || 0));
+    el("rv-count").textContent = shown.length + (shown.length === 1 ? " person" : " people");
+    if (!shown.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = rvItems.length ? "Nobody matches." : "Nobody yet.";
+      list.appendChild(empty);
+      return;
+    }
+    shown.forEach((item) => list.appendChild(personCard(item)));
+  }
+
+  function personCard(item) {
+    const wrap = document.createElement("div");
+    wrap.className = "p-card" + (item.suspended ? " suspended" : "");
+    const head = document.createElement("button");
+    head.type = "button";
+    head.className = "p-head";
+    head.innerHTML = '<span class="p-ava"></span><span class="p-main"><b></b><span class="p-mail"></span><span class="p-chips"></span></span><span class="p-when"></span>';
+    head.querySelector(".p-ava").textContent = initialsOf(item);
+    head.querySelector("b").textContent = (item.details || {}).name || item.email.split("@")[0];
+    head.querySelector(".p-mail").textContent = item.email;
+    const chips = head.querySelector(".p-chips");
+    const words = ID_WORDS[item.decision] || ID_WORDS.none;
+    chip(chips, words[0], item.decision === "approved" ? "ok" : item.decision === "denied" ? "bad" : "");
+    if (item.suspended) chip(chips, "Suspended", "bad");
+    if (item.role) chip(chips, item.role === "owner" ? "Owner" : "Admin", "role");
+    if (item.plan && item.plan.tier !== "free" && item.plan.tier !== "owner") chip(chips, SA.PLAN_NAMES[item.plan.tier] + (item.plan.source === "trial" ? " trial" : ""), "ok");
+    head.querySelector(".p-when").textContent = item.last ? agoText(item.last) : "";
+    head.onclick = () => { rvOpen = rvOpen.split(":")[0] === item.id ? "" : item.id; renderAdminPeople(); };
+    wrap.appendChild(head);
+    if (rvOpen.split(":")[0] === item.id) wrap.appendChild(personDetail(item));
+    return wrap;
+  }
+
+  function personDetail(item) {
+    const box = document.createElement("div");
+    box.className = "p-detail";
+    const line = (text, cls) => { if (!text) return; const s = document.createElement("span"); s.textContent = text; if (cls) s.className = cls; box.appendChild(s); };
+    const d = item.details || {};
+    line(d.street ? d.street + ", " + d.city + " " + d.state + " " + d.zip : "No address given yet");
+    line(d.phone || "");
+    line(item.by === "owner" ? "ID decided by Spencer" : item.by === "admin" ? "ID decided by " + item.adminBy : item.by === "auto" ? "ID: automatic check" : "Has not started the ID check");
+    line(item.reason || "", "p-why");
+    if (item.suspended) line("Suspended by " + (item.suspendBy === "ai" ? "the AI" : item.suspendBy === "owner" ? "Spencer" : item.suspendWho || "an admin") + " · " + item.suspendReason, "p-bad");
+    if (mayAdmin("people")) {
+      if (item.joined) line("Joined " + new Date(item.joined).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) + " · last active " + agoText(item.last) + (item.push ? " · notifications on " + item.push : ""), "p-meta");
+      if (item.share === false) line("Has turned off device and usage sharing.", "p-meta");
+      (item.devices || []).forEach((dev) => line((PLATFORM_NAMES[dev.p] || dev.p) + (dev.m ? " · " + dev.m : "") + (dev.os ? " · " + dev.os : "") + (dev.br ? " · " + dev.br : "") + (dev.app ? " · " + dev.app : "") + (dev.inst ? " · installed" : "") + " · seen " + agoText(dev.seen), "p-dev"));
+      if (item.stats) line(item.stats.docs + " documents · " + item.stats.expenses + " expenses · " + item.stats.drives + " drives · " + item.stats.budgets + " budget lines · " + item.stats.goals + " goals", "p-meta");
+    }
+    // Spencer may act on anyone but himself. An admin may not touch Spencer or another admin.
+    const locked = item.role === "owner" || (item.role === "admin" && !isOwner());
+    if (locked) { line(item.role === "owner" ? "The owner's account cannot be changed." : "Only Spencer can change an admin.", "p-meta"); return box; }
+    const actions = document.createElement("div");
+    actions.className = "quick-row";
+    if (mayAdmin("identity")) {
+      actions.appendChild(adButton("Approve", false, () => decideIdentity(item.id, "approved", "", "")));
+      actions.appendChild(adButton("Deny…", true, () => { rvOpen = item.id + ":deny"; renderAdminPeople(); }));
+      actions.appendChild(adButton("Ask for info…", false, () => { rvOpen = item.id + ":info"; renderAdminPeople(); }));
+      if (item.by === "owner" || item.by === "admin") actions.appendChild(adButton("Undo ID decision", false, () => decideIdentity(item.id, "clear", "", "")));
+    }
+    if (mayAdmin("suspend")) {
+      if (item.suspended) actions.appendChild(adButton("Activate", false, () => suspendAccount(item.id, "activate", "", "")));
+      else actions.appendChild(adButton("Suspend…", true, () => { rvOpen = item.id + ":suspend"; renderAdminPeople(); }));
+      if (item.suspendBy === "owner" || item.suspendBy === "admin") actions.appendChild(adButton("Undo suspend", false, () => suspendAccount(item.id, "clear", "", "")));
+    }
+    if (isOwner()) {
+      actions.appendChild(adButton("Plan…", false, () => { rvOpen = item.id + ":plan"; renderAdminPeople(); }));
+      actions.appendChild(adButton(item.role === "admin" ? "Remove admin" : "Make admin", false, () => setRole(item.email, item.role !== "admin")));
+    }
+    if (!actions.children.length) line("Your rights do not allow changes here.", "p-meta");
+    box.appendChild(actions);
+    const open = rvOpen.split(":")[1];
+    if (open && rvReasons[open]) box.appendChild(reasonPanel(item, open));
+    if (open === "plan") box.appendChild(planPanel(item));
+    return box;
+  }
+
+  function reasonPanel(item, kind) {
     const panel = document.createElement("div");
     panel.className = "rv-panel";
     const title = document.createElement("b");
@@ -7378,12 +7623,7 @@
     const select = document.createElement("select");
     select.className = "auth-input";
     const table = rvReasons[kind] || {};
-    Object.keys(table).forEach((code) => {
-      const option = document.createElement("option");
-      option.value = code;
-      option.textContent = table[code];
-      select.appendChild(option);
-    });
+    Object.keys(table).forEach((code) => { const option = document.createElement("option"); option.value = code; option.textContent = table[code]; select.appendChild(option); });
     const note = document.createElement("input");
     note.className = "auth-input";
     note.maxLength = 200;
@@ -7393,11 +7633,9 @@
     const go = document.createElement("button");
     go.className = "pill small";
     go.textContent = "Confirm";
-    go.onclick = () => (kind === "suspend"
-      ? suspendAccount(item.id, "suspend", select.value, note.value)
-      : decideIdentity(item.id, kind === "info" ? "info" : "denied", select.value, note.value));
+    go.onclick = () => (kind === "suspend" ? suspendAccount(item.id, "suspend", select.value, note.value) : decideIdentity(item.id, kind === "info" ? "info" : "denied", select.value, note.value));
     row.appendChild(go);
-    row.appendChild(rvButton("Cancel", false, () => { rvOpen = ""; renderReviews(); }));
+    row.appendChild(adButton("Cancel", false, () => { rvOpen = item.id; renderAdminPeople(); }));
     panel.appendChild(title);
     panel.appendChild(select);
     panel.appendChild(note);
@@ -7405,113 +7643,145 @@
     return panel;
   }
 
-  function renderReviews() {
-    document.querySelectorAll("#rv-filter button").forEach((button) => {
-      button.classList.toggle("on", button.dataset.filter === rvFilter);
-      button.onclick = () => { rvFilter = button.dataset.filter; renderReviews(); };
-    });
-    const list = el("rv-list");
-    list.innerHTML = "";
-    const shown = rvItems.filter(rvMatches);
-    if (idState.role === "owner") shown.sort((a, b) => (b.last || 0) - (a.last || 0));
-    if (!shown.length) {
-      const empty = document.createElement("p");
-      empty.className = "note";
-      empty.textContent = rvItems.length ? "Nobody matches." : "Nobody yet.";
-      list.appendChild(empty);
-      return;
-    }
-    const iAm = idState.role;
-    shown.forEach((item) => {
+  function planPanel(item) {
+    const panel = document.createElement("div");
+    panel.className = "rv-panel";
+    const title = document.createElement("b");
+    title.textContent = "Give a plan";
+    const select = document.createElement("select");
+    select.className = "auth-input";
+    [["plus", "Plus"], ["premium", "Premium"], ["essentials", "Essentials"], ["free", "Free (remove)"]].forEach(([value, label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; select.appendChild(option); });
+    const days = document.createElement("input");
+    days.className = "auth-input";
+    days.inputMode = "numeric";
+    days.value = "30";
+    const row = document.createElement("div");
+    row.className = "quick-row";
+    const go = document.createElement("button");
+    go.className = "pill small";
+    go.textContent = "Confirm";
+    go.onclick = () => setPlanFor(item.id, select.value, Number(days.value) || 30);
+    row.appendChild(go);
+    row.appendChild(adButton("Cancel", false, () => { rvOpen = item.id; renderAdminPeople(); }));
+    panel.appendChild(title);
+    panel.appendChild(select);
+    panel.appendChild(days);
+    panel.appendChild(row);
+    return panel;
+  }
+
+  // Spencer's team: who is an admin, and exactly what each one may do.
+  function renderTeam() {
+    const host = el("ad-team");
+    host.innerHTML = "";
+    if (!isOwner()) { host.appendChild(Object.assign(document.createElement("p"), { className: "note", textContent: "Only Spencer can see this." })); return; }
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = "You always have every right. An admin has only what you tick here, and you can take any of it back at any time.";
+    host.appendChild(note);
+    const admins = rvItems.filter((item) => item.role === "admin");
+    if (!admins.length) host.appendChild(Object.assign(document.createElement("p"), { className: "note", textContent: "No admins yet. Add one below." }));
+    admins.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "p-card";
+      const head = document.createElement("div");
+      head.className = "p-head static";
+      head.innerHTML = '<span class="p-ava"></span><span class="p-main"><b></b><span class="p-mail"></span></span>';
+      head.querySelector(".p-ava").textContent = initialsOf(item);
+      head.querySelector("b").textContent = (item.details || {}).name || item.email.split("@")[0];
+      head.querySelector(".p-mail").textContent = item.email;
+      card.appendChild(head);
+      const rights = document.createElement("div");
+      rights.className = "rights";
+      const chosen = (item.rights || []).slice();
+      Object.keys(rvRightNames).forEach((right) => {
+        const label = document.createElement("label");
+        label.className = "right-row";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = chosen.indexOf(right) !== -1;
+        box.onchange = () => {
+          const at = chosen.indexOf(right);
+          if (box.checked && at === -1) chosen.push(right);
+          if (!box.checked && at !== -1) chosen.splice(at, 1);
+        };
+        const text = document.createElement("span");
+        text.textContent = rvRightNames[right];
+        label.appendChild(box);
+        label.appendChild(text);
+        rights.appendChild(label);
+      });
+      card.appendChild(rights);
       const row = document.createElement("div");
-      row.className = "rv-item" + (item.suspended ? " suspended" : "");
-      const d = item.details || {};
-      const head = document.createElement("b");
-      head.textContent = (d.name || item.email) + " · " + (ID_WORDS[item.decision] || ID_WORDS.none)[0] + (item.suspended ? " · Suspended" : "") + (item.role ? " · " + (item.role === "owner" ? "Owner" : "Admin") : "");
-      const who = document.createElement("span");
-      who.textContent = item.email + (d.street ? " · " + d.street + ", " + d.city + " " + d.state + " " + d.zip : "") + (d.phone ? " · " + d.phone : "");
-      const why = document.createElement("span");
-      why.textContent = (item.by === "owner" ? "ID decided by Spencer" : item.by === "admin" ? "ID decided by " + item.adminBy : item.by === "auto" ? "ID: automatic check" : "Has not started the ID check")
-        + (item.reason ? " · " + item.reason : "") + (item.hasDetails ? "" : " · no details yet");
-      row.appendChild(head);
-      row.appendChild(who);
-      row.appendChild(why);
-      if (idState.role === "owner" && item.devices) renderPersonExtras(row, item);
-      if (item.suspended) {
-        const sus = document.createElement("span");
-        sus.className = "rv-sus";
-        sus.textContent = "Suspended by " + (item.suspendBy === "ai" ? "the AI" : item.suspendBy === "owner" ? "Spencer" : item.suspendWho || "an admin") + " · " + item.suspendReason;
-        row.appendChild(sus);
-      }
-      // Spencer can act on anyone but himself; an admin cannot act on another admin or Spencer.
-      const locked = item.role === "owner" || (item.role === "admin" && iAm !== "owner");
-      if (locked) {
-        const lockNote = document.createElement("span");
-        lockNote.textContent = item.role === "owner" ? "The owner's account cannot be changed." : "Only Spencer can change an admin.";
-        row.appendChild(lockNote);
-      } else {
-        const actions = document.createElement("div");
-        actions.className = "quick-row";
-        actions.appendChild(rvButton("Approve", false, () => decideIdentity(item.id, "approved", "", "")));
-        actions.appendChild(rvButton("Deny…", true, () => { rvOpen = item.id + ":deny"; renderReviews(); }));
-        actions.appendChild(rvButton("Ask for info…", false, () => { rvOpen = item.id + ":info"; renderReviews(); }));
-        if (item.suspended) actions.appendChild(rvButton("Activate", false, () => suspendAccount(item.id, "activate", "", "")));
-        else actions.appendChild(rvButton("Suspend…", true, () => { rvOpen = item.id + ":suspend"; renderReviews(); }));
-        if (item.by === "owner" || item.by === "admin") actions.appendChild(rvButton("Undo ID decision", false, () => decideIdentity(item.id, "clear", "", "")));
-        if (item.suspendBy === "owner" || item.suspendBy === "admin") actions.appendChild(rvButton("Undo suspend decision", false, () => suspendAccount(item.id, "clear", "", "")));
-        if (idState.role === "owner") actions.appendChild(rvButton("Plan…", false, () => { rvOpen = item.id + ":plan"; renderReviews(); }));
-        row.appendChild(actions);
-        const parts = rvOpen.split(":");
-        if (parts[0] === item.id && rvReasons[parts[1]]) row.appendChild(rvPanel(item, parts[1]));
-        if (parts[0] === item.id && parts[1] === "plan") {
-          const panel = document.createElement("div");
-          panel.className = "rv-panel";
-          const title = document.createElement("b");
-          title.textContent = "Give a plan";
-          const select = document.createElement("select");
-          select.className = "auth-input";
-          [["plus", "Plus"], ["premium", "Premium"], ["essentials", "Essentials"], ["free", "Free (remove)"]].forEach(([value, label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; select.appendChild(option); });
-          const days = document.createElement("input");
-          days.className = "auth-input";
-          days.inputMode = "numeric";
-          days.value = "30";
-          days.placeholder = "Days";
-          const go = document.createElement("button");
-          go.className = "pill small";
-          go.textContent = "Confirm";
-          go.onclick = () => setPlanFor(item.id, select.value, Number(days.value) || 30);
-          panel.appendChild(title);
-          panel.appendChild(select);
-          panel.appendChild(days);
-          panel.appendChild(go);
-          row.appendChild(panel);
-        }
-      }
-      list.appendChild(row);
+      row.className = "quick-row";
+      const save = document.createElement("button");
+      save.className = "pill small";
+      save.textContent = "Save what they can do";
+      save.onclick = () => setRights(item.email, chosen);
+      row.appendChild(save);
+      row.appendChild(adButton("Remove admin", true, () => setRole(item.email, false)));
+      card.appendChild(row);
+      host.appendChild(card);
     });
+    const add = document.createElement("div");
+    add.className = "bg-edit";
+    const email = document.createElement("input");
+    email.className = "auth-input";
+    email.type = "email";
+    email.placeholder = "Email of the person to make an admin";
+    const go = document.createElement("button");
+    go.className = "pill small";
+    go.textContent = "Make admin";
+    go.onclick = () => setRole(email.value.trim().toLowerCase(), true);
+    add.appendChild(email);
+    add.appendChild(go);
+    host.appendChild(add);
   }
 
   const DECISION_WORDS = { approved: "Approved", denied: "Denied", info: "Asked for more information", clear: "Decision removed" };
 
-  async function reviewCall(path, body, okText) {
+  async function adminCall(path, body, okText) {
     el("rv-msg").textContent = "Saving…";
     const done = await call("POST", path, body);
-    if (done.status === 403 && done.body && done.body.error === "owner_decided") { el("rv-msg").textContent = "Spencer already decided this one. Only he can change it."; return; }
+    const error = done.body && done.body.error;
+    if (done.status === 403 && error === "owner_decided") { el("rv-msg").textContent = "Spencer already decided this one. Only he can change it."; return; }
+    if (done.status === 403 && error === "not_allowed") { el("rv-msg").textContent = "Spencer has not given you that right."; return; }
     if (done.status === 403) { el("rv-msg").textContent = "You cannot change that account."; return; }
-    if (done.status === 400) { el("rv-msg").textContent = "Pick a reason first."; return; }
+    if (done.status === 404) { el("rv-msg").textContent = "No account with that email."; return; }
+    if (done.status === 400) { el("rv-msg").textContent = error === "not_an_admin" ? "That person is not an admin." : "Pick a reason first."; return; }
     if (done.status !== 200) { el("rv-msg").textContent = "That did not go through. Try again."; return; }
     rvOpen = "";
-    await openReviews();
+    await loadAdmin();
     el("rv-msg").textContent = okText + ".";
     showPull(okText + ".");
   }
 
   function decideIdentity(userId, decision, reason, note) {
-    return reviewCall("/api/admin/identity/decide", { userId, decision, reason, note }, DECISION_WORDS[decision] || "Saved");
+    return adminCall("/api/admin/identity/decide", { userId, decision, reason, note }, DECISION_WORDS[decision] || "Saved");
   }
 
   function suspendAccount(userId, action, reason, note) {
-    return reviewCall("/api/admin/suspend", { userId, action, reason, note }, { suspend: "Suspended", activate: "Activated", clear: "Decision removed" }[action]);
+    return adminCall("/api/admin/suspend", { userId, action, reason, note }, { suspend: "Suspended", activate: "Activated", clear: "Decision removed" }[action]);
+  }
+
+  function setPlanFor(userId, tier, days) {
+    return adminCall("/api/admin/plan", { userId, tier, days }, tier === "free" ? "Plan removed" : SA.PLAN_NAMES[tier] + " given for " + days + " days");
+  }
+
+  function setRole(email, admin) {
+    if (!email) { el("rv-msg").textContent = "Enter an email."; return; }
+    return adminCall("/api/admin/role", { email, admin }, admin ? "Made an admin, able to review ID checks" : "Admin access removed");
+  }
+
+  function setRights(email, rights) {
+    return adminCall("/api/admin/rights", { email, rights }, rights.length ? "Saved what they can do" : "Took away every right");
+  }
+
+  function renderAdminEntry() {
+    const show2 = LIVE && !!idState.role;
+    document.querySelectorAll("[data-admin]").forEach((node) => { node.hidden = !show2; });
+    const sub = el("admin-sub");
+    if (sub) sub.textContent = isOwner() ? "Overview, people, and your team" : "The people you can review";
   }
 
   let liveShell = "";
@@ -8327,6 +8597,7 @@
         if (state.state !== "prompt") return;
       }
     } catch (error) {}
+    renderLocationAsk();
     document.getElementById("loc-ask").hidden = false;
   }
 
@@ -8606,6 +8877,25 @@
   }
 
   const placeOf = (point) => (point && Number.isFinite(point.lat) && Number.isFinite(point.lon) ? { lat: point.lat, lon: point.lon } : null);
+
+  // Google Play asks for this in the app, in plain words, before the system prompt appears.
+  function renderLocationAsk() {
+    const body = document.getElementById("loc-ask-body");
+    const list = document.getElementById("loc-ask-list");
+    if (!body || !list) return;
+    const background = !!bgPlugin();
+    body.textContent = "This happens only after you tap Start drive, and stops when you tap End drive. It is never collected when no drive is running, and it is never sold or shared.";
+    const points = [
+      "What it records: the route you take, where the drive started and ended, and the distance.",
+      "What it is for: the mileage log saved with that drive\u2019s expense, for your own records and taxes.",
+      background
+        ? "It keeps recording in the background, with the screen off or another app open, so a drive is not cut short. Your phone shows a notification the whole time."
+        : "On the web it only records while this page is open.",
+      "You can pause a drive for breaks, and delete any drive afterwards."
+    ];
+    list.innerHTML = "";
+    points.forEach((text) => { const item = document.createElement("li"); item.textContent = text; list.appendChild(item); });
+  }
 
   function renderDriveMap(drive) {
     const host = document.getElementById("drive-map");
@@ -8893,7 +9183,7 @@
   function renderAll() {
     runAutopilot();
     try { renderSharingRow(); } catch (error) {}
-    try { renderPlanRow(); renderUpsellCard(); renderPaywall(); } catch (error) {}
+    try { renderPlanRow(); renderUpsellCard(); renderPaywall(); renderAdminEntry(); } catch (error) {}
     try { renderCategoryChoices(); } catch (error) {}
     try { renderChecks(); } catch (error) {}
     renderAccountChrome();
