@@ -1250,6 +1250,9 @@
           <div class="auth-card acct-view" data-view="reviews">
             <h2 class="auth-title">Identity reviews</h2>
             <p class="auth-sub" id="rv-report">Loading&hellip;</p>
+            <label class="auth-label" for="rv-email">Approve or deny by email</label>
+            <input class="auth-input" id="rv-email" type="email" autocomplete="off" placeholder="reviewer@example.com">
+            <div class="quick-row"><button class="pill small" onclick="decideByEmail('approved')">Approve</button><button class="pill-outline small danger-link" onclick="decideByEmail('denied')">Deny</button></div>
             <div id="rv-list"></div>
             <button class="btn-secondary" onclick="setAcctView('home')">Back</button>
             <p class="auth-msg" id="rv-msg" role="alert"></p>
@@ -6198,7 +6201,7 @@
       const who = document.createElement("span");
       who.textContent = item.email + (d.street ? " · " + d.street + ", " + d.city + " " + d.state + " " + d.zip : "");
       const why = document.createElement("span");
-      why.textContent = (item.by === "owner" ? "Decided by Spencer" : item.by === "admin" ? "Decided by " + item.adminBy : "Automatic check") + (item.note ? " · " + item.note : "");
+      why.textContent = (item.by === "owner" ? "Decided by Spencer" : item.by === "admin" ? "Decided by " + item.adminBy : item.by === "auto" ? "Automatic check" : "Has not started the ID check") + (item.note ? " · " + item.note : "") + (item.hasDetails ? "" : " · no details yet");
       const actions = document.createElement("div");
       actions.className = "quick-row";
       [["approved", "Approve"], ["denied", "Deny"], ["clear", "Undo decision"]].forEach(([value, label]) => {
@@ -6216,11 +6219,23 @@
     });
   }
 
-  async function decideIdentity(userId, decision) {
-    const done = await call("POST", "/api/admin/identity/decide", { userId, decision });
+  const DECISION_WORDS = { approved: "Approved", denied: "Denied", clear: "Decision removed" };
+
+  async function decideIdentity(userId, decision, email) {
+    el("rv-msg").textContent = "Saving…";
+    const done = await call("POST", "/api/admin/identity/decide", email ? { email, decision } : { userId, decision });
     if (done.status === 403 && done.body && done.body.error === "owner_decided") { el("rv-msg").textContent = "Spencer already decided this one. Only he can change it."; return; }
+    if (done.status === 404) { el("rv-msg").textContent = "No account with that email."; return; }
     if (done.status !== 200) { el("rv-msg").textContent = "That did not go through. Try again."; return; }
-    openReviews();
+    await openReviews();
+    el("rv-msg").textContent = (DECISION_WORDS[decision] || "Saved") + (email ? " " + email : "") + ".";
+    showPull((DECISION_WORDS[decision] || "Saved") + ".");
+  }
+
+  function decideByEmail(decision) {
+    const email = el("rv-email").value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el("rv-msg").textContent = "Enter the person's email first."; return; }
+    decideIdentity("", decision, email);
   }
 
   let liveShell = "";
