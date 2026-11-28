@@ -677,6 +677,58 @@
   .shutter { width: 74px; height: 74px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); cursor: pointer; }
   .shutter:active { transform: scale(.94); }
   .shutter.armed { border-color: var(--lime); background: rgba(180,255,106,.35); }
+  .dt-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+  .rv-item { border: 1px solid var(--line, #ddd); border-radius: 14px; padding: 12px; margin: 10px 0; }
+  .rv-item b { display: block; }
+  .rv-item span { display: block; font-size: 13px; opacity: .8; margin-top: 2px; }
+  .rv-item .quick-row { margin-top: 8px; }
+  .smap { position: relative; height: 240px; margin-top: 12px; border-radius: 16px; overflow: hidden; background: #e8eaed; touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+  .smap.big { height: min(58vh, 520px); }
+  .smap .tiles, .smap svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  .smap .tiles img { position: absolute; width: 256px; height: 256px; max-width: none; pointer-events: none; }
+  .smap svg { pointer-events: none; overflow: visible; }
+  .smap .route-under { fill: none; stroke: #1559c1; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+  .smap .route { fill: none; stroke: #4285f4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  .smap .pin-start { fill: #34a853; stroke: #fff; stroke-width: 3; }
+  .smap .pin-end { fill: #ea4335; stroke: #fff; stroke-width: 3; }
+  .smap .here-halo { fill: rgba(66,133,244,.22); animation: here-pulse 2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  .smap .here { fill: #4285f4; stroke: #fff; stroke-width: 3; }
+  @keyframes here-pulse { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+  .smap .ctl { position: absolute; right: 10px; bottom: 26px; display: flex; flex-direction: column; gap: 8px; }
+  .smap .ctl button { width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; color: #3c4043; font-size: 22px; line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.3); cursor: pointer; display: grid; place-items: center; }
+  .smap .ctl button svg { width: 20px; height: 20px; stroke: #4285f4; fill: none; stroke-width: 2.2; position: static; }
+  .smap .credit { position: absolute; right: 0; bottom: 0; font: 10px/1.4 sans-serif; padding: 1px 6px; background: rgba(255,255,255,.8); color: #333; }
+  .smap .credit a { color: inherit; }
+  .nav-apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  .nav-app { display: block; padding: 10px 8px; border-radius: 14px; border: 1px solid rgba(127,127,127,.3); background: var(--paper, #fff); color: inherit; font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
+  .nav-app b { display: block; font-size: 14px; }
+  .nav-app span { display: block; font-size: 12px; opacity: .7; }
+  .tap-card { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; position: relative; }
+  .tap-card .tap-more { position: absolute; right: 14px; top: 14px; font-size: 12px; font-weight: 700; opacity: .65; }
+  .tap-card:active { transform: scale(.985); }
+  .chart { display: flex; align-items: flex-end; gap: 8px; height: 150px; margin: 14px 0 4px; padding-top: 8px; }
+  .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+  .chart .pair { flex: 1; width: 100%; display: flex; align-items: flex-end; gap: 3px; border-radius: 8px; padding: 0 2px; }
+  .chart .col.on .pair { background: rgba(127,127,127,.12); }
+  .chart .b-in, .chart .b-out { flex: 1; border-radius: 6px 6px 0 0; min-height: 2px; transition: height .35s cubic-bezier(.2,.8,.2,1); }
+  .chart .b-in { background: linear-gradient(180deg, var(--mint, #7fd6a8), var(--spruce, #1f6b4f)); }
+  .chart .b-out { background: linear-gradient(180deg, #ffb3a1, #d4573b); }
+  .chart .lab { font-size: 11px; opacity: .75; }
+  .chart-read { font-size: 13px; text-align: center; margin: 4px 0 12px; opacity: .85; }
+  .in-change { margin: 4px 0 0; font-weight: 700; }
+  .in-change.up { color: #2fa36b; } .in-change.down { color: #d4573b; }
+  .in-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; width: 100%; text-align: left; padding: 10px 0; border: 0; border-bottom: 1px solid rgba(127,127,127,.2); background: none; font: inherit; color: inherit; cursor: pointer; }
+  .in-row .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(127,127,127,.18); overflow: hidden; }
+  .in-row .bar i { display: block; height: 100%; background: var(--spruce, #1f6b4f); border-radius: 3px; }
+  .in-row small { grid-column: 1 / -1; opacity: .7; }
+  .in-list { margin: 4px 0 10px; }
+  .ask-box { display: flex; gap: 8px; margin: 10px 0; }
+  .ask-box input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 999px; border: 1px solid rgba(127,127,127,.35); font: inherit; background: var(--paper, #fff); color: inherit; }
+  .check-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
+  .check-row i { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; background: #2fa36b; }
+  .check-row.check i { background: #e0a100; }
+  .check-row b { display: block; }
+  .check-row span { font-size: 13px; opacity: .8; }
   .cam-type { display: block; margin: 0 auto 10px; padding: 8px 16px; border: 0; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; font: inherit; font-size: 14px; }
   .cam-auto { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: #fff; font-size: 13px; font-weight: 600; }
   .cam-auto input { accent-color: var(--lime); width: 18px; height: 18px; }
@@ -971,7 +1023,7 @@
         <div class="dash">
           <button class="card" onclick="showFiltered('overdue')"><span class="note">Overdue</span><strong id="card-overdue">1</strong><p>Tap to open</p></button>
           <button class="card" onclick="showFiltered('draft')"><span class="note">Drafts</span><strong id="card-drafts">1</strong><p>Not sent yet</p></button>
-          <button class="card" onclick="show('money')"><span class="note">Money out</span><strong id="card-out">$420.00</strong><p>Matches expenses</p></button>
+          <button class="card" onclick="openInsight('out')"><span class="note">Money out</span><strong id="card-out">$420.00</strong><p>Tap for details</p></button>
           <button class="card" onclick="show('banks')"><span class="note">Linked</span><strong id="card-linked">2</strong><p>Bank and card</p></button>
         </div>
         <div class="section-label">Recent</div>
@@ -1163,12 +1215,44 @@
               <button class="btn-primary" onclick="syncNow(true)"><span class="spinner"></span><span class="btn-label">Sync now</span></button>
               <button class="btn-secondary" onclick="signOut()">Sign out</button>
             </div>
+            <div class="acct-section">You</div>
+            <div class="acct-item"><div><b>Your details <span class="badge off" id="details-badge">Needed</span></b><span id="details-sub">Your legal name, home address, and phone. Needed before banking.</span></div><button class="btn-small" onclick="openDetails()">Edit</button></div>
+            <div class="acct-item"><div><b>Identity <span class="badge off" id="idv-badge">Not checked</span></b><span id="idv-sub">Joining is free. To link a bank or card, check your ID once: a photo of your driver&rsquo;s license and a selfie, handled by Plaid. Simple Accountz never stores your license.</span></div><button class="btn-small" id="idv-btn" onclick="startIdentity()">Verify</button></div>
+            <div class="acct-item" id="reviews-row" hidden><div><b>Identity reviews</b><span id="reviews-sub">Approve or deny people the automatic check could not settle.</span></div><button class="btn-small" onclick="openReviews()">Open</button></div>
             <div class="acct-section">Security</div>
             <div class="acct-item"><div><b>2-step sign-in <span class="badge off" id="totp-badge">Off</span></b><span id="totp-sub">Use an authenticator app for codes, and to reset a forgotten password.</span></div><button class="btn-small" id="totp-btn" onclick="toggleTotp()">Turn on</button></div>
             <div class="acct-item"><div><b>Sign in on another device</b><span>Show a QR code and scan it with the other phone or computer's camera. It works once, for 2 minutes.</span></div><button class="btn-small" onclick="showLoginQr()">Show QR</button></div>
             <div class="acct-item"><div><b>Password</b><span>Changing it signs you out on other devices.</span></div><button class="btn-small" onclick="askConfirm('change')">Change</button></div>
             <div class="acct-item"><div><b>Delete account</b><span>Removes your account and its cloud copy for good.</span></div><button class="btn-small danger" onclick="askConfirm('delete')">Delete</button></div>
             <p class="auth-msg" id="acct-msg" role="alert"></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="details">
+            <h2 class="auth-title">Your details</h2>
+            <p class="auth-sub">Use your legal name and the home address on your driver&rsquo;s license. The ID check compares them.</p>
+            <label class="auth-label" for="dt-name">Legal name</label>
+            <input class="auth-input" id="dt-name" autocomplete="name" maxlength="100" placeholder="First and last name">
+            <label class="auth-label" for="dt-street">Street address</label>
+            <input class="auth-input" id="dt-street" autocomplete="address-line1" maxlength="120" placeholder="1800 Market St">
+            <label class="auth-label" for="dt-city">City</label>
+            <input class="auth-input" id="dt-city" autocomplete="address-level2" maxlength="60">
+            <div class="dt-row">
+              <div><label class="auth-label" for="dt-state">State</label><input class="auth-input" id="dt-state" autocomplete="address-level1" maxlength="2" placeholder="PA"></div>
+              <div><label class="auth-label" for="dt-zip">ZIP</label><input class="auth-input" id="dt-zip" autocomplete="postal-code" inputmode="numeric" maxlength="10"></div>
+            </div>
+            <label class="auth-label" for="dt-phone">Phone</label>
+            <input class="auth-input" id="dt-phone" autocomplete="tel" inputmode="tel" maxlength="20">
+            <button class="btn-primary" id="dt-go" onclick="saveDetails()"><span class="spinner"></span><span class="btn-label">Save details</span></button>
+            <button class="btn-secondary" onclick="setAcctView('home')">Back</button>
+            <p class="auth-msg" id="dt-msg" role="alert"></p>
+          </div>
+
+          <div class="auth-card acct-view" data-view="reviews">
+            <h2 class="auth-title">Identity reviews</h2>
+            <p class="auth-sub" id="rv-report">Loading&hellip;</p>
+            <div id="rv-list"></div>
+            <button class="btn-secondary" onclick="setAcctView('home')">Back</button>
+            <p class="auth-msg" id="rv-msg" role="alert"></p>
           </div>
 
           <div class="auth-card acct-view" data-view="totp-setup">
@@ -1373,10 +1457,10 @@
           <span class="amt">2</span>
           <span class="sub" id="linked-summary">Harbor Checking · City Card •••• 1884</span>
         </button>
-        <div class="card"><h3 id="money-in">$1,640.00 in</h3><p id="money-in-note">Card and check payments this month</p></div>
-        <div class="card"><h3 id="money-out">$420.00 out</h3><p>Expenses in USD only</p></div>
-        <div class="card"><h3 id="money-profit">$1,220.00 rough profit</h3><p>Calculated from dated payments and expenses. Not a full ledger.</p></div>
-        <div class="card" id="forecast-card"><h3 id="forecast-net">Next 30 days</h3><p id="forecast-note">Open invoices coming in, minus what you usually spend.</p></div>
+        <button class="card tap-card" onclick="openInsight('in')"><h3 id="money-in">$1,640.00 in</h3><p id="money-in-note">Card and check payments this month</p><span class="tap-more">Details &rsaquo;</span></button>
+        <button class="card tap-card" onclick="openInsight('out')"><h3 id="money-out">$420.00 out</h3><p>Expenses in USD only</p><span class="tap-more">Details &rsaquo;</span></button>
+        <button class="card tap-card" onclick="openInsight('profit')"><h3 id="money-profit">$1,220.00 rough profit</h3><p>Calculated from dated payments and expenses. Not a full ledger.</p><span class="tap-more">Details &rsaquo;</span></button>
+        <button class="card tap-card" id="forecast-card" onclick="openInsight('forecast')"><h3 id="forecast-net">Next 30 days</h3><p id="forecast-note">Open invoices coming in, minus what you usually spend.</p><span class="tap-more">Details &rsaquo;</span></button>
         <div class="quick-row">
           <button class="pill-outline small" onclick="beginMileage()">Drives</button>
           <button class="pill-outline small" onclick="openTimer()">Job timer</button>
@@ -1499,18 +1583,11 @@
           <button class="on" data-period="month">This month</button>
           <button data-period="year">Year</button>
         </div>
-        <div class="bars" aria-hidden="true">
-          <div style="height:40%"></div>
-          <div class="alt" style="height:55%"></div>
-          <div style="height:70%"></div>
-          <div class="alt" style="height:48%"></div>
-          <div style="height:90%"></div>
-          <div class="alt" style="height:62%"></div>
-        </div>
-        <div class="axis"><span>Jun</span><span>Nov</span></div>
-        <div class="card"><h3>Top client</h3><p id="report-top">Maria Chen · $2,430 viewed, not yet paid</p></div>
-        <div class="card"><h3 id="report-income">$1,640.00 in</h3><p id="report-expense">Expenses in this period</p></div>
-        <div class="card"><h3>Tax collected</h3><p id="report-tax">$0.00 this month</p></div>
+        <div class="chart" id="report-chart" role="group" aria-label="Money in and out, last 6 months"></div>
+        <p class="chart-read" id="report-chart-read">Tap a month to see its numbers.</p>
+        <button class="card tap-card" onclick="openInsight('clients')"><h3>Top client</h3><p id="report-top">Maria Chen · $2,430 viewed, not yet paid</p><span class="tap-more">Details &rsaquo;</span></button>
+        <button class="card tap-card" onclick="openInsight('profit')"><h3 id="report-income">$1,640.00 in</h3><p id="report-expense">Expenses in this period</p><span class="tap-more">Details &rsaquo;</span></button>
+        <button class="card tap-card" onclick="openInsight('tax')"><h3>Tax collected</h3><p id="report-tax">$0.00 this month</p><span class="tap-more">Details &rsaquo;</span></button>
         <p class="note" id="report-export-note"></p>
         <div class="section-label">Use with other accounting software</div>
         <p class="note">Import these into QuickBooks, Xero, Sage, Wave, FreshBooks, Zoho Books, or MYOB. They cover the period picked above.</p>
@@ -1577,6 +1654,7 @@
         <button class="set-row live-only" onclick="eraseBooks()"><span class="name">Erase data on this device</span><span class="sub">Removes every invoice, expense, and file saved here</span></button>
         <button class="set-row"><span class="name">Your language</span><span class="sub">English · does not change the customer invoice</span></button>
         <button class="preview-only set-row"><span class="name">Support</span><span class="sub">Chat and email</span></button>
+        <p class="note company-note" id="company-note">Simple Accountz is made by SJM Enterprises · 1800 Market St, Philadelphia, PA 19103 · <a href="tel:+12156642407">(215) 664-2407</a> · <a href="support.html" target="_blank" rel="noopener">Support</a></p>
       </section>
 
       <section class="screen no-tabs" id="payments">
@@ -1635,7 +1713,13 @@
       <section class="screen no-tabs" id="mileage">
         <button class="back" onclick="show('money')">Back</button>
         <h2 class="title">Drives</h2>
-        <div class="card" id="drive-card"><h3 class="timer-clock" id="drive-distance">0.0 mi</h3><p id="drive-state">Tap Start when you set off. Keep Simple Accountz open while you drive; it tracks the route and distance by GPS and files the trip when you tap End.</p><svg class="route-svg" id="drive-route" viewBox="0 0 320 140" role="img" aria-label="Map of this drive" hidden></svg></div>
+        <div class="card" id="drive-card"><h3 class="timer-clock" id="drive-distance">0.0 mi</h3><p id="drive-state">Tap Start when you set off. Keep Simple Accountz open while you drive; it tracks the route and distance by GPS and files the trip when you tap End.</p><div class="smap" id="drive-map" hidden></div></div>
+        <div class="field"><label for="drive-dest">Where to? (optional)</label><input id="drive-dest" maxlength="200" placeholder="Address or place" autocomplete="street-address"></div>
+        <div class="nav-apps" aria-label="Get directions in">
+          <button class="nav-app" onclick="openNav('apple')"><b>Apple Maps</b><span>Directions</span></button>
+          <button class="nav-app" onclick="openNav('google')"><b>Google Maps</b><span>Directions</span></button>
+          <button class="nav-app" onclick="openNav('waze')"><b>Waze</b><span>Directions</span></button>
+        </div>
         <div class="stack-btns">
           <button class="pill" id="drive-toggle" onclick="toggleDrive()">Start drive</button>
           <button class="pill-outline" id="drive-pause" onclick="toggleDrivePause()" hidden>Pause for a break</button>
@@ -1803,6 +1887,32 @@
         <button class="textlink" onclick="show('locked')">Preview a lockout</button>
       </section>
 
+      <section class="screen no-tabs" id="drive-view">
+        <button class="back" onclick="show('mileage')">Back</button>
+        <h2 class="title" id="dv2-title">Drive</h2>
+        <div class="smap big" id="dv2-map"></div>
+        <div class="card"><h3 id="dv2-miles"></h3><p id="dv2-sub"></p></div>
+        <div class="nav-apps" aria-label="Open this drive in">
+          <a class="nav-app" id="dv2-apple" target="_blank" rel="noopener"><b>Apple Maps</b><span>Open route</span></a>
+          <a class="nav-app" id="dv2-google" target="_blank" rel="noopener"><b>Google Maps</b><span>Open route</span></a>
+          <a class="nav-app" id="dv2-waze" target="_blank" rel="noopener"><b>Waze</b><span>Go to the end</span></a>
+        </div>
+      </section>
+
+      <section class="screen no-tabs" id="insight">
+        <button class="back" onclick="backFromInsight()">Back</button>
+        <h2 class="title" id="in-title">Details</h2>
+        <div class="seg lime" id="in-period">
+          <button data-period="last_month">Last month</button>
+          <button class="on" data-period="month">This month</button>
+          <button data-period="year">Year</button>
+        </div>
+        <div class="hero in-hero"><div class="kicker" id="in-kicker"></div><p class="amount" id="in-amount"></p><p class="in-change" id="in-change"></p></div>
+        <div class="chart" id="in-chart" role="group" aria-label="Last 6 months"></div>
+        <p class="chart-read" id="in-chart-read">Tap a month to see its numbers.</p>
+        <div id="in-body"></div>
+      </section>
+
       <section class="screen no-tabs" id="recovery-qr">
         <button class="back" onclick="show('security')">Back</button>
         <h2 class="title">Recovery QR</h2>
@@ -1846,6 +1956,19 @@
         <button class="suggest biz-only preview-only" onclick="ask('deposit')">Request a 25% deposit</button>
         <button class="suggest biz-only" onclick="ask('weekly')">Who owes you this week</button>
         <div id="ai-action"></div>
+        <div class="section-label">Ask about your books</div>
+        <form class="ask-box" onsubmit="event.preventDefault(); askBooks(document.getElementById('ask-input').value)">
+          <input id="ask-input" maxlength="200" placeholder="How is my business doing this month?" aria-label="Ask about your books">
+          <button class="pill small" type="submit">Ask</button>
+        </form>
+        <button class="suggest" onclick="askBooks('How is my business doing this month?')">How&rsquo;s business?</button>
+        <button class="suggest" onclick="askBooks('Check my books for mistakes')">Check my books</button>
+        <button class="suggest" onclick="askBooks('What did I spend on this month?')">Spending by category</button>
+        <button class="suggest" onclick="askBooks('Who are my top clients this year?')">Top clients</button>
+        <button class="suggest" onclick="askBooks('Check my account balances')">Account balances</button>
+        <button class="suggest" onclick="askBooks('Mileage this year')">Miles this year</button>
+        <div class="section-label">What I checked for you</div>
+        <div id="ai-checks"></div>
       </section>
 
       <nav class="tabs" id="tabs">
@@ -2341,6 +2464,9 @@
     // yourself, it would also wipe your change, so it goes away.
     if (autoUndo && (docs !== autoUndo.afterDocs || transactions !== autoUndo.afterTx)) autoUndo = null;
     if (!autoMode) { autoWaiting = []; return; }
+    // Every expense gets a category, so reports and taxes are right. One the owner set is never changed.
+    const sorted = SA.categorizeExpenses(transactions);
+    if (sorted.changed) transactions = sorted.transactions;
     const result = SA.autopilot(docs, transactions, SA.LEDGER_TODAY, {
       kind: accountKind,
       weeklySent: !!(weeklyNote && weeklyNote.sent),
@@ -3296,6 +3422,216 @@
     renderTaxes();
   }
 
+  // ---- Card details ----
+  let insightKind = "profit";
+  let insightPeriod = "month";
+  let insightFrom = "money";
+  const INSIGHT_TITLES = { in: "Money in", out: "Money out", profit: "Rough profit", forecast: "Next 30 days", tax: "Tax collected", clients: "Clients" };
+
+  function openInsight(kind) {
+    insightKind = INSIGHT_TITLES[kind] ? kind : "profit";
+    const current = document.querySelector(".screen.on");
+    insightFrom = current && current.id !== "insight" ? current.id : insightFrom;
+    insightPeriod = insightFrom === "reports" ? reportPeriod : moneyPeriod;
+    show("insight");
+    renderInsight();
+  }
+
+  function backFromInsight() { show(insightFrom || "money"); }
+
+  // A six-month chart: tap a month to read it.
+  function drawChart(host, months, readId, pick) {
+    if (!host) return;
+    host.innerHTML = "";
+    const top = Math.max(1, Math.max.apply(null, months.map((m) => Math.max(m.inMinor, m.outMinor))));
+    months.forEach((m, index) => {
+      const col = document.createElement("button");
+      col.type = "button";
+      col.className = "col";
+      col.setAttribute("aria-label", m.label + ": " + SA.formatMoney(m.inMinor, businessCurrency) + " in, " + SA.formatMoney(m.outMinor, businessCurrency) + " out");
+      col.innerHTML = '<span class="pair"><i class="b-in"></i><i class="b-out"></i></span><span class="lab"></span>';
+      col.querySelector(".b-in").style.height = Math.max(1, Math.round(m.inMinor / top * 100)) + "%";
+      col.querySelector(".b-out").style.height = Math.max(1, Math.round(m.outMinor / top * 100)) + "%";
+      col.querySelector(".lab").textContent = m.label;
+      col.onclick = () => {
+        host.querySelectorAll(".col").forEach((node) => node.classList.remove("on"));
+        col.classList.add("on");
+        const read = document.getElementById(readId);
+        if (read) read.textContent = m.label + ": " + SA.formatMoney(m.inMinor, businessCurrency) + " in · " + SA.formatMoney(m.outMinor, businessCurrency) + " out · " + SA.formatMoney(m.profitMinor, businessCurrency) + " profit";
+      };
+      host.appendChild(col);
+      if (index === pick) col.onclick();
+    });
+  }
+
+  function insightRows(host, rows, total, onTap) {
+    rows.forEach((row) => {
+      const button = document.createElement("button");
+      button.className = "in-row";
+      button.innerHTML = '<span class="n"></span><b class="v"></b><span class="bar"><i></i></span><small></small>';
+      button.querySelector(".n").textContent = row.name;
+      button.querySelector(".v").textContent = SA.formatMoney(row.minor, businessCurrency);
+      button.querySelector(".bar i").style.width = Math.max(2, total ? Math.round(row.minor / total * 100) : 0) + "%";
+      button.querySelector("small").textContent = row.share + "% · " + row.count + (row.count === 1 ? " item" : " items");
+      if (onTap) button.onclick = () => onTap(row);
+      host.appendChild(button);
+    });
+  }
+
+  function txRows(host, list) {
+    list.forEach((tx) => {
+      const button = document.createElement("button");
+      button.className = "exp";
+      button.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+      button.querySelector(".name").textContent = tx.name;
+      button.querySelector(".amt").textContent = SA.formatMoney(tx.amountMinor, tx.currency);
+      button.querySelector(".sub").textContent = shortDate(tx.date) + (tx.category ? " · " + tx.category : "");
+      if (tx.kind === "out") button.onclick = () => openSavedExpense(tx);
+      host.appendChild(button);
+    });
+  }
+
+  function renderInsight() {
+    document.querySelectorAll("#in-period button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.period === insightPeriod);
+      button.onclick = () => { insightPeriod = button.dataset.period; renderInsight(); };
+    });
+    const b = SA.periodBreakdown(transactions, insightPeriod, SA.LEDGER_TODAY, businessCurrency);
+    if (!b) return;
+    const kind = insightKind;
+    const money = (minor) => SA.formatMoney(minor, businessCurrency);
+    document.getElementById("in-title").textContent = INSIGHT_TITLES[kind];
+    document.getElementById("in-period").hidden = kind === "forecast";
+    const body = document.getElementById("in-body");
+    body.innerHTML = "";
+    const label = (text) => { const node = document.createElement("div"); node.className = "section-label"; node.textContent = text; body.appendChild(node); };
+    const note = (text) => { const node = document.createElement("p"); node.className = "note"; node.textContent = text; body.appendChild(node); };
+    const change = document.getElementById("in-change");
+    const pct = b.change ? b.change[kind === "in" ? "in" : kind === "out" ? "out" : "profit"] : null;
+    const goodUp = kind !== "out";
+    change.className = "in-change" + (pct ? ((pct > 0) === goodUp ? " up" : " down") : "");
+    change.textContent = b.prev ? (pct == null ? "New this period" : pct === 0 ? "Same as the period before" : (pct > 0 ? "▲ " : "▼ ") + Math.abs(pct) + "% vs " + shortDate(b.prevStart) + "–" + shortDate(b.prevEnd)) : "";
+    document.getElementById("in-kicker").textContent = shortDate(b.start) + " – " + shortDate(b.end);
+    drawChart(document.getElementById("in-chart"), b.months, "in-chart-read", b.months.length - 1);
+    const expenses = transactions.filter((tx) => tx.kind === "out" && tx.currency === businessCurrency && tx.date >= b.start && tx.date <= b.end);
+    if (kind === "profit") {
+      document.getElementById("in-amount").textContent = money(b.profitMinor);
+      label("How it adds up");
+      insightRows(body, [
+        { name: "Money in", minor: b.inMinor, share: 100, count: b.counts.in },
+        { name: "Money out", minor: b.outMinor, share: b.inMinor ? Math.round(b.outMinor / b.inMinor * 1000) / 10 : 0, count: b.counts.out }
+      ], Math.max(b.inMinor, b.outMinor), (row) => openInsight(row.name === "Money in" ? "in" : "out"));
+      if (b.marginPct != null) note("Profit margin " + b.marginPct + "%: you keep " + b.marginPct + " cents of each dollar that comes in.");
+      if (b.taxMinor) note(money(b.taxMinor) + " of the money in is tax you collected. Set it aside; it is not profit.");
+      if (b.mileage.drives) note(b.mileage.drives + " drive" + (b.mileage.drives === 1 ? "" : "s") + " count for " + money(b.mileage.minor) + " of the costs.");
+      label("Biggest costs");
+      insightRows(body, b.byCategory.slice(0, 6), b.outMinor, (row) => { insightKind = "out"; renderInsight(); });
+      note("Rough profit is money in minus money out for dated payments and expenses. It is not a full ledger or a tax figure.");
+    } else if (kind === "in" || kind === "clients") {
+      document.getElementById("in-amount").textContent = money(b.inMinor);
+      label(kind === "clients" ? "Who paid you" : "Where it came from");
+      insightRows(body, b.byPayer.slice(0, 10), b.inMinor, null);
+      if (!b.byPayer.length) note("No payments in this period yet.");
+      label("Largest payments");
+      txRows(body, b.biggestIn);
+      const open = docs.filter((doc) => SA.isOpenInvoice(doc));
+      if (open.length) note(open.length + " invoice" + (open.length === 1 ? " is" : "s are") + " still open for " + SA.formatOutstanding(open) + ".");
+    } else if (kind === "out") {
+      document.getElementById("in-amount").textContent = money(b.outMinor);
+      label("By category · tap one to see its expenses");
+      const list = document.createElement("div");
+      list.className = "in-list";
+      insightRows(body, b.byCategory, b.outMinor, (row) => {
+        list.innerHTML = "";
+        txRows(list, expenses.filter((tx) => (tx.category || (tx.mileage ? "Mileage" : SA.guessCategory(tx.name)) || "Uncategorized") === row.name));
+        list.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+      body.appendChild(list);
+      if (!b.byCategory.length) note("No expenses in this period.");
+      label("Largest expenses");
+      txRows(body, b.biggestOut);
+    } else if (kind === "tax") {
+      document.getElementById("in-amount").textContent = money(b.taxMinor);
+      note("Tax collected on payments received in this period. Keep it apart from profit: it is owed to the tax office.");
+      label("Payments with tax");
+      txRows(body, transactions.filter((tx) => tx.kind === "in" && tx.taxMinor && tx.currency === businessCurrency && tx.date >= b.start && tx.date <= b.end));
+    } else if (kind === "forecast") {
+      const net = document.getElementById("forecast-net").textContent;
+      document.getElementById("in-amount").textContent = net;
+      document.getElementById("in-kicker").textContent = "Next 30 days";
+      change.textContent = "";
+      note(document.getElementById("forecast-note").textContent);
+      label("Invoices coming in");
+      const open = docs.filter((doc) => SA.isOpenInvoice(doc)).sort((x, y) => (x.due < y.due ? -1 : 1));
+      open.forEach((doc) => {
+        const button = document.createElement("button");
+        button.className = "exp";
+        button.innerHTML = '<span class="name"></span><span class="amt"></span><span class="sub"></span>';
+        button.querySelector(".name").textContent = doc.name + (doc.number ? " · " + doc.number : "");
+        button.querySelector(".amt").textContent = SA.formatMoney(SA.balanceOf(doc), doc.currency);
+        button.querySelector(".sub").textContent = doc.due ? "Due " + shortDate(doc.due) : "No due date";
+        body.appendChild(button);
+      });
+      if (!open.length) note("No open invoices.");
+    }
+  }
+
+  // ---- Ask about your books, and the assistant's own checks ----
+  function bookState() {
+    return { transactions, docs, today: SA.LEDGER_TODAY, currency: businessCurrency, bankItems: (bankState && bankState.items) || [] };
+  }
+
+  function askBooks(question) {
+    const q = String(question || "").trim();
+    if (!q) return;
+    const answer = SA.answerReport(q, bookState());
+    assistantStarted = true;
+    show("assistant");
+    const thread = document.getElementById("thread");
+    thread.innerHTML = "";
+    const user = document.createElement("div");
+    user.className = "bubble user";
+    user.textContent = q;
+    const ai = document.createElement("div");
+    ai.className = "bubble ai";
+    ai.textContent = answer.title + "\n" + answer.lines.join("\n");
+    thread.appendChild(user);
+    thread.appendChild(ai);
+    const slot = document.getElementById("ai-action");
+    slot.innerHTML = "";
+    const more = { profit: "profit", income: "in", expenses: "out", categories: "out", clients: "clients", tax: "tax" }[answer.intent];
+    if (more) {
+      const open = document.createElement("button");
+      open.className = "pill small";
+      open.textContent = "See the details";
+      open.onclick = () => { insightFrom = "assistant"; insightKind = more; insightPeriod = answer.period === "week" ? "month" : answer.period; show("insight"); renderInsight(); };
+      slot.appendChild(open);
+    }
+    const input = document.getElementById("ask-input");
+    if (input) input.value = "";
+  }
+
+  function renderChecks() {
+    const host = document.getElementById("ai-checks");
+    if (!host) return;
+    host.innerHTML = "";
+    SA.auditBooks(bookState()).forEach((row) => {
+      const item = document.createElement("div");
+      item.className = "check-row " + row.level;
+      item.innerHTML = "<i></i><div><b></b><span></span></div>";
+      item.querySelector("b").textContent = row.title;
+      item.querySelector("span").textContent = row.detail;
+      if (row.fix === "categorize") {
+        const fix = document.createElement("button");
+        fix.className = "pill-outline small";
+        fix.textContent = "Sort them";
+        fix.onclick = () => { transactions = SA.categorizeExpenses(transactions).transactions; renderAll(); showPull("Expenses sorted into categories."); };
+        item.querySelector("div").appendChild(fix);
+      }
+      host.appendChild(item);
+    });
+  }
+
   function renderReports() {
     document.querySelectorAll("#report-period button").forEach((button) => {
       button.classList.toggle("on", button.dataset.period === reportPeriod);
@@ -3305,6 +3641,8 @@
     document.getElementById("report-income").textContent = SA.formatMoney(packet.incomeMinor, businessCurrency) + " in";
     document.getElementById("report-expense").textContent = SA.formatMoney(packet.expenseMinor, businessCurrency) + " in expenses · " + packet.start + " to " + packet.end;
     document.getElementById("report-tax").textContent = SA.formatMoney(packet.taxCollectedMinor, businessCurrency) + " · " + packet.taxName;
+    const chartData = SA.periodBreakdown(transactions, reportPeriod, SA.LEDGER_TODAY, businessCurrency);
+    if (chartData) drawChart(document.getElementById("report-chart"), chartData.months, "report-chart-read", chartData.months.length - 1);
     const open = docs.filter(doc => SA.isOpenInvoice(doc)).sort((a, b) => SA.balanceOf(b) - SA.balanceOf(a));
     document.getElementById("report-top").textContent = open.length
       ? open[0].name + " · " + SA.formatMoney(SA.balanceOf(open[0]), open[0].currency) + " still open"
@@ -4784,6 +5122,7 @@
       syncNow(false);
       if (bankPending()) finishBank(false);
       else syncBanks(false);
+      checkIdentity();
     });
     if (sync.signedIn) setTimeout(() => { refreshProfile(); syncNow(false); loadBanks().then(() => syncBanks(false)); }, 0);
   }
@@ -5086,9 +5425,16 @@
       show("account");
       return;
     }
+    if (!idState.verified) {
+      setBankState("Verify your identity first. Joining is free; banking needs a one-time ID check.");
+      show("account");
+      renderAccount();
+      return;
+    }
     setBankState("Opening your bank…");
     const made = await call("POST", "/api/bank/link", { returnTo: location.href.split("#")[0] });
     if (made.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (made.status === 403) { setBankState("Verify your identity first. Banking needs a one-time ID check."); show("account"); renderAccount(); return; }
     if (made.status === 200 && made.body && made.body.configured === false) {
       setBankState("Bank linking is not switched on yet for this app.");
       return;
@@ -5261,8 +5607,14 @@
     } catch (error) {}
   }
 
+  // Identity and role come from the server on every sign-in; they are never trusted from this device.
+  let idState = { verified: false, enabled: false, status: "none", note: "", hasDetails: false, role: "" };
   function applyProfile(profile) {
     if (!profile) return;
+    idState = {
+      verified: !!profile.identityVerified, enabled: !!profile.identityEnabled, status: String(profile.identityStatus || "none"),
+      note: String(profile.identityNote || ""), hasDetails: !!profile.hasDetails, role: profile.role === "owner" || profile.role === "admin" ? profile.role : ""
+    };
     sync.email = profile.email || sync.email;
     sync.emailVerified = !!profile.emailVerified;
     sync.totpEnabled = !!profile.totpEnabled;
@@ -5724,6 +6076,7 @@
     el("acct-verify-text").textContent = sync.mailEnabled
       ? "Confirm your email so you can reset your password by email."
       : "Email confirmation turns on soon. Set up 2-step sign-in so you can always get back in.";
+    renderIdentity();
     el("totp-badge").textContent = sync.totpEnabled ? "On" : "Off";
     el("totp-badge").className = "badge " + (sync.totpEnabled ? "on" : "off");
     el("totp-btn").textContent = sync.totpEnabled ? "Turn off" : "Turn on";
@@ -5737,6 +6090,137 @@
       chip.classList.toggle("cta", !signedIn);
       el("sync-status-text").textContent = DEMO ? "Demo with sample data · nothing is saved" : (signedIn ? status : "Sign up free to back up and sync");
     }
+  }
+
+  const ID_WORDS = {
+    approved: ["Verified", "on", "Your identity is checked. Banking is unlocked."],
+    review: ["In review", "off", "A person is checking your details against your ID."],
+    pending: ["Checking", "off", "Your ID check is still running. Come back in a few minutes."],
+    denied: ["Not approved", "off", "Your ID check did not pass. Fix your details and try again, or contact support."],
+    none: ["Not checked", "off", ""]
+  };
+
+  function renderIdentity() {
+    const words = ID_WORDS[idState.status] || ID_WORDS.none;
+    el("idv-badge").textContent = words[0];
+    el("idv-badge").className = "badge " + words[1];
+    if (words[2]) el("idv-sub").textContent = words[2] + (idState.note && idState.status !== "approved" ? " (" + idState.note + ")" : "");
+    el("idv-btn").hidden = idState.verified || idState.status === "review";
+    el("idv-btn").textContent = idState.status === "denied" ? "Try again" : "Verify";
+    el("details-badge").textContent = idState.hasDetails ? "Saved" : "Needed";
+    el("details-badge").className = "badge " + (idState.hasDetails ? "on" : "off");
+    el("reviews-row").hidden = !idState.role;
+  }
+
+  async function openDetails() {
+    setAcctView("details");
+    el("dt-msg").textContent = "";
+    const got = await call("GET", "/api/details");
+    const d = got.status === 200 && got.body && got.body.details;
+    if (!d) return;
+    el("dt-name").value = d.name || "";
+    el("dt-street").value = d.street || "";
+    el("dt-city").value = d.city || "";
+    el("dt-state").value = d.state || "";
+    el("dt-zip").value = d.zip || "";
+    el("dt-phone").value = d.phone || "";
+  }
+
+  const DETAIL_PROBLEMS = {
+    name: "Enter your first and last name as on your license.",
+    street: "Enter the street address with its number, like 1800 Market St.",
+    city: "Enter the city.",
+    state: "Enter the two-letter state, like PA.",
+    zip: "Enter a 5-digit ZIP code.",
+    phone: "Enter a 10-digit US phone number."
+  };
+
+  async function saveDetails() {
+    const body = { name: el("dt-name").value, street: el("dt-street").value, city: el("dt-city").value, state: el("dt-state").value, zip: el("dt-zip").value, phone: el("dt-phone").value };
+    const check = SA.checkDetails(body);
+    if (!check.ok) { el("dt-msg").textContent = DETAIL_PROBLEMS[check.field]; el("dt-" + check.field).focus(); return; }
+    const saved = await call("PUT", "/api/details", body);
+    if (saved.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (saved.status === 400 && saved.body && DETAIL_PROBLEMS[saved.body.field]) { el("dt-msg").textContent = DETAIL_PROBLEMS[saved.body.field]; return; }
+    if (saved.status !== 200) { el("dt-msg").textContent = "Could not save just now. Try again in a minute."; return; }
+    applyProfile(saved.body);
+    setAcctView("home");
+    showPull(idState.verified ? "Details saved." : "Details saved. Next, verify your identity to unlock banking.");
+  }
+
+  const ID_PENDING_KEY = "simpleaccountz.idv.pending";
+  async function startIdentity() {
+    if (!sync.signedIn) { show("account"); return; }
+    if (!idState.hasDetails) { openDetails(); el("dt-msg").textContent = "Add your details first. The ID check compares them with your license."; return; }
+    const made = await call("POST", "/api/identity/start", { returnTo: location.href.split("#")[0] });
+    if (made.status === 401) { signedOutByServer(); renderAccount(); return; }
+    if (made.status === 200 && made.body && made.body.configured === false) { el("acct-msg").textContent = "Identity checks are not switched on yet. Banking stays locked until they are."; return; }
+    if (made.status === 200 && made.body && made.body.verified) { await refreshProfile(); renderAccount(); return; }
+    if (made.status !== 200 || !made.body || !made.body.url) { el("acct-msg").textContent = "Could not start the ID check just now. Try again in a minute."; return; }
+    try { localStorage.setItem(ID_PENDING_KEY, "1"); } catch (error) {}
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (window.SA_NATIVE && plugins && plugins.Browser) plugins.Browser.open({ url: made.body.url }).catch(() => { window.location.href = made.body.url; });
+    else if (!window.open(made.body.url, "_blank", "noopener")) window.location.href = made.body.url;
+  }
+
+  // When they come back from the ID check, ask the server how it went.
+  async function checkIdentity() {
+    let waiting = false;
+    try { waiting = localStorage.getItem(ID_PENDING_KEY) === "1"; } catch (error) {}
+    if (!waiting || !sync.signedIn) return;
+    const got = await call("POST", "/api/identity/check", {});
+    if (got.status !== 200 || !got.body) return;
+    if (got.body.status !== "pending") { try { localStorage.removeItem(ID_PENDING_KEY); } catch (error) {} }
+    await refreshProfile();
+    renderAccount();
+    const words = ID_WORDS[got.body.status] || ID_WORDS.none;
+    if (words[2]) showPull(words[2]);
+  }
+
+  async function openReviews() {
+    setAcctView("reviews");
+    el("rv-msg").textContent = "";
+    const [report, queue] = await Promise.all([call("GET", "/api/admin/report"), call("GET", "/api/admin/identity")]);
+    if (report.status === 200 && report.body) {
+      const r = report.body;
+      el("rv-report").textContent = r.users + " people · " + r.verified + " verified · " + r.waiting + " waiting · " + r.denied + " denied";
+    } else el("rv-report").textContent = "Only Spencer and his admins can see this.";
+    const list = el("rv-list");
+    list.innerHTML = "";
+    const items = queue.status === 200 && queue.body ? queue.body.items || [] : [];
+    if (!items.length) { list.innerHTML = '<p class="note">Nothing waiting.</p>'; return; }
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "rv-item";
+      const d = item.details || {};
+      const head = document.createElement("b");
+      head.textContent = (d.name || item.email) + " · " + (ID_WORDS[item.decision] || ID_WORDS.none)[0];
+      const who = document.createElement("span");
+      who.textContent = item.email + (d.street ? " · " + d.street + ", " + d.city + " " + d.state + " " + d.zip : "");
+      const why = document.createElement("span");
+      why.textContent = (item.by === "owner" ? "Decided by Spencer" : item.by === "admin" ? "Decided by " + item.adminBy : "Automatic check") + (item.note ? " · " + item.note : "");
+      const actions = document.createElement("div");
+      actions.className = "quick-row";
+      [["approved", "Approve"], ["denied", "Deny"], ["clear", "Undo decision"]].forEach(([value, label]) => {
+        const button = document.createElement("button");
+        button.className = value === "denied" ? "pill-outline small danger-link" : "pill-outline small";
+        button.textContent = label;
+        button.onclick = () => decideIdentity(item.id, value);
+        actions.appendChild(button);
+      });
+      row.appendChild(head);
+      row.appendChild(who);
+      row.appendChild(why);
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+  }
+
+  async function decideIdentity(userId, decision) {
+    const done = await call("POST", "/api/admin/identity/decide", { userId, decision });
+    if (done.status === 403 && done.body && done.body.error === "owner_decided") { el("rv-msg").textContent = "Spencer already decided this one. Only he can change it."; return; }
+    if (done.status !== 200) { el("rv-msg").textContent = "That did not go through. Try again."; return; }
+    openReviews();
   }
 
   let liveShell = "";
@@ -6371,7 +6855,7 @@
     const clock = (at) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (drive && drive.paused) setDriveState("Paused at " + clock(drive.pausedAt || Date.now()) + ". Miles and route are not tracked until you resume.");
     else if (drive) setDriveState("Tracking since " + clock(drive.startedAt) + (drive.start ? " from " + SA.placeText(drive.start) : "") + ". Keep Simple Accountz open while you drive.");
-    drawRoute(document.getElementById("drive-route"), drive ? drive.route : null);
+    renderDriveMap(drive);
     renderRunning();
   }
 
@@ -6630,6 +7114,194 @@
   }
 
   // Draws a route with no map service: the path, a green start, and a red end.
+  // ---- Street map: drag, pinch or scroll to zoom, double-tap, follow your position ----
+  // Tiles from OpenStreetMap. The route, start (green), end (red), and you (blue) on top.
+  function makeMap(host) {
+    if (!host) return null;
+    if (host._map) return host._map;
+    const ns = "http://www.w3.org/2000/svg";
+    host.innerHTML = '<div class="tiles"></div><svg></svg><div class="ctl"><button type="button" aria-label="Zoom in">+</button><button type="button" aria-label="Zoom out">−</button><button type="button" aria-label="Show my route"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button></div><div class="credit">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>';
+    const tiles = host.querySelector(".tiles");
+    const svg = host.querySelector("svg");
+    const st = { zoom: 15, cx: 0, cy: 0, route: [], here: null, start: null, end: null, follow: true, imgs: {} };
+    const size = () => ({ w: host.clientWidth || 320, h: host.clientHeight || 240 });
+    function setCenter(lat, lon) { const w = SA.mapWorld(lat, lon, st.zoom); st.cx = w.x; st.cy = w.y; }
+    function centerLatLon() { return SA.mapLatLon(st.cx, st.cy, st.zoom); }
+    function toScreen(lat, lon) {
+      const w = SA.mapWorld(lat, lon, st.zoom), box = size();
+      return { x: w.x - st.cx + box.w / 2, y: w.y - st.cy + box.h / 2 };
+    }
+    function draw() {
+      const box = size();
+      const left = st.cx - box.w / 2, top = st.cy - box.h / 2, count = Math.pow(2, st.zoom);
+      const want = {};
+      for (let ty = Math.floor(top / 256); ty <= Math.floor((top + box.h) / 256); ty++) {
+        if (ty < 0 || ty >= count) continue;
+        for (let tx = Math.floor(left / 256); tx <= Math.floor((left + box.w) / 256); tx++) {
+          const wrap = ((tx % count) + count) % count;
+          const key = st.zoom + "/" + wrap + "/" + ty;
+          want[key] = true;
+          let img = st.imgs[key];
+          if (!img) {
+            img = document.createElement("img");
+            img.alt = "";
+            img.decoding = "async";
+            img.src = "https://tile.openstreetmap.org/" + key + ".png";
+            st.imgs[key] = img;
+            tiles.appendChild(img);
+          }
+          img.style.left = Math.round(tx * 256 - left) + "px";
+          img.style.top = Math.round(ty * 256 - top) + "px";
+        }
+      }
+      Object.keys(st.imgs).forEach((key) => { if (!want[key]) { st.imgs[key].remove(); delete st.imgs[key]; } });
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      const add = (tag, attrs) => { const node = document.createElementNS(ns, tag); Object.keys(attrs).forEach((k) => node.setAttribute(k, attrs[k])); svg.appendChild(node); return node; };
+      st.route.forEach((segment) => {
+        if (!segment.length) return;
+        const d = segment.map((pt, i) => { const q = toScreen(pt[0], pt[1]); return (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1); }).join(" ");
+        add("path", { d, class: "route-under" });
+        add("path", { d, class: "route" });
+      });
+      if (st.start) { const q = toScreen(st.start.lat, st.start.lon); add("circle", { cx: q.x, cy: q.y, r: 8, class: "pin-start" }); }
+      if (st.end) { const q = toScreen(st.end.lat, st.end.lon); add("circle", { cx: q.x, cy: q.y, r: 8, class: "pin-end" }); }
+      if (st.here) {
+        const q = toScreen(st.here.lat, st.here.lon);
+        add("circle", { cx: q.x, cy: q.y, r: 22, class: "here-halo" });
+        add("circle", { cx: q.x, cy: q.y, r: 8, class: "here" });
+      }
+    }
+    function zoomTo(z, px, py) {
+      const box = size();
+      const next = Math.max(3, Math.min(19, z));
+      if (next === st.zoom) return;
+      const ax = px == null ? box.w / 2 : px, ay = py == null ? box.h / 2 : py;
+      const k = Math.pow(2, next - st.zoom);
+      const wx = st.cx + ax - box.w / 2, wy = st.cy + ay - box.h / 2;
+      st.cx = wx * k - (ax - box.w / 2);
+      st.cy = wy * k - (ay - box.h / 2);
+      st.zoom = next;
+      Object.keys(st.imgs).forEach((key) => { st.imgs[key].remove(); delete st.imgs[key]; });
+      draw();
+    }
+    function fit() {
+      const points = [].concat.apply([], st.route).concat([st.here, st.start, st.end].filter(Boolean).map((p) => [p.lat, p.lon]));
+      const box = size();
+      const view = SA.fitMap(points, box.w, box.h, 40, 17);
+      if (!view) return false;
+      st.zoom = view.zoom;
+      Object.keys(st.imgs).forEach((key) => { st.imgs[key].remove(); delete st.imgs[key]; });
+      setCenter(view.center.lat, view.center.lon);
+      draw();
+      return true;
+    }
+    // Drag with one finger or the mouse; pinch with two.
+    const pointers = new Map();
+    let pinch = null, lastTap = 0;
+    host.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(".ctl, .credit")) return;
+      host.setPointerCapture(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values());
+        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: st.zoom };
+      }
+      const now = Date.now();
+      if (pointers.size === 1 && now - lastTap < 300) { const r = host.getBoundingClientRect(); st.follow = false; zoomTo(st.zoom + 1, event.clientX - r.left, event.clientY - r.top); }
+      lastTap = now;
+    });
+    host.addEventListener("pointermove", (event) => {
+      const prev = pointers.get(event.pointerId);
+      if (!prev) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 1) {
+        st.cx -= event.clientX - prev.x;
+        st.cy -= event.clientY - prev.y;
+        st.follow = false;
+        draw();
+      } else if (pointers.size === 2 && pinch) {
+        const [a, b] = Array.from(pointers.values());
+        const step = Math.round(Math.log2(Math.hypot(a.x - b.x, a.y - b.y) / pinch.dist));
+        const r = host.getBoundingClientRect();
+        if (pinch.zoom + step !== st.zoom) { st.follow = false; zoomTo(pinch.zoom + step, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top); }
+      }
+    });
+    const lift = (event) => { pointers.delete(event.pointerId); if (pointers.size < 2) pinch = null; };
+    host.addEventListener("pointerup", lift);
+    host.addEventListener("pointercancel", lift);
+    host.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const r = host.getBoundingClientRect();
+      st.follow = false;
+      zoomTo(st.zoom + (event.deltaY < 0 ? 1 : -1), event.clientX - r.left, event.clientY - r.top);
+    }, { passive: false });
+    const buttons = host.querySelectorAll(".ctl button");
+    buttons[0].onclick = () => zoomTo(st.zoom + 1);
+    buttons[1].onclick = () => zoomTo(st.zoom - 1);
+    buttons[2].onclick = () => { st.follow = true; if (st.here) { st.zoom = Math.max(st.zoom, 15); setCenter(st.here.lat, st.here.lon); draw(); } else fit(); };
+    const api = {
+      // route: [[ [lat, lon], ... ], ...]; here, start, end: { lat, lon } or null.
+      set(data) {
+        st.route = (Array.isArray(data.route) ? data.route : []).filter((seg) => Array.isArray(seg) && seg.length)
+          .map((seg) => seg.filter((pt) => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1])));
+        st.here = data.here || null;
+        st.start = data.start || null;
+        st.end = data.end || null;
+        if (!st.placed) { st.placed = fit(); return; }
+        if (st.follow && st.here) setCenter(st.here.lat, st.here.lon);
+        draw();
+      },
+      refit() { st.placed = fit(); },
+      state: st,
+      center: centerLatLon
+    };
+    window.addEventListener("resize", () => draw());
+    host._map = api;
+    return api;
+  }
+
+  const placeOf = (point) => (point && Number.isFinite(point.lat) && Number.isFinite(point.lon) ? { lat: point.lat, lon: point.lon } : null);
+
+  function renderDriveMap(drive) {
+    const host = document.getElementById("drive-map");
+    if (!host) return;
+    const here = drive && drive.last ? placeOf(drive.last) : null;
+    host.hidden = !drive || (!here && !(drive.route && drive.route.length));
+    if (host.hidden) { if (host._map) host._map.state.placed = false; return; }
+    const map = makeMap(host);
+    map.set({ route: drive.route, here, start: placeOf(drive.start), end: null });
+  }
+
+  // Directions in Apple Maps, Google Maps, or Waze, from where you are to where you typed.
+  function openNav(app) {
+    const drive = readDrive();
+    const dest = (document.getElementById("drive-dest") || {}).value || "";
+    const from = drive && drive.last ? placeOf(drive.last) : null;
+    const links = SA.mapLinks(from, null, dest);
+    if (!links) { showPull("Type where you are going first, or start the drive so the app knows where you are."); return; }
+    if (!readDrive()) showPull("Tip: tap Start drive too, so the miles are logged.");
+    window.open(links[app], "_blank", "noopener");
+  }
+
+  function openDriveView(tx) {
+    const m = tx.mileage || {};
+    show("drive-view");
+    document.getElementById("dv2-title").textContent = tx.name || "Drive";
+    document.getElementById("dv2-miles").textContent = SA.formatMoney(tx.amountMinor, tx.currency) + (m.distance ? " · " + m.distance : "");
+    const from = SA.placeText(m.start), to = SA.placeText(m.end);
+    document.getElementById("dv2-sub").textContent = shortDate(tx.date) + (from ? " · from " + from : "") + (to ? " to " + to : "");
+    const links = SA.mapLinks(m.start, m.end, "");
+    ["apple", "google", "waze"].forEach((app) => {
+      const a = document.getElementById("dv2-" + app);
+      a.hidden = !links;
+      if (links) a.href = links[app];
+    });
+    const host = document.getElementById("dv2-map");
+    const map = makeMap(host);
+    map.state.placed = false;
+    requestAnimationFrame(() => map.set({ route: m.route, here: null, start: placeOf(m.start), end: placeOf(m.end) }));
+  }
+
   function drawRoute(svg, route) {
     if (!svg) return;
     const ns = "http://www.w3.org/2000/svg";
@@ -6718,15 +7390,14 @@
         svg.setAttribute("aria-label", "Map of this drive");
         row.appendChild(svg);
         drawRoute(svg, tx.mileage.route);
+        svg.style.cursor = "pointer";
+        svg.addEventListener("click", () => openDriveView(tx));
       }
-      const link = SA.mapLink(tx.mileage.start, tx.mileage.end, apple);
-      if (link) {
-        const open = document.createElement("a");
+      if (tx.mileage.start || tx.mileage.end || (tx.mileage.route && tx.mileage.route.length)) {
+        const open = document.createElement("button");
         open.className = "textlink";
-        open.href = link;
-        open.target = "_blank";
-        open.rel = "noopener";
-        open.textContent = "Open in Maps";
+        open.textContent = "Open map · Apple Maps, Google Maps, Waze";
+        open.onclick = () => openDriveView(tx);
         row.appendChild(open);
       }
       list.appendChild(row);
@@ -6802,6 +7473,7 @@
 
   function renderAll() {
     runAutopilot();
+    try { renderChecks(); } catch (error) {}
     renderAccountChrome();
     renderHome();
     renderDocs();

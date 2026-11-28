@@ -3443,6 +3443,327 @@ function accountingExport(format, docs, transactions, period, today, currency, c
   return { ok: true, format, count, mime: "text/csv", filename: slug + "-" + format + "-" + start + "-to-" + end + ".csv", text: "﻿" + lines.join("\r\n") + "\r\n" };
 }
 
+// ---- Your details (mirrors the server's rules, so mistakes show before sending) ----
+const US_STATE_CODES = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR".split(" ");
+
+function checkDetails(body) {
+  const b = body || {};
+  const text = (value, max) => String(value == null ? "" : value).replace(/\s+/g, " ").trim().slice(0, max);
+  const d = {
+    name: text(b.name, 100), street: text(b.street, 120), city: text(b.city, 60),
+    state: text(b.state, 2).toUpperCase(), zip: text(b.zip, 10), phone: String(b.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "")
+  };
+  if (!/^[A-Za-z][A-Za-z .'-]{1,99}$/.test(d.name) || d.name.split(" ").length < 2) return { ok: false, field: "name" };
+  if (!/^\d+[A-Za-z]?\s+\S/.test(d.street)) return { ok: false, field: "street" };
+  if (!/^[A-Za-z][A-Za-z .'-]+$/.test(d.city)) return { ok: false, field: "city" };
+  if (US_STATE_CODES.indexOf(d.state) === -1) return { ok: false, field: "state" };
+  if (!/^\d{5}(-\d{4})?$/.test(d.zip)) return { ok: false, field: "zip" };
+  if (!/^[2-9]\d{9}$/.test(d.phone)) return { ok: false, field: "phone" };
+  return { ok: true, details: d };
+}
+
+// ---- Street map maths (Web Mercator, 256-pixel tiles) ----
+function mapWorld(lat, lon, zoom) {
+  const n = 256 * Math.pow(2, zoom);
+  const rad = Math.max(-85, Math.min(85, lat)) * Math.PI / 180;
+  return { x: (lon + 180) / 360 * n, y: (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n };
+}
+
+function mapLatLon(x, y, zoom) {
+  const n = 256 * Math.pow(2, zoom);
+  const lon = x / n * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
+  return { lat, lon };
+}
+
+// The closest zoom that shows every point, and the middle to centre on.
+function fitMap(points, width, height, pad, maxZoom) {
+  const pts = (points || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (!pts.length) return null;
+  const margin = pad == null ? 40 : pad;
+  let zoom = maxZoom == null ? 17 : maxZoom;
+  for (; zoom > 2; zoom--) {
+    const w = pts.map((p) => mapWorld(p[0], p[1], zoom));
+    const spanX = Math.max.apply(null, w.map((q) => q.x)) - Math.min.apply(null, w.map((q) => q.x));
+    const spanY = Math.max.apply(null, w.map((q) => q.y)) - Math.min.apply(null, w.map((q) => q.y));
+    if (spanX <= width - 2 * margin && spanY <= height - 2 * margin) break;
+  }
+  const w = pts.map((p) => mapWorld(p[0], p[1], zoom));
+  const cx = (Math.max.apply(null, w.map((q) => q.x)) + Math.min.apply(null, w.map((q) => q.x))) / 2;
+  const cy = (Math.max.apply(null, w.map((q) => q.y)) + Math.min.apply(null, w.map((q) => q.y))) / 2;
+  return { zoom, center: mapLatLon(cx, cy, zoom) };
+}
+
+// Directions in the map app the person uses. A typed destination works in all three.
+function mapLinks(start, end, destination) {
+  const a = placeText(start).replace(" ", "");
+  const b = placeText(end).replace(" ", "");
+  const dest = String(destination || "").trim().slice(0, 200);
+  const to = dest ? encodeURIComponent(dest) : b;
+  if (!to && !a) return null;
+  return {
+    apple: "https://maps.apple.com/?" + (a ? "saddr=" + a + "&" : "") + (to ? "daddr=" + to + "&" : "") + "dirflg=d",
+    google: to
+      ? "https://www.google.com/maps/dir/?api=1" + (a ? "&origin=" + a : "") + "&destination=" + to + "&travelmode=driving"
+      : "https://www.google.com/maps/search/?api=1&query=" + a,
+    waze: dest ? "https://waze.com/ul?q=" + to + "&navigate=yes" : "https://waze.com/ul?ll=" + (b || a) + "&navigate=yes"
+  };
+}
+
+// ---- Card details: everything behind a number on Money, Home, and Reports ----
+function monthStart(date, back) {
+  const parts = date.split("-").map(Number);
+  const d = new Date(Date.UTC(parts[0], parts[1] - 1 - back, 1));
+  return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-01";
+}
+
+function monthEnd(start) {
+  const parts = start.split("-").map(Number);
+  const d = new Date(Date.UTC(parts[0], parts[1], 0));
+  return start.slice(0, 8) + String(d.getUTCDate()).padStart(2, "0");
+}
+
+function previousBounds(period, today) {
+  const end = today || LEDGER_TODAY;
+  if (period === "month") {
+    const start = monthStart(end, 1);
+    const day = Math.min(Number(end.slice(8, 10)), Number(monthEnd(start).slice(8, 10)));
+    return { start, end: start.slice(0, 8) + String(day).padStart(2, "0") };
+  }
+  if (period === "last_month") { const start = monthStart(end, 2); return { start, end: monthEnd(start) }; }
+  if (period === "year") { const y = Number(end.slice(0, 4)) - 1; return { start: y + "-01-01", end: y + end.slice(4) }; }
+  if (period === "week") return { start: shiftDate(end, -13), end: shiftDate(end, -7) };
+  return null;
+}
+
+function sumKind(transactions, start, end, currency) {
+  let inMinor = 0, outMinor = 0, taxMinor = 0;
+  transactions.forEach((tx) => {
+    if (tx.currency !== currency || tx.date < start || tx.date > end) return;
+    if (tx.kind === "in") inMinor += tx.amountMinor;
+    if (tx.kind === "refund") inMinor -= tx.amountMinor;
+    if (tx.kind === "out") outMinor += tx.amountMinor;
+    taxMinor += allocatedTax(tx);
+  });
+  return { inMinor, outMinor, profitMinor: inMinor - outMinor, taxMinor };
+}
+
+function changePct(now, before) {
+  if (!before) return now ? null : 0;
+  return Math.round((now - before) / Math.abs(before) * 1000) / 10;
+}
+
+function periodBreakdown(transactions, period, today, currency) {
+  const txs = Array.isArray(transactions) ? transactions : [];
+  const bounds = periodBounds(period, today);
+  if (!bounds) return null;
+  const now = sumKind(txs, bounds.start, bounds.end, currency);
+  const prevB = previousBounds(period, today);
+  const prev = prevB ? sumKind(txs, prevB.start, prevB.end, currency) : null;
+  const inside = txs.filter((tx) => tx.currency === currency && tx.date >= bounds.start && tx.date <= bounds.end);
+  const group = (list, key) => {
+    const map = {};
+    list.forEach((tx) => {
+      const name = key(tx) || "Other";
+      if (!map[name]) map[name] = { name, minor: 0, count: 0 };
+      map[name].minor += tx.amountMinor;
+      map[name].count += 1;
+    });
+    const rows = Object.keys(map).map((k) => map[k]).sort((a, b) => b.minor - a.minor);
+    const total = rows.reduce((sum, row) => sum + row.minor, 0);
+    rows.forEach((row) => { row.share = total ? Math.round(row.minor / total * 1000) / 10 : 0; });
+    return rows;
+  };
+  const outs = inside.filter((tx) => tx.kind === "out");
+  const ins = inside.filter((tx) => tx.kind === "in");
+  const months = [];
+  for (let back = 5; back >= 0; back--) {
+    const start = monthStart(bounds.end, back);
+    const end = back === 0 ? bounds.end : monthEnd(start);
+    const totals = sumKind(txs, start, end, currency);
+    months.push(Object.assign({ key: start.slice(0, 7), label: MONTH_NAMES[Number(start.slice(5, 7)) - 1] }, totals));
+  }
+  const drives = outs.filter((tx) => tx.mileage);
+  return {
+    start: bounds.start, end: bounds.end, prevStart: prevB ? prevB.start : "", prevEnd: prevB ? prevB.end : "",
+    inMinor: now.inMinor, outMinor: now.outMinor, profitMinor: now.profitMinor, taxMinor: now.taxMinor,
+    prev,
+    change: prev ? { in: changePct(now.inMinor, prev.inMinor), out: changePct(now.outMinor, prev.outMinor), profit: changePct(now.profitMinor, prev.profitMinor) } : null,
+    marginPct: now.inMinor > 0 ? Math.round(now.profitMinor / now.inMinor * 1000) / 10 : null,
+    byCategory: group(outs, (tx) => tx.category || (tx.mileage ? "Mileage" : guessCategory(tx.name)) || "Uncategorized"),
+    byPayer: group(ins, (tx) => tx.name),
+    biggestOut: outs.slice().sort((a, b) => b.amountMinor - a.amountMinor).slice(0, 5),
+    biggestIn: ins.slice().sort((a, b) => b.amountMinor - a.amountMinor).slice(0, 5),
+    months,
+    counts: { in: ins.length, out: outs.length },
+    mileage: { drives: drives.length, minor: drives.reduce((sum, tx) => sum + tx.amountMinor, 0) }
+  };
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// ---- The assistant's own checks: it looks over the books so the owner does not have to ----
+// level: "fixed" (it already put it right), "check" (a person should look), "ok".
+function auditBooks(state) {
+  const s = state || {};
+  const docs = Array.isArray(s.docs) ? s.docs : [];
+  const txs = Array.isArray(s.transactions) ? s.transactions : [];
+  const today = s.today || LEDGER_TODAY;
+  const currency = s.currency || "USD";
+  const out = [];
+  // 1. Every invoice adds up: its lines, tax, and payments match the stored totals.
+  docs.filter((doc) => doc.type === "invoice" && Array.isArray(doc.lines) && doc.lines.length).forEach((doc) => {
+    const calc = calculateDocument(doc);
+    if (!calc.ok) { out.push({ id: "calc-" + doc.id, level: "check", title: (doc.number || doc.name) + " has a line that cannot be priced", detail: "Open it and fix the quantity or rate.", docId: doc.id }); return; }
+    if (doc.totalMinor != null && calc.totalMinor !== doc.totalMinor) {
+      out.push({ id: "total-" + doc.id, level: "check", title: (doc.number || doc.name) + " total does not match its lines",
+        detail: "Lines and tax come to " + formatMoney(calc.totalMinor, doc.currency) + ", but it says " + formatMoney(doc.totalMinor, doc.currency) + ".", docId: doc.id });
+    }
+  });
+  // 2. Nothing is counted twice.
+  const outs = txs.filter((tx) => tx.kind === "out");
+  const seen = {};
+  outs.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).forEach((tx) => {
+    const key = String(tx.name || "").toLowerCase() + "|" + tx.amountMinor + "|" + tx.currency;
+    const before = seen[key];
+    if (before && Math.abs(Date.parse(tx.date) - Date.parse(before.date)) <= 3 * 86400000 && before.id !== tx.id) {
+      out.push({ id: "dup-" + tx.id, level: "check", title: "Possible double expense: " + tx.name,
+        detail: formatMoney(tx.amountMinor, tx.currency) + " on " + before.date + " and " + tx.date + ". Delete one if it is the same purchase.", txId: tx.id });
+    }
+    seen[key] = tx;
+  });
+  // 3. Unusual amounts are worth a second look (a misread receipt, a typo).
+  const amounts = outs.filter((tx) => tx.currency === currency && !tx.mileage).map((tx) => tx.amountMinor).sort((a, b) => a - b);
+  if (amounts.length >= 5) {
+    const median = amounts[Math.floor(amounts.length / 2)];
+    outs.filter((tx) => tx.currency === currency && !tx.mileage && tx.amountMinor > median * 10 && tx.amountMinor > 50000).forEach((tx) => {
+      out.push({ id: "big-" + tx.id, level: "check", title: tx.name + " is much bigger than usual", detail: formatMoney(tx.amountMinor, tx.currency) + ". Check it matches the receipt.", txId: tx.id });
+    });
+  }
+  // 4. Expenses get a category, so reports and taxes are right.
+  const uncategorized = outs.filter((tx) => !tx.category && !tx.mileage);
+  if (uncategorized.length) {
+    out.push({ id: "cat", level: "check", title: uncategorized.length + " expense" + (uncategorized.length === 1 ? " has" : "s have") + " no category", detail: "Tap Sort them and I will file each one. You can change any of them later.", fix: "categorize" });
+  }
+  // 5. Money owed: overdue invoices.
+  const overdue = docs.filter((doc) => doc.type === "invoice" && !doc.closed && doc.due && doc.due < today && balanceOf(doc) > 0);
+  if (overdue.length) {
+    const owed = overdue.reduce((sum, doc) => sum + balanceOf(doc), 0);
+    out.push({ id: "overdue", level: "check", title: overdue.length + " overdue invoice" + (overdue.length === 1 ? "" : "s") + ", " + formatMoney(owed, currency), detail: "Reminders are written for you; each one waits for your tap." });
+  }
+  // 6. Linked account balances.
+  (Array.isArray(s.bankItems) ? s.bankItems : []).forEach((item) => {
+    (item.accounts || []).forEach((account) => {
+      if (!Number.isFinite(account.balanceMinor)) return;
+      if (account.balanceMinor < 0 && !/credit|card/i.test(account.type || account.name || "")) {
+        out.push({ id: "neg-" + account.id, level: "check", title: (account.name || "An account") + " is overdrawn", detail: "Balance " + formatMoney(account.balanceMinor, account.currency || currency) + "." });
+      } else if (account.balanceMinor >= 0 && account.balanceMinor < 10000 && !/credit|card/i.test(account.type || "")) {
+        out.push({ id: "low-" + account.id, level: "check", title: (account.name || "An account") + " is running low", detail: "Balance " + formatMoney(account.balanceMinor, account.currency || currency) + "." });
+      }
+    });
+  });
+  if (!out.some((row) => row.level === "check")) out.push({ id: "ok", level: "ok", title: "Everything adds up", detail: "Invoice totals, expenses, and balances all check out." });
+  return out;
+}
+
+// Fills in a category on every expense that has none. Never changes one the owner set.
+function categorizeExpenses(transactions) {
+  let changed = 0;
+  const next = (Array.isArray(transactions) ? transactions : []).map((tx) => {
+    if (tx.kind !== "out" || tx.category || tx.mileage) return tx;
+    const category = guessCategory(tx.name) || "Other";
+    changed += 1;
+    return Object.assign({}, tx, { category });
+  });
+  return { transactions: next, changed };
+}
+
+// ---- Reports in plain words: ask a question, get the numbers ----
+const REPORT_INTENTS = [
+  // "Account balances" before "check", so "check my account balances" shows the balances.
+  ["balance", /\b(account balances?|bank balances?|balances|bank|accounts|cash on hand|checking account|savings)\b/i],
+  ["check", /\b(check|audit|accura\w*|mistakes?|errors?|wrong|add up|verify|review)\b/i],
+  ["mileage", /\b(mile|miles|mileage|drive|drives|driving|trip)\b/i],
+  ["tax", /\b(tax|taxes|sales tax|vat|gst)\b/i],
+  ["owed", /\b(owed|owes?|owing|overdue|unpaid|outstanding|receivables?|late|balance due)\b/i],
+  ["clients", /\b(client|clients|customer|customers|who paid|top payer)\b/i],
+  ["categories", /\b(category|categories|spend on|spent on|where.*money|biggest expense)\b/i],
+  ["expenses", /\b(expense|expenses|spend|spent|spending|costs?|out)\b/i],
+  ["income", /\b(income|revenue|sales|earned|made|in)\b/i],
+  ["profit", /\b(profit|net|margin|doing|summary|report|overview|how.*business)\b/i]
+];
+
+function reportIntent(question) {
+  const q = String(question || "");
+  for (let i = 0; i < REPORT_INTENTS.length; i++) if (REPORT_INTENTS[i][1].test(q)) return REPORT_INTENTS[i][0];
+  return "profit";
+}
+
+function askPeriod(question) {
+  const q = String(question || "").toLowerCase();
+  if (/last month/.test(q)) return "last_month";
+  if (/\byear\b|annual|ytd|this year/.test(q)) return "year";
+  if (/\bweek\b/.test(q)) return "week";
+  return "month";
+}
+
+function signed(pct) {
+  if (pct == null) return "new this period";
+  if (pct === 0) return "no change";
+  return (pct > 0 ? "up " : "down ") + Math.abs(pct) + "% from the period before";
+}
+
+function answerReport(question, state) {
+  const s = state || {};
+  const currency = s.currency || "USD";
+  const period = askPeriod(question);
+  const intent = reportIntent(question);
+  const b = periodBreakdown(s.transactions || [], period, s.today || LEDGER_TODAY, currency);
+  const money = (minor) => formatMoney(minor, currency);
+  const when = { month: "This month", last_month: "Last month", year: "This year", week: "This week" }[period];
+  const lines = [];
+  let title = "";
+  if (intent === "check") {
+    const found = auditBooks(s);
+    title = "I checked your books";
+    found.forEach((row) => lines.push((row.level === "check" ? "Look: " : row.level === "fixed" ? "Done: " : "") + row.title + ". " + row.detail));
+  } else if (intent === "balance") {
+    title = "Linked account balances";
+    const items = Array.isArray(s.bankItems) ? s.bankItems : [];
+    items.forEach((item) => (item.accounts || []).forEach((a) => lines.push((a.name || "Account") + (a.mask ? " ••" + a.mask : "") + ": " + formatMoney(a.balanceMinor || 0, a.currency || currency))));
+    if (!lines.length) lines.push("No bank or card is linked yet. Link one under Linked accounts (after the one-time ID check) and I will watch the balances for you.");
+  } else if (intent === "mileage") {
+    title = when + ": drives";
+    lines.push(b.mileage.drives + " drive" + (b.mileage.drives === 1 ? "" : "s") + " logged, worth " + money(b.mileage.minor) + " as a mileage expense.");
+  } else if (intent === "tax") {
+    title = when + ": tax collected";
+    lines.push(money(b.taxMinor) + " in tax collected on payments received.");
+  } else if (intent === "owed") {
+    title = "Money owed to you";
+    const owed = (s.docs || []).filter((doc) => doc.type === "invoice" && !doc.closed && balanceOf(doc) > 0);
+    const late = owed.filter((doc) => doc.due && doc.due < (s.today || LEDGER_TODAY));
+    lines.push(owed.length + " open invoice" + (owed.length === 1 ? "" : "s") + " totalling " + money(owed.reduce((sum, doc) => sum + balanceOf(doc), 0)) + ".");
+    if (late.length) lines.push(late.length + " overdue: " + late.map((doc) => (doc.number || doc.name) + " " + money(balanceOf(doc))).join(", ") + ".");
+  } else if (intent === "clients") {
+    title = when + ": who paid you";
+    b.byPayer.slice(0, 5).forEach((row) => lines.push(row.name + ": " + money(row.minor) + " (" + row.share + "%)"));
+    if (!b.byPayer.length) lines.push("No payments in this period yet.");
+  } else if (intent === "categories" || intent === "expenses") {
+    title = when + ": spending";
+    lines.push(money(b.outMinor) + " spent, " + signed(b.change && b.change.out) + ".");
+    b.byCategory.slice(0, 5).forEach((row) => lines.push(row.name + ": " + money(row.minor) + " (" + row.share + "%)"));
+  } else if (intent === "income") {
+    title = when + ": money in";
+    lines.push(money(b.inMinor) + " received, " + signed(b.change && b.change.in) + ".");
+  } else {
+    title = when + ": profit";
+    lines.push(money(b.inMinor) + " in, " + money(b.outMinor) + " out, " + money(b.profitMinor) + " rough profit (" + signed(b.change && b.change.profit) + ").");
+    if (b.marginPct != null) lines.push("You keep " + b.marginPct + " cents of every dollar that comes in.");
+    if (b.byCategory[0]) lines.push("Biggest cost: " + b.byCategory[0].name + ", " + money(b.byCategory[0].minor) + ".");
+  }
+  return { intent, period, title, lines, breakdown: b };
+}
+
 const SA = {
   CURRENCIES,
   switchAccountBooks,
@@ -3601,6 +3922,7 @@ const SA = {
   driveRecord,
   routePaths,
   routeMapView,
+  checkDetails, mapWorld, mapLatLon, fitMap, mapLinks, periodBreakdown, previousBounds, auditBooks, categorizeExpenses, answerReport, reportIntent, askPeriod,
   padQuad,
   repairAmounts,
   placeText,
