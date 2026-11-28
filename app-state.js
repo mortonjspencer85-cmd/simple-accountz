@@ -2624,6 +2624,115 @@ const TOTAL_WORDS = /\b(grand\s*total|balance\s*due|amount\s*due|total\s*due|bal
 const SKIP_TOTAL = /\b(sub\s*-?total|tax|vat|gst|tip|change|cash|tendered|discount|sav(?:e|ed|ing|ings)|promo(?:tion)?s?|coupons?|rewards?|points|items?|qty|quantity|count|units?)\b/i;
 const NOT_A_NAME = /^[\s\d\W]*$/;
 
+// ---- Sturdier reading of what the camera's reader returns ----
+// The reader often gets one letter or digit wrong. Label words are matched allowing one slip,
+// so "TOTAI", "SUB1OTAL" and "TAX1" still count as TOTAL, SUBTOTAL and TAX.
+const LABEL_WORDS = ["total", "subtotal", "balance", "amount", "change", "tender", "debit", "credit", "payable", "invoice"];
+
+function editDistance(a, b) {
+  const row = [];
+  for (let j = 0; j <= b.length; j++) row.push(j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const keep = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = keep;
+    }
+  }
+  return row[b.length];
+}
+
+function fixLabelWords(line) {
+  return String(line || "").replace(/[A-Za-z0-9]{3,}/g, (word) => {
+    if (/^\d+$/.test(word)) return word;
+    const plain = word.toLowerCase().replace(/0/g, "o").replace(/1/g, "l").replace(/5/g, "s").replace(/8/g, "b");
+    if (/^tax[a-z0-9]?$/.test(plain) && /^[Tt][Aa][Xx]\d?$/.test(word)) return "TAX";
+    if (plain.length < 5) return word;
+    for (let i = 0; i < LABEL_WORDS.length; i++) {
+      const target = LABEL_WORDS[i];
+      if (Math.abs(plain.length - target.length) <= 1 && editDistance(plain, target) <= 1) return target.toUpperCase();
+    }
+    // "SUB1OTAL" reads as "subiotal": one extra letter inside SUBTOTAL.
+    if (editDistance(plain.replace(/l/g, "i"), "subiotal") <= 1 && /^sub/.test(plain)) return "SUBTOTAL";
+    return word;
+  });
+}
+
+// A total that adds up: some amount that is the sum of two others, and is paid (it shows
+// again on a card, cash, or debit line). Item prices alone never make a total, so this only
+// settles what the labels could not.
+function amountsOf(lines, only) {
+  const out = [];
+  lines.forEach((line, index) => {
+    if (isCardLine(line) || (parseLooseDate(line) && !/[$£€¥]/.test(line))) return;
+    if (only && !only.test(line)) return;
+    findMoney(line.replace(/\d+(?:[.,]\d+)?\s*%/g, " ")).forEach((item) => {
+      if (/[$£€¥]/.test(item.raw) || /[.,]\d{2}$/.test(item.raw)) out.push({ minor: item.minor, index });
+    });
+  });
+  return out;
+}
+
+const TENDER_LINE = /\b(debit|credit|tender|tend|paid|payment|card|eft|cash|visa|mastercard|amex|discover)\b/i;
+
+function tenderAmounts(lines) {
+  return amountsOf(lines, TENDER_LINE).map((item) => item.minor);
+}
+
+function consistentTotal(lines) {
+  const all = amountsOf(lines);
+  const tender = tenderAmounts(lines);
+  // The sums are made from prices, subtotal, and tax. Never from cash handed over or change given:
+  // total plus change is just the cash again.
+  const addends = amountsOf(lines.filter((line) => !TENDER_LINE.test(line) && !/\bchange\b/i.test(line)));
+  const set = {};
+  all.forEach((item) => { set[item.minor] = (set[item.minor] || 0) + 1; });
+  let best = 0;
+  Object.keys(set).forEach((key) => {
+    const z = Number(key);
+    const paid = tender.indexOf(z) !== -1 || set[key] >= 2;
+    if (!paid || z <= best) return;
+    for (let i = 0; i < addends.length; i++) {
+      for (let j = i + 1; j < addends.length; j++) {
+        if (addends[i].minor > 0 && addends[j].minor > 0 && addends[i].minor + addends[j].minor === z && addends[i].minor !== z && addends[j].minor !== z) { best = z; return; }
+      }
+    }
+  });
+  return best;
+}
+
+// Output that is mostly noise is not a reading. Real receipts have words and prices.
+function textLooksReadable(text) {
+  const lines = String(text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const good = lines.filter((line) => /[A-Za-z]{3,}/.test(line) || /\d+[.,]\d{2}\b/.test(line)).length;
+  const letters = (String(text || "").match(/[A-Za-z0-9]/g) || []).length;
+  const noise = (String(text || "").match(/[^A-Za-z0-9\s.,$%#:\/&@'*-]/g) || []).length;
+  return good >= 3 && noise <= letters * 0.35;
+}
+
+// Two looks at the same page: keep whatever either one found, the first look winning a tie.
+function mergeScans(first, second) {
+  if (!first) return second;
+  if (!second) return first;
+  const out = Object.assign({}, second, first);
+  Object.keys(second).forEach((key) => {
+    const mine = first[key];
+    const empty = mine === "" || mine === 0 || mine == null;
+    if (empty) out[key] = second[key];
+  });
+  out.readable = Boolean(first.readable || second.readable);
+  const keys = ["merchant", "client", "number", "totalMinor", "date", "due", "email", "phone"];
+  out.fields = keys.filter((key) => out[key]).length;
+  return out;
+}
+
+function scanIsComplete(scan, kind) {
+  if (!scan || !(scan.totalMinor > 0)) return false;
+  return kind === "invoice" ? Boolean(scan.client) : Boolean(scan.merchant);
+}
+
 // The reader's usual slips inside an amount: O for 0, l or I for 1, a space by the
 // decimal point, S for $. Only fixed where the text is plainly a price (it has cents).
 function repairAmounts(line) {
@@ -2638,7 +2747,10 @@ function repairAmounts(line) {
 function cleanLines(text) {
   return String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean)
     .map((line) => repairAmounts(line.replace(/\bT[0O]TAL\b/gi, "TOTAL").replace(/\bAM0UNT\b/gi, "AMOUNT")
-      .replace(/\bSUBT[0O]TAL\b/gi, "SUBTOTAL")));
+      .replace(/\bSUBT[0O]TAL\b/gi, "SUBTOTAL")))
+    // One slipped letter in a label ("TOTAI", "SUB1OTAL", "TAX1") still counts. A rate like "6.625 %" is not an amount.
+    .map((line) => fixLabelWords(line).replace(/\d+(?:[.,]\d+)?\s*%/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 }
 
 // grand = the amount to pay. skip = tax, subtotal, tender. total = a plain total.
@@ -2718,6 +2830,11 @@ function merchantName(line) {
 
 function merchantLine(line) {
   if (!line || line.length < 3 || line.length > 40) return false;
+  // Stray marks (> | ~ = _ and the like) mean the reader was guessing at smudges.
+  if (/[<>|~=_^\[\]{}\\\u2014\u2018\u2019\u201c\u201d]/.test(line)) return false;
+  // Real names have vowels. Two or more consonant-only words of three letters or more is noise.
+  const longWords = line.split(" ").filter((word) => /^[A-Za-z]{3,}$/.test(word));
+  if (longWords.filter((word) => !/[aeiouyAEIOUY]/.test(word)).length >= 2 || (longWords.length && longWords.filter((word) => !/[aeiouyAEIOUY]/.test(word)).length / longWords.length > 0.34)) return false;
   if (NOT_A_NAME.test(line)) return false;
   if (lineTotalKind(line)) return false;
   if (NOT_MERCHANT.test(line)) return false;
@@ -2789,23 +2906,36 @@ function parseReceiptText(text, today, dayFirst) {
   if (!lines.length) return found;
 
   let totalMinor = readLabeledTotal(lines);
-  // Subtotal plus tax checks the total: a misread total is replaced when the
-  // card or cash line agrees with the sum instead.
+  // Subtotal plus tax checks the total. When the total and the sum disagree, the one the
+  // card, debit, or cash line paid wins; failing that, a total below the sum is a misread.
   const sub = labelledAmount(lines, /\bsub\s*-?total\b/i);
   const tax = labelledAmount(lines, /\b(?:sales\s*)?(?:tax|vat|gst|hst)\b/i);
-  if (sub && tax < sub) {
+  const tender = tenderAmounts(lines);
+  const paidOf = (amount) => tender.indexOf(amount) !== -1;
+  if (sub && tax > 0 && tax < sub) {
     const sum = sub + tax;
-    const paid = lines.filter((line) => isCardLine(line) || /\b(?:debit|credit|tend(?:er(?:ed)?)?|paid|payment)\b/i.test(line))
-      .some((line) => priceTokens(line, true).some((item) => item.minor === sum));
-    if (!totalMinor || (totalMinor !== sum && paid) || totalMinor < sub) totalMinor = sum;
+    if (!totalMinor) totalMinor = sum;
+    else if (totalMinor !== sum) {
+      if (paidOf(sum) && !paidOf(totalMinor)) totalMinor = sum;
+      else if (!paidOf(totalMinor) && totalMinor < sum) totalMinor = sum;
+    }
+  } else if (sub) {
+    if (!totalMinor || totalMinor < sub) totalMinor = sub;
   }
+  // A total that adds up (two amounts make it, and it was paid) settles what the labels could not.
+  const adds = consistentTotal(lines);
+  if (!totalMinor) totalMinor = adds;
+  else if (adds && adds !== totalMinor && paidOf(adds) && !paidOf(totalMinor)) totalMinor = adds;
   if (!totalMinor) {
-    // No labelled total: the largest real price, never a card, a year, or a street number.
+    // Still nothing: the largest real price, never a card, a year, a street number, or a bare whole number.
     lines.forEach((line) => {
       if (lineTotalKind(line) === "skip") return;
       if (parseLooseDate(line) && !/[$£€¥]/.test(line)) return;
       if (looksLikeAddress(line) || isCardLine(line)) return;
-      priceTokens(line, false).forEach((item) => { if (item.minor > totalMinor) totalMinor = item.minor; });
+      priceTokens(line, false).forEach((item) => {
+        if (!(/[$£€¥]/.test(item.raw) || /[.,]\d{1,2}$/.test(item.raw))) return;
+        if (item.minor > totalMinor) totalMinor = item.minor;
+      });
     });
   }
   if (totalMinor > 0) { found.totalMinor = totalMinor; found.fields += 1; }
@@ -3922,6 +4052,7 @@ const SA = {
   driveRecord,
   routePaths,
   routeMapView,
+  textLooksReadable, mergeScans, scanIsComplete, fixLabelWords, consistentTotal,
   checkDetails, mapWorld, mapLatLon, fitMap, mapLinks, periodBreakdown, previousBounds, auditBooks, categorizeExpenses, answerReport, reportIntent, askPeriod,
   padQuad,
   repairAmounts,

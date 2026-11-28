@@ -637,6 +637,7 @@
   .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: 1px; }
   .badge.on { background: #d8fff1; color: #006b3a; }
   .badge.off { background: #fff3c2; color: #7a5600; }
+  .notice.danger { background: #fde8e4; border-color: #f2a99b; color: #7a1d0c; }
   .notice { background: #fff8db; border: 1px solid #ffe27a; border-radius: 12px; padding: 12px 14px; font-size: 13px; margin: 16px 0 0;
     display: flex; justify-content: space-between; gap: 10px; align-items: center; color: #4a3b00; }
   .qr-box { display: block; width: 208px; height: 208px; margin: 8px auto 12px; padding: 10px; background: #fff; border-radius: 16px; border: 1px solid #e3e6e0; }
@@ -681,6 +682,11 @@
   .rv-item { border: 1px solid var(--line, #ddd); border-radius: 14px; padding: 12px; margin: 10px 0; }
   .rv-item b { display: block; }
   .rv-item span { display: block; font-size: 13px; opacity: .8; margin-top: 2px; }
+  .rv-item.suspended { border-color: #d4573b; background: rgba(212,87,59,.07); }
+  .rv-item .rv-sus { color: #d4573b; font-weight: 700; opacity: 1; }
+  .rv-panel { margin-top: 10px; padding: 10px; border-radius: 12px; background: rgba(127,127,127,.1); }
+  .rv-panel select, .rv-panel input { margin: 8px 0; }
+  #rv-filter { margin: 10px 0; }
   .rv-item .quick-row { margin-top: 8px; }
   .smap { position: relative; height: 240px; margin-top: 12px; border-radius: 16px; overflow: hidden; background: #e8eaed; touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
   .smap.big { height: min(58vh, 520px); }
@@ -703,6 +709,12 @@
   .nav-app { display: block; padding: 10px 8px; border-radius: 14px; border: 1px solid rgba(127,127,127,.3); background: var(--paper, #fff); color: inherit; font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
   .nav-app b { display: block; font-size: 14px; }
   .nav-app span { display: block; font-size: 12px; opacity: .7; }
+  .tap-photo { cursor: zoom-in; }
+  .photo-zoom { position: fixed; inset: 0; z-index: 80; background: #0b0b0b; display: flex; flex-direction: column; }
+  .photo-zoom[hidden] { display: none; }
+  .pz-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; background: rgba(0,0,0,.6); color: #fff; }
+  .pz-stage { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; display: grid; place-items: start center; touch-action: pan-x pan-y pinch-zoom; }
+  .pz-stage img { display: block; max-width: none; width: 100%; height: auto; }
   .tap-card { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; position: relative; }
   .tap-card .tap-more { position: absolute; right: 14px; top: 14px; font-size: 12px; font-weight: 700; opacity: .65; }
   .tap-card:active { transform: scale(.985); }
@@ -1210,6 +1222,7 @@
 
           <div class="auth-card acct-view" data-view="home">
             <div class="acct-head"><div class="avatar" id="acct-avatar">S</div><div><b id="acct-email-shown"></b><span id="acct-sync"></span></div></div>
+            <div class="notice danger" id="acct-suspended" hidden><span id="acct-suspended-text"></span></div>
             <div class="notice" id="acct-verify" hidden><span id="acct-verify-text">Confirm your email so you can reset your password by email.</span><button class="btn-small" onclick="resendVerify()">Resend</button></div>
             <div class="acct-actions">
               <button class="btn-primary" onclick="syncNow(true)"><span class="spinner"></span><span class="btn-label">Sync now</span></button>
@@ -1250,9 +1263,8 @@
           <div class="auth-card acct-view" data-view="reviews">
             <h2 class="auth-title">Identity reviews</h2>
             <p class="auth-sub" id="rv-report">Loading&hellip;</p>
-            <label class="auth-label" for="rv-email">Approve or deny by email</label>
-            <input class="auth-input" id="rv-email" type="email" autocomplete="off" placeholder="reviewer@example.com">
-            <div class="quick-row"><button class="pill small" onclick="decideByEmail('approved')">Approve</button><button class="pill-outline small danger-link" onclick="decideByEmail('denied')">Deny</button></div>
+            <input class="auth-input" id="rv-search" type="search" autocomplete="off" placeholder="Search by name or email" oninput="renderReviews()">
+            <div class="seg lime" id="rv-filter"><button data-filter="all" class="on">Everyone</button><button data-filter="waiting">Waiting</button><button data-filter="denied">Denied</button><button data-filter="suspended">Suspended</button></div>
             <div id="rv-list"></div>
             <button class="btn-secondary" onclick="setAcctView('home')">Back</button>
             <p class="auth-msg" id="rv-msg" role="alert"></p>
@@ -1520,7 +1532,7 @@
         <p class="scan-note" id="invoice-scan-note" hidden></p>
         <div class="quick-row" id="invoice-redo"><button class="pill-outline small" onclick="retakeInvoice()">Retake photo</button><button class="pill-outline small danger-link" onclick="discardInvoice()">Delete photo</button></div>
         <p class="note" id="invoice-note">Check the client and the total. Nothing is sent.</p>
-        <img class="receipt-shot" id="invoice-photo" alt="Scanned invoice" hidden>
+        <img class="receipt-shot tap-photo" onclick="openPhoto(this.src)" id="invoice-photo" alt="Scanned invoice" hidden>
         <div class="card" id="invoice-card" style="background:var(--linen)">
           <h3>Sample invoice</h3>
           <p>North dock · $320.00. Save keeps it as a draft.</p>
@@ -1558,7 +1570,7 @@
         <p class="scan-note" id="receipt-scan-note" hidden></p>
         <div class="quick-row" id="receipt-redo"><button class="pill-outline small" onclick="retakeReceipt()">Retake photo</button><button class="pill-outline small danger-link" onclick="discardReceipt()">Delete photo</button></div>
         <p class="note" id="expense-note">Check the photo, then save. Nothing is filed until then.</p>
-        <img class="receipt-shot" id="receipt-photo" alt="Receipt photo" hidden>
+        <img class="receipt-shot tap-photo" onclick="openPhoto(this.src)" id="receipt-photo" alt="Receipt photo" hidden>
         <div class="card" id="receipt-card" style="background:var(--linen)">
           <h3>Sample receipt</h3>
           <p>Harbor Lumber · Nov 18, 2026. Check the total, then save.</p>
@@ -1901,6 +1913,11 @@
           <a class="nav-app" id="dv2-waze" target="_blank" rel="noopener"><b>Waze</b><span>Go to the end</span></a>
         </div>
       </section>
+
+      <div class="photo-zoom" id="photo-zoom" hidden role="dialog" aria-label="Photo">
+        <div class="pz-bar"><button class="pill small" onclick="zoomPhoto(-1)" aria-label="Zoom out">&minus;</button><button class="pill small" onclick="zoomPhoto(1)" aria-label="Zoom in">+</button><span id="pz-level">Fit</span><button class="pill small" onclick="closePhoto()">Done</button></div>
+        <div class="pz-stage" id="pz-stage"><img id="pz-img" alt="Photo"></div>
+      </div>
 
       <section class="screen no-tabs" id="insight">
         <button class="back" onclick="backFromInsight()">Back</button>
@@ -3834,6 +3851,10 @@
     cam.last = null;
     cam.readyAt = 0;
     cam.shown = null;
+    cam.want = null;
+    cam.cand = null;
+    cam.candN = 0;
+    cam.alpha = 0;
     cam.shooting = false;
     cam.auto = camEl("cam-auto").checked;
     camEl("cam").classList.add("on");
@@ -3847,6 +3868,10 @@
     camBusy(false);
     if (cam.raf) cancelAnimationFrame(cam.raf);
     cam.raf = 0;
+    if (cam.paintRaf) cancelAnimationFrame(cam.paintRaf);
+    cam.paintRaf = 0;
+    cam.want = null;
+    cam.shown = null;
     if (cam.timer) clearTimeout(cam.timer);
     cam.timer = 0;
     stopStream();
@@ -3875,6 +3900,7 @@
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
     const attempts = [
+      { video: { facingMode: { ideal: cam.facing }, width: { ideal: 2560 }, height: { ideal: 1920 } }, audio: false },
       { video: { facingMode: { ideal: cam.facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false },
       { video: { facingMode: cam.facing }, audio: false },
       { video: true, audio: false }
@@ -3892,6 +3918,10 @@
     cam.track = cam.stream.getVideoTracks()[0];
     const able = cam.track && cam.track.getCapabilities ? cam.track.getCapabilities() : {};
     cam.nativeZoom = able && able.zoom ? able.zoom : null;
+    // Keep the lens focused on the page, not the table behind it.
+    try {
+      if (able && able.focusMode && able.focusMode.indexOf("continuous") !== -1) await cam.track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+    } catch (error) {}
     const slider = camEl("cam-zoom");
     slider.min = "1";
     slider.max = String(cam.nativeZoom ? Math.min(8, cam.nativeZoom.max / (cam.nativeZoom.min || 1)) : 6);
@@ -3979,7 +4009,7 @@
     if (cam.timer) clearTimeout(cam.timer);
     cam.timer = setTimeout(() => {
       cam.raf = requestAnimationFrame(() => { detectOnce(); scheduleDetect(); });
-    }, 140);
+    }, 100);
   }
 
   function detectOnce() {
@@ -4037,7 +4067,59 @@
     if (node && node.textContent !== text) node.textContent = text;
   }
 
+  // The outline is drawn in two parts. The finder only says where the page is (a few
+  // times a second); this paints at the screen's full speed, easing toward that spot,
+  // fading in and out, and ignoring a one-frame false box. That is what stops the glitching.
+  const GUIDE_NEAR = 0.06;
+
   function drawGuide(quad, width, height) {
+    if (!quad) { cam.want = null; cam.cand = null; cam.candN = 0; paintSoon(); return; }
+    const next = quad.corners.map((corner) => ({ x: corner.x / width, y: corner.y / height }));
+    const apart = (a, b) => Math.max.apply(null, a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
+    if (cam.want && apart(next, cam.want) < GUIDE_NEAR) {
+      cam.want = next;
+      cam.cand = null;
+      cam.candN = 0;
+    } else {
+      // A new or far-away box has to be seen twice in a row before the outline moves to it.
+      cam.candN = cam.cand && apart(next, cam.cand) < GUIDE_NEAR ? cam.candN + 1 : 1;
+      cam.cand = next;
+      if (cam.candN >= 2) { cam.want = next; cam.cand = null; cam.candN = 0; }
+    }
+    paintSoon();
+  }
+
+  function paintSoon() {
+    if (cam.paintRaf) return;
+    cam.paintAt = 0;
+    cam.paintRaf = requestAnimationFrame(paintGuide);
+  }
+
+  function paintGuide(now) {
+    cam.paintRaf = 0;
+    if (!camEl("cam").classList.contains("on")) return;
+    const dt = Math.min(64, cam.paintAt ? now - cam.paintAt : 16);
+    cam.paintAt = now;
+    const ease = 1 - Math.exp(-dt / 55);
+    if (cam.want) {
+      cam.shown = cam.shown
+        ? cam.shown.map((p, i) => ({ x: p.x + (cam.want[i].x - p.x) * ease, y: p.y + (cam.want[i].y - p.y) * ease }))
+        : cam.want.map((p) => ({ x: p.x, y: p.y }));
+      cam.alpha = Math.min(1, (cam.alpha || 0) + dt / 140);
+    } else {
+      cam.alpha = Math.max(0, (cam.alpha || 0) - dt / 200);
+      if (!cam.alpha) cam.shown = null;
+    }
+    renderGuide(cam.shown, cam.alpha || 0);
+    const settled = cam.want && cam.shown && apart2(cam.shown, cam.want) < 0.0008 && cam.alpha >= 1;
+    if ((cam.want && !settled) || (!cam.want && cam.alpha > 0)) cam.paintRaf = requestAnimationFrame(paintGuide);
+  }
+
+  function apart2(a, b) {
+    return Math.max.apply(null, a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
+  }
+
+  function renderGuide(shown, alpha) {
     const overlay = camEl("cam");
     const canvas = camEl("cam-guide");
     const box = overlay.getBoundingClientRect();
@@ -4047,19 +4129,10 @@
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
-    if (!quad) { cam.shown = null; return; }
-    const kx = W / width;
-    const ky = H / height;
-    const target = quad.corners.map((corner) => ({ x: corner.x * kx, y: corner.y * ky }));
-    // Small wobbles glide; a real move jumps, so the outline never trails behind the page.
-    const jump = cam.shown
-      ? Math.max.apply(null, cam.shown.map((point, i) => Math.hypot(target[i].x - point.x, target[i].y - point.y)))
-      : Infinity;
-    cam.shown = jump > Math.hypot(W, H) * 0.06
-      ? target
-      : cam.shown.map((point, i) => ({ x: point.x + (target[i].x - point.x) * 0.5, y: point.y + (target[i].y - point.y) * 0.5 }));
-    const pts = cam.shown;
+    if (!shown || alpha <= 0) return;
+    const pts = shown.map((p) => ({ x: p.x * W, y: p.y * H }));
     const ready = cam.steady >= 2;
+    ctx.globalAlpha = alpha;
     const trace = () => pts.forEach((point, i) => (i ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y)));
     ctx.beginPath();
     ctx.rect(0, 0, W, H);
@@ -4096,6 +4169,7 @@
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
     });
+    ctx.globalAlpha = 1;
   }
 
   function camBusy(on, text, progress) {
@@ -4128,7 +4202,7 @@
       const box = camEl("cam").getBoundingClientRect();
       const crop = visibleCrop(video, box.width, box.height);
       const full = document.createElement("canvas");
-      const scale = Math.min(1, 2000 / Math.max(crop.sw, crop.sh));
+      const scale = Math.min(1, 3200 / Math.max(crop.sw, crop.sh));
       full.width = Math.round(crop.sw * scale);
       full.height = Math.round(crop.sh * scale);
       full.getContext("2d").drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, full.width, full.height);
@@ -4175,7 +4249,7 @@
     const ky = source.height / Math.round(detectWidth * source.height / source.width);
     // A margin round the page, so no edge of the receipt or invoice is cut off.
     const corners = SA.padQuad(quad.corners.map((corner) => ({ x: corner.x * kx, y: corner.y * ky })), source.width, source.height, 0.035);
-    const size = SA.straightenedSize(corners, 1500);
+    const size = SA.straightenedSize(corners, 2400);
     if (!size) return source;
     const to = [{ x: 0, y: 0 }, { x: size.width, y: 0 }, { x: size.width, y: size.height }, { x: 0, y: size.height }];
     const home = SA.solveHomography(to, corners);
@@ -4219,7 +4293,99 @@
     return out;
   }
 
-  // High-contrast grey copy: what the reader sees best.
+  // The reading copy of a photo. Faded paper, stains, shadows, and a bright window on one side
+  // all fool a plain contrast stretch. This divides each spot by the light around it (so uneven
+  // light and stains drop out), stretches what is left, and firms up the print a little.
+  function forReadingFlat(canvas) {
+    let width = Math.max(1500, Math.min(2000, canvas.width));
+    let height = Math.round(canvas.height * width / canvas.width);
+    // Very long receipts: keep the whole thing, but never so many pixels that a phone gives up.
+    const pixels = width * height;
+    if (pixels > 6000000) {
+      const shrink = Math.sqrt(6000000 / pixels);
+      width = Math.round(width * shrink);
+      height = Math.round(height * shrink);
+    }
+    const out = document.createElement("canvas");
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(canvas, 0, 0, width, height);
+    const image = ctx.getImageData(0, 0, width, height);
+    const data = image.data;
+    const gray = new Float32Array(width * height);
+    for (let i = 0, p = 0; i < gray.length; i++, p += 4) gray[i] = data[p] * 0.299 + data[p + 1] * 0.587 + data[p + 2] * 0.114;
+    // The light around each spot, measured on a grid a quarter the size, then looked up.
+    const ds = 4;
+    const lw = Math.ceil(width / ds);
+    const lh = Math.ceil(height / ds);
+    const low = new Float32Array(lw * lh);
+    for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+      let sum = 0, n = 0;
+      for (let dy = 0; dy < ds && y * ds + dy < height; dy++) for (let dx = 0; dx < ds && x * ds + dx < width; dx++) { sum += gray[(y * ds + dy) * width + x * ds + dx]; n++; }
+      low[y * lw + x] = sum / n;
+    }
+    const integral = new Float64Array((lw + 1) * (lh + 1));
+    for (let y = 1; y <= lh; y++) {
+      let row = 0;
+      for (let x = 1; x <= lw; x++) { row += low[(y - 1) * lw + x - 1]; integral[y * (lw + 1) + x] = integral[(y - 1) * (lw + 1) + x] + row; }
+    }
+    const reach = Math.max(4, Math.round(width / 28 / ds / 2));
+    const mean = new Float32Array(lw * lh);
+    for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+      const x0 = Math.max(0, x - reach), x1 = Math.min(lw, x + reach + 1), y0 = Math.max(0, y - reach), y1 = Math.min(lh, y + reach + 1);
+      mean[y * lw + x] = (integral[y1 * (lw + 1) + x1] - integral[y0 * (lw + 1) + x1] - integral[y1 * (lw + 1) + x0] + integral[y0 * (lw + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+    }
+    const flat = new Float32Array(gray.length);
+    const hist = new Uint32Array(401);
+    for (let y = 0; y < height; y++) {
+      const row = (y / ds | 0) * lw;
+      for (let x = 0; x < width; x++) {
+        const value = gray[y * width + x] / Math.max(30, mean[row + (x / ds | 0)]) * 200;
+        flat[y * width + x] = value;
+        hist[Math.max(0, Math.min(400, value | 0))] += 1;
+      }
+    }
+    let lo = 0, hi = 400, seen = 0;
+    for (let i = 0; i <= 400; i++) { seen += hist[i]; if (seen > flat.length * 0.01) { lo = i; break; } }
+    seen = 0;
+    for (let i = 400; i >= 0; i--) { seen += hist[i]; if (seen > flat.length * 0.005) { hi = i; break; } }
+    const span = Math.max(20, hi - lo);
+    const curve = new Uint8Array(256);
+    for (let v = 0; v < 256; v++) curve[v] = Math.round(255 / (1 + Math.exp(-(v - 150) / 30)));
+    for (let i = 0, p = 0; i < flat.length; i++, p += 4) {
+      const v = curve[Math.max(0, Math.min(255, Math.round((flat[i] - lo) * 255 / span)))];
+      data[p] = data[p + 1] = data[p + 2] = v;
+    }
+    ctx.putImageData(image, 0, 0);
+    return out;
+  }
+
+  // Reads a photo the way a careful person would: look once, and if the total or the name is
+  // still missing, look again a different way, then keep the best of what each look found.
+  async function readPage(canvas, kind, onProgress) {
+    const parse = (text) => (kind === "invoice"
+      ? SA.parseInvoiceText(text, SA.LEDGER_TODAY, countryCode !== "US")
+      : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US"));
+    const passes = [
+      (report) => readText(forReadingFlat(canvas).toDataURL("image/png"), report, "6"),
+      (report) => readText(forReading(canvas).toDataURL("image/jpeg", 0.9), report, "4")
+    ];
+    let best = null;
+    for (let i = 0; i < passes.length; i++) {
+      const text = await passes[i]((p) => { if (onProgress) onProgress((i + p) / passes.length); });
+      const scan = parse(text);
+      // Sure enough of what it read, and it looks like a page of words and prices.
+      scan.readable = ocrConfidence >= 40 && SA.textLooksReadable(text);
+      best = scan.readable ? SA.mergeScans(best && best.readable ? best : null, scan) : (best || scan);
+      if (SA.scanIsComplete(best, kind)) break;
+    }
+    // A photo that could not be read clearly fills in nothing, rather than something wrong.
+    return best && best.readable ? best : null;
+  }
+
+  // High-contrast grey copy: the second look at a page.
   function forReading(canvas) {
     const width = Math.min(1400, canvas.width);
     const height = Math.round(canvas.height * width / canvas.width);
@@ -4263,10 +4429,7 @@
     {
       try {
         camBusy(true, "Reading the page…", 0.2);
-        const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9), (p) => camBusy(true, "Reading the page…", 0.2 + p * 0.75));
-        scan = mode === "invoice"
-          ? SA.parseInvoiceText(text, SA.LEDGER_TODAY, countryCode !== "US")
-          : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US");
+        scan = await readPage(canvas, mode, (p) => camBusy(true, "Reading the page…", 0.2 + p * 0.75));
       } catch (error) {
         scan = null;
         failedRead = true;
@@ -4319,7 +4482,10 @@
     ]);
   }
 
-  async function readText(dataUrl, onProgress) {
+  let ocrProgress = null;
+  let ocrConfidence = 0;
+  async function readText(dataUrl, onProgress, psm) {
+    ocrProgress = onProgress || null;
     if (!window.Tesseract) {
       if (!ocrLoading) ocrLoading = loadScriptOnce("ocr/tesseract.min.js").catch((error) => { ocrLoading = null; throw error; });
       await withTimeout(ocrLoading, 30000, "reader_load");
@@ -4333,7 +4499,7 @@
           langPath: "ocr/",
           gzip,
           logger: (message) => {
-            if (message && message.status === "recognizing text" && onProgress) onProgress(message.progress || 0);
+            if (message && message.status === "recognizing text" && ocrProgress) ocrProgress(message.progress || 0);
           }
         }), 60000, "reader_start");
       } catch (error) {
@@ -4345,8 +4511,16 @@
       } catch (error) {}
     }
     try {
+      try { if (ocrWorker.setParameters) await ocrWorker.setParameters({ tessedit_pageseg_mode: psm || "4" }); } catch (error) {}
       const result = await withTimeout(ocrWorker.recognize(dataUrl), 60000, "reader_read");
-      return (result && result.data && result.data.text) || "";
+      // Keep only the lines the reader is fairly sure of. A smudged line is worse than no line.
+      const data = (result && result.data) || {};
+      ocrConfidence = Number(data.confidence) || 0;
+      const kept = [];
+      (data.blocks || []).forEach((block) => (block.paragraphs || []).forEach((para) => (para.lines || []).forEach((line) => {
+        if ((Number(line.confidence) || 0) >= 45 && line.text && line.text.trim()) kept.push(line.text.trim());
+      })));
+      return kept.length ? kept.join("\n") : (ocrConfidence >= 45 ? String(data.text || "") : "");
     } catch (error) {
       // A worker that timed out is no use again; the next photo starts a fresh one.
       try { if (ocrWorker && ocrWorker.terminate) ocrWorker.terminate(); } catch (ignored) {}
@@ -4365,7 +4539,7 @@
     const note = document.getElementById("receipt-scan-note");
     const open = (id) => !onlyEmpty || !document.getElementById(id).value.trim();
     if (!scan || !scan.fields) {
-      if (note) { note.textContent = "Could not read this one. Type the details in."; note.hidden = false; }
+      if (note) { note.textContent = "I could not read this photo clearly. Retake it closer and steady with the whole page in the box, or type the details in."; note.hidden = false; }
       return;
     }
     const filled = [];
@@ -4384,7 +4558,7 @@
     if (note) {
       note.textContent = filled.length
         ? "Filled in the " + listWords(filled) + " from the photo. Check it before saving."
-        : "Could not read this one. Type the details in.";
+        : "I could not read this photo clearly. Retake it closer and steady with the whole page in the box, or type the details in.";
       note.hidden = false;
     }
   }
@@ -4393,7 +4567,7 @@
     const note = document.getElementById("invoice-scan-note");
     const open = (id) => !onlyEmpty || !document.getElementById(id).value.trim();
     if (!scan || !scan.fields) {
-      if (note) { note.textContent = "Could not read this one. Type the details in."; note.hidden = false; }
+      if (note) { note.textContent = "I could not read this photo clearly. Retake it closer and steady with the whole page in the box, or type the details in."; note.hidden = false; }
       return;
     }
     const filled = [];
@@ -4405,7 +4579,7 @@
     if (note) {
       note.textContent = filled.length
         ? "Filled in the " + listWords(filled) + " from the photo. Check it before saving."
-        : "Could not read this one. Type the details in.";
+        : "I could not read this photo clearly. Retake it closer and steady with the whole page in the box, or type the details in.";
       note.hidden = false;
     }
   }
@@ -4500,12 +4674,19 @@
     return new Promise((resolve) => {
       const image = new Image();
       image.onload = () => {
-        const scale = Math.min(1, 1280 / Math.max(image.width || 1, image.height || 1));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
-        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
+        // Big enough to read when tapped, small enough to store. Try the sharp size first.
+        const make = (limit, quality) => {
+          const scale = Math.min(1, limit / Math.max(image.width || 1, image.height || 1));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          return canvas.toDataURL("image/jpeg", quality);
+        };
+        let out = make(1800, 0.8);
+        if (out.length > 1200000) out = make(1400, 0.75);
+        if (out.length > 1200000) out = make(1100, 0.7);
+        resolve(out);
       };
       image.onerror = () => resolve("");
       image.src = dataUrl;
@@ -4548,14 +4729,11 @@
       let scan = null;
       try {
         const canvas = document.createElement("canvas");
-        const scale = Math.min(1, 2000 / Math.max(image.width || 1, image.height || 1));
+        const scale = Math.min(1, 3200 / Math.max(image.width || 1, image.height || 1));
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
         canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-        const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9));
-        scan = mode === "invoice"
-          ? SA.parseInvoiceText(text, SA.LEDGER_TODAY, countryCode !== "US")
-          : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US");
+        scan = await readPage(canvas, mode);
       } catch (error) {
         scan = null;
       }
@@ -5611,12 +5789,13 @@
   }
 
   // Identity and role come from the server on every sign-in; they are never trusted from this device.
-  let idState = { verified: false, enabled: false, status: "none", note: "", hasDetails: false, role: "" };
+  let idState = { verified: false, enabled: false, status: "none", note: "", hasDetails: false, role: "", suspended: false, suspendReason: "" };
   function applyProfile(profile) {
     if (!profile) return;
     idState = {
       verified: !!profile.identityVerified, enabled: !!profile.identityEnabled, status: String(profile.identityStatus || "none"),
-      note: String(profile.identityNote || ""), hasDetails: !!profile.hasDetails, role: profile.role === "owner" || profile.role === "admin" ? profile.role : ""
+      note: String(profile.identityNote || ""), hasDetails: !!profile.hasDetails, role: profile.role === "owner" || profile.role === "admin" ? profile.role : "",
+      suspended: !!profile.suspended, suspendReason: String(profile.suspendReason || "")
     };
     sync.email = profile.email || sync.email;
     sync.emailVerified = !!profile.emailVerified;
@@ -5659,7 +5838,17 @@
   }
 
   async function call(method, path, body) {
-    try { return await api(method, path, body); } catch (error) { return { status: 0, body: null }; }
+    try {
+      const got = await api(method, path, body);
+      // A suspended account is told why, once, wherever it happens.
+      if (got.status === 403 && got.body && got.body.error === "suspended" && !idState.suspended) {
+        idState.suspended = true;
+        idState.suspendReason = String(got.body.reason || "");
+        showPull("Your account is suspended. Open your profile to see why.");
+        try { renderAccount(); } catch (error) {}
+      }
+      return got;
+    } catch (error) { return { status: 0, body: null }; }
   }
 
   function scheduleSync() {
@@ -6100,6 +6289,7 @@
     review: ["In review", "off", "A person is checking your details against your ID."],
     pending: ["Checking", "off", "Your ID check is still running. Come back in a few minutes."],
     denied: ["Not approved", "off", "Your ID check did not pass. Fix your details and try again, or contact support."],
+    info: ["More info needed", "off", "We need a little more from you. Update your details and verify again."],
     none: ["Not checked", "off", ""]
   };
 
@@ -6109,7 +6299,9 @@
     el("idv-badge").className = "badge " + words[1];
     if (words[2]) el("idv-sub").textContent = words[2] + (idState.note && idState.status !== "approved" ? " (" + idState.note + ")" : "");
     el("idv-btn").hidden = idState.verified || idState.status === "review";
-    el("idv-btn").textContent = idState.status === "denied" ? "Try again" : "Verify";
+    el("idv-btn").textContent = idState.status === "denied" || idState.status === "info" ? "Try again" : "Verify";
+    el("acct-suspended").hidden = !idState.suspended;
+    el("acct-suspended-text").textContent = "Your account is suspended" + (idState.suspendReason ? ": " + idState.suspendReason : "") + ". Your books are safe on this device. Contact support@simpleaccountz.com or (215) 664-2407 to have it reviewed.";
     el("details-badge").textContent = idState.hasDetails ? "Saved" : "Needed";
     el("details-badge").className = "badge " + (idState.hasDetails ? "on" : "off");
     el("reviews-row").hidden = !idState.role;
@@ -6180,62 +6372,160 @@
     if (words[2]) showPull(words[2]);
   }
 
+  // ---- Identity reviews: approve, deny, ask for more, suspend, activate. Always with a reason. ----
+  let rvItems = [];
+  let rvReasons = { deny: {}, info: {}, suspend: {} };
+  let rvFilter = "all";
+  let rvOpen = "";
+
   async function openReviews() {
     setAcctView("reviews");
     el("rv-msg").textContent = "";
     const [report, queue] = await Promise.all([call("GET", "/api/admin/report"), call("GET", "/api/admin/identity")]);
     if (report.status === 200 && report.body) {
       const r = report.body;
-      el("rv-report").textContent = r.users + " people · " + r.verified + " verified · " + r.waiting + " waiting · " + r.denied + " denied";
+      el("rv-report").textContent = r.users + " people · " + r.verified + " verified · " + r.waiting + " waiting · " + r.denied + " denied · " + r.suspended + " suspended";
     } else el("rv-report").textContent = "Only Spencer and his admins can see this.";
+    rvItems = queue.status === 200 && queue.body ? queue.body.items || [] : [];
+    if (queue.body && queue.body.reasons) rvReasons = queue.body.reasons;
+    renderReviews();
+  }
+
+  const RV_FILTERS = [["all", "Everyone"], ["waiting", "Waiting"], ["denied", "Denied"], ["suspended", "Suspended"]];
+
+  function rvMatches(item) {
+    const q = el("rv-search").value.trim().toLowerCase();
+    if (q && (item.email + " " + ((item.details || {}).name || "")).toLowerCase().indexOf(q) === -1) return false;
+    if (rvFilter === "waiting") return item.decision === "review" || item.decision === "pending" || item.decision === "info" || item.decision === "none";
+    if (rvFilter === "denied") return item.decision === "denied";
+    if (rvFilter === "suspended") return item.suspended;
+    return true;
+  }
+
+  function rvButton(label, danger, handler) {
+    const button = document.createElement("button");
+    button.className = "pill-outline small" + (danger ? " danger-link" : "");
+    button.textContent = label;
+    button.onclick = handler;
+    return button;
+  }
+
+  function rvPanel(item, kind) {
+    const panel = document.createElement("div");
+    panel.className = "rv-panel";
+    const title = document.createElement("b");
+    title.textContent = { deny: "Deny: why?", info: "Ask for more information: what?", suspend: "Suspend: why?" }[kind];
+    const select = document.createElement("select");
+    select.className = "auth-input";
+    const table = rvReasons[kind] || {};
+    Object.keys(table).forEach((code) => {
+      const option = document.createElement("option");
+      option.value = code;
+      option.textContent = table[code];
+      select.appendChild(option);
+    });
+    const note = document.createElement("input");
+    note.className = "auth-input";
+    note.maxLength = 200;
+    note.placeholder = "Add a note (optional, the person sees it for ID decisions)";
+    const row = document.createElement("div");
+    row.className = "quick-row";
+    const go = document.createElement("button");
+    go.className = "pill small";
+    go.textContent = "Confirm";
+    go.onclick = () => (kind === "suspend"
+      ? suspendAccount(item.id, "suspend", select.value, note.value)
+      : decideIdentity(item.id, kind === "info" ? "info" : "denied", select.value, note.value));
+    row.appendChild(go);
+    row.appendChild(rvButton("Cancel", false, () => { rvOpen = ""; renderReviews(); }));
+    panel.appendChild(title);
+    panel.appendChild(select);
+    panel.appendChild(note);
+    panel.appendChild(row);
+    return panel;
+  }
+
+  function renderReviews() {
+    document.querySelectorAll("#rv-filter button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.filter === rvFilter);
+      button.onclick = () => { rvFilter = button.dataset.filter; renderReviews(); };
+    });
     const list = el("rv-list");
     list.innerHTML = "";
-    const items = queue.status === 200 && queue.body ? queue.body.items || [] : [];
-    if (!items.length) { list.innerHTML = '<p class="note">Nothing waiting.</p>'; return; }
-    items.forEach((item) => {
+    const shown = rvItems.filter(rvMatches);
+    if (!shown.length) {
+      const empty = document.createElement("p");
+      empty.className = "note";
+      empty.textContent = rvItems.length ? "Nobody matches." : "Nobody yet.";
+      list.appendChild(empty);
+      return;
+    }
+    const iAm = idState.role;
+    shown.forEach((item) => {
       const row = document.createElement("div");
-      row.className = "rv-item";
+      row.className = "rv-item" + (item.suspended ? " suspended" : "");
       const d = item.details || {};
       const head = document.createElement("b");
-      head.textContent = (d.name || item.email) + " · " + (ID_WORDS[item.decision] || ID_WORDS.none)[0];
+      head.textContent = (d.name || item.email) + " · " + (ID_WORDS[item.decision] || ID_WORDS.none)[0] + (item.suspended ? " · Suspended" : "") + (item.role ? " · " + (item.role === "owner" ? "Owner" : "Admin") : "");
       const who = document.createElement("span");
-      who.textContent = item.email + (d.street ? " · " + d.street + ", " + d.city + " " + d.state + " " + d.zip : "");
+      who.textContent = item.email + (d.street ? " · " + d.street + ", " + d.city + " " + d.state + " " + d.zip : "") + (d.phone ? " · " + d.phone : "");
       const why = document.createElement("span");
-      why.textContent = (item.by === "owner" ? "Decided by Spencer" : item.by === "admin" ? "Decided by " + item.adminBy : item.by === "auto" ? "Automatic check" : "Has not started the ID check") + (item.note ? " · " + item.note : "") + (item.hasDetails ? "" : " · no details yet");
-      const actions = document.createElement("div");
-      actions.className = "quick-row";
-      [["approved", "Approve"], ["denied", "Deny"], ["clear", "Undo decision"]].forEach(([value, label]) => {
-        const button = document.createElement("button");
-        button.className = value === "denied" ? "pill-outline small danger-link" : "pill-outline small";
-        button.textContent = label;
-        button.onclick = () => decideIdentity(item.id, value);
-        actions.appendChild(button);
-      });
+      why.textContent = (item.by === "owner" ? "ID decided by Spencer" : item.by === "admin" ? "ID decided by " + item.adminBy : item.by === "auto" ? "ID: automatic check" : "Has not started the ID check")
+        + (item.reason ? " · " + item.reason : "") + (item.hasDetails ? "" : " · no details yet");
       row.appendChild(head);
       row.appendChild(who);
       row.appendChild(why);
-      row.appendChild(actions);
+      if (item.suspended) {
+        const sus = document.createElement("span");
+        sus.className = "rv-sus";
+        sus.textContent = "Suspended by " + (item.suspendBy === "ai" ? "the AI" : item.suspendBy === "owner" ? "Spencer" : item.suspendWho || "an admin") + " · " + item.suspendReason;
+        row.appendChild(sus);
+      }
+      // Spencer can act on anyone but himself; an admin cannot act on another admin or Spencer.
+      const locked = item.role === "owner" || (item.role === "admin" && iAm !== "owner");
+      if (locked) {
+        const lockNote = document.createElement("span");
+        lockNote.textContent = item.role === "owner" ? "The owner's account cannot be changed." : "Only Spencer can change an admin.";
+        row.appendChild(lockNote);
+      } else {
+        const actions = document.createElement("div");
+        actions.className = "quick-row";
+        actions.appendChild(rvButton("Approve", false, () => decideIdentity(item.id, "approved", "", "")));
+        actions.appendChild(rvButton("Deny…", true, () => { rvOpen = item.id + ":deny"; renderReviews(); }));
+        actions.appendChild(rvButton("Ask for info…", false, () => { rvOpen = item.id + ":info"; renderReviews(); }));
+        if (item.suspended) actions.appendChild(rvButton("Activate", false, () => suspendAccount(item.id, "activate", "", "")));
+        else actions.appendChild(rvButton("Suspend…", true, () => { rvOpen = item.id + ":suspend"; renderReviews(); }));
+        if (item.by === "owner" || item.by === "admin") actions.appendChild(rvButton("Undo ID decision", false, () => decideIdentity(item.id, "clear", "", "")));
+        if (item.suspendBy === "owner" || item.suspendBy === "admin") actions.appendChild(rvButton("Undo suspend decision", false, () => suspendAccount(item.id, "clear", "", "")));
+        row.appendChild(actions);
+        const parts = rvOpen.split(":");
+        if (parts[0] === item.id && rvReasons[parts[1]]) row.appendChild(rvPanel(item, parts[1]));
+      }
       list.appendChild(row);
     });
   }
 
-  const DECISION_WORDS = { approved: "Approved", denied: "Denied", clear: "Decision removed" };
+  const DECISION_WORDS = { approved: "Approved", denied: "Denied", info: "Asked for more information", clear: "Decision removed" };
 
-  async function decideIdentity(userId, decision, email) {
+  async function reviewCall(path, body, okText) {
     el("rv-msg").textContent = "Saving…";
-    const done = await call("POST", "/api/admin/identity/decide", email ? { email, decision } : { userId, decision });
+    const done = await call("POST", path, body);
     if (done.status === 403 && done.body && done.body.error === "owner_decided") { el("rv-msg").textContent = "Spencer already decided this one. Only he can change it."; return; }
-    if (done.status === 404) { el("rv-msg").textContent = "No account with that email."; return; }
+    if (done.status === 403) { el("rv-msg").textContent = "You cannot change that account."; return; }
+    if (done.status === 400) { el("rv-msg").textContent = "Pick a reason first."; return; }
     if (done.status !== 200) { el("rv-msg").textContent = "That did not go through. Try again."; return; }
+    rvOpen = "";
     await openReviews();
-    el("rv-msg").textContent = (DECISION_WORDS[decision] || "Saved") + (email ? " " + email : "") + ".";
-    showPull((DECISION_WORDS[decision] || "Saved") + ".");
+    el("rv-msg").textContent = okText + ".";
+    showPull(okText + ".");
   }
 
-  function decideByEmail(decision) {
-    const email = el("rv-email").value.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { el("rv-msg").textContent = "Enter the person's email first."; return; }
-    decideIdentity("", decision, email);
+  function decideIdentity(userId, decision, reason, note) {
+    return reviewCall("/api/admin/identity/decide", { userId, decision, reason, note }, DECISION_WORDS[decision] || "Saved");
+  }
+
+  function suspendAccount(userId, action, reason, note) {
+    return reviewCall("/api/admin/suspend", { userId, action, reason, note }, { suspend: "Suspended", activate: "Activated", clear: "Decision removed" }[action]);
   }
 
   let liveShell = "";
@@ -7297,6 +7587,30 @@
     if (!readDrive()) showPull("Tip: tap Start drive too, so the miles are logged.");
     window.open(links[app], "_blank", "noopener");
   }
+
+  // ---- Tap a picture to see it big. Pinch, or use + and -, then drag to look around. ----
+  let photoLevel = 1;
+  function openPhoto(src) {
+    if (!src || src.indexOf("data:image/") !== 0 && src.indexOf("blob:") !== 0) return;
+    photoLevel = 1;
+    document.getElementById("pz-img").src = src;
+    setPhotoLevel();
+    document.getElementById("photo-zoom").hidden = false;
+  }
+  function setPhotoLevel() {
+    document.getElementById("pz-img").style.width = photoLevel * 100 + "%";
+    document.getElementById("pz-level").textContent = photoLevel === 1 ? "Fit" : photoLevel + "x";
+  }
+  function zoomPhoto(step) {
+    photoLevel = Math.max(1, Math.min(4, photoLevel + step));
+    setPhotoLevel();
+  }
+  function closePhoto() {
+    document.getElementById("photo-zoom").hidden = true;
+    document.getElementById("pz-img").removeAttribute("src");
+  }
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closePhoto(); });
+  document.addEventListener("dblclick", (event) => { if (event.target && event.target.id === "pz-img") { photoLevel = photoLevel === 1 ? 2 : 1; setPhotoLevel(); } });
 
   function openDriveView(tx) {
     const m = tx.mileage || {};
