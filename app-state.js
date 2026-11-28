@@ -1477,7 +1477,7 @@ function invoiceFromScan(scan, fields) {
       type: "invoice",
       name: name,
       number: "",
-      subtitle: "Scanned",
+      subtitle: scan.photo ? "Scanned" : "Typed in",
       stored: "draft",
       display: "Draft",
       chip: "draft",
@@ -2524,6 +2524,22 @@ function applyHomography(h, x, y) {
 }
 
 // How big the straightened page should be, keeping the paper's real proportions.
+// Pushes the corners out from the middle, so the photo keeps a margin round the page
+// and never cuts off its edge. Stays inside the picture.
+function padQuad(corners, width, height, frac) {
+  const share = frac == null ? 0.035 : frac;
+  const cx = corners.reduce((sum, c) => sum + c.x, 0) / corners.length;
+  const cy = corners.reduce((sum, c) => sum + c.y, 0) / corners.length;
+  const reach = Math.max(width, height) * share;
+  return corners.map((c) => {
+    const dx = c.x - cx, dy = c.y - cy, len = Math.hypot(dx, dy) || 1;
+    return {
+      x: Math.max(0, Math.min(width - 1, c.x + dx / len * reach)),
+      y: Math.max(0, Math.min(height - 1, c.y + dy / len * reach))
+    };
+  });
+}
+
 function straightenedSize(corners, maxWidth) {
   const side = (a, b) => Math.hypot(corners[b].x - corners[a].x, corners[b].y - corners[a].y);
   const width = Math.max(side(0, 1), side(3, 2));
@@ -2608,9 +2624,21 @@ const TOTAL_WORDS = /\b(grand\s*total|balance\s*due|amount\s*due|total\s*due|bal
 const SKIP_TOTAL = /\b(sub\s*-?total|tax|vat|gst|tip|change|cash|tendered|discount|sav(?:e|ed|ing|ings)|promo(?:tion)?s?|coupons?|rewards?|points|items?|qty|quantity|count|units?)\b/i;
 const NOT_A_NAME = /^[\s\d\W]*$/;
 
+// The reader's usual slips inside an amount: O for 0, l or I for 1, a space by the
+// decimal point, S for $. Only fixed where the text is plainly a price (it has cents).
+function repairAmounts(line) {
+  return line
+    .replace(/(\d)\s*([.,])\s+(\d{2})\b/g, "$1$2$3")
+    .replace(/(\d)\s+([.,])(\d{2})\b/g, "$1$2$3")
+    .replace(/(^|[\s:])S(?=\s?\d[\dOoIl]*[.,][\dOoIl]{2}\b)/g, "$1$")
+    .replace(/(^|[^A-Za-z])([\dOoIl]*\d[\dOoIl]*[.,][\dOoIl]{2})(?![A-Za-z\d])/g,
+      (all, before, amount) => before + amount.replace(/[Oo]/g, "0").replace(/[Il]/g, "1"));
+}
+
 function cleanLines(text) {
   return String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean)
-    .map((line) => line.replace(/\bT[0O]TAL\b/gi, "TOTAL").replace(/\bAM0UNT\b/gi, "AMOUNT"));
+    .map((line) => repairAmounts(line.replace(/\bT[0O]TAL\b/gi, "TOTAL").replace(/\bAM0UNT\b/gi, "AMOUNT")
+      .replace(/\bSUBT[0O]TAL\b/gi, "SUBTOTAL")));
 }
 
 // grand = the amount to pay. skip = tax, subtotal, tender. total = a plain total.
@@ -2701,6 +2729,59 @@ function merchantLine(line) {
   return (line.match(/[A-Za-z]/g) || []).length >= 3;
 }
 
+// Shops whose name is usually a logo the reader cannot see, matched anywhere on the
+// receipt (a footer, "Thank you for shopping at", or the web address).
+const KNOWN_SHOPS = [
+  ["Walmart", /\bwal[\s-]?mart\b/i], ["Target", /\btarget\b(?!\s*(?:price|date))/i], ["The Home Depot", /\bhome\s*depot\b/i],
+  ["Lowe's", /\blowe'?s\b/i], ["Costco", /\bcostco\b/i], ["Sam's Club", /\bsam'?s\s*club\b/i], ["Dollar General", /\bdollar\s*general\b/i],
+  ["Dollar Tree", /\bdollar\s*tree\b/i], ["Family Dollar", /\bfamily\s*dollar\b/i], ["Walgreens", /\bwalgreens\b/i], ["CVS", /\bcvs\b/i],
+  ["Rite Aid", /\brite\s*aid\b/i], ["Kroger", /\bkroger\b/i], ["Safeway", /\bsafeway\b/i], ["Publix", /\bpublix\b/i], ["Aldi", /\baldi\b/i],
+  ["Trader Joe's", /\btrader\s*joe'?s\b/i], ["Whole Foods", /\bwhole\s*foods\b/i], ["ShopRite", /\bshop\s*rite\b/i], ["Wegmans", /\bwegmans\b/i],
+  ["Stop & Shop", /\bstop\s*&\s*shop\b/i], ["7-Eleven", /\b7[\s-]?eleven\b/i], ["Wawa", /\bwawa\b/i], ["Sheetz", /\bsheetz\b/i],
+  ["Shell", /\bshell\b(?:\s*oil)?/i], ["ExxonMobil", /\bexxon|\bmobil\b/i], ["Chevron", /\bchevron\b/i], ["Sunoco", /\bsunoco\b/i],
+  ["Speedway", /\bspeedway\b/i], ["Circle K", /\bcircle\s*k\b/i], ["Staples", /\bstaples\b/i], ["Office Depot", /\boffice\s*depot\b/i],
+  ["Best Buy", /\bbest\s*buy\b/i], ["Menards", /\bmenards\b/i], ["Ace Hardware", /\bace\s*hardware\b/i], ["Harbor Freight", /\bharbor\s*freight\b/i],
+  ["Tractor Supply", /\btractor\s*supply\b/i], ["AutoZone", /\bauto\s*zone\b/i], ["O'Reilly Auto Parts", /\bo'?reilly\b/i],
+  ["Advance Auto Parts", /\badvance\s*auto\b/i], ["IKEA", /\bikea\b/i], ["Michaels", /\bmichaels\b/i], ["Hobby Lobby", /\bhobby\s*lobby\b/i],
+  ["PetSmart", /\bpetsmart\b/i], ["Petco", /\bpetco\b/i], ["Starbucks", /\bstarbucks\b/i], ["Dunkin'", /\bdunkin\b/i],
+  ["McDonald's", /\bmc\s*donald'?s\b/i], ["Chick-fil-A", /\bchick[\s-]?fil[\s-]?a\b/i], ["Chipotle", /\bchipotle\b/i], ["Subway", /\bsubway\b/i],
+  ["Panera Bread", /\bpanera\b/i], ["Wendy's", /\bwendy'?s\b/i], ["Burger King", /\bburger\s*king\b/i], ["Taco Bell", /\btaco\s*bell\b/i],
+  ["Domino's", /\bdomino'?s\b/i], ["Pizza Hut", /\bpizza\s*hut\b/i], ["The UPS Store", /\bups\s*store\b/i], ["FedEx", /\bfedex\b/i],
+  ["USPS", /\busps\b|\bpostal\s*service\b/i], ["Amazon", /\bamazon\b/i], ["Apple", /\bapple\s*store\b/i]
+];
+
+function knownShop(lines) {
+  const all = lines.join("\n");
+  for (let i = 0; i < KNOWN_SHOPS.length; i++) if (KNOWN_SHOPS[i][1].test(all)) return KNOWN_SHOPS[i][0];
+  return "";
+}
+
+// How much a header line looks like a shop's name: mostly letters, real words, near the top.
+function merchantScore(line, index) {
+  const letters = (line.match(/[A-Za-z]/g) || []).length;
+  const words = line.split(/\s+/).filter((word) => /^[A-Za-z&'.-]{2,}$/.test(word));
+  if (letters / line.replace(/\s/g, "").length < 0.7 || !words.length) return 0;
+  if (words.some((word) => word.length >= 3 && !/[aeiouy]/i.test(word) && !/^[A-Z&.]{2,5}$/.test(word))) return 0;
+  return 10 - index + Math.min(words.length, 4) + (line === line.toUpperCase() ? 2 : 0);
+}
+
+function labelledAmount(lines, pattern) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!pattern.test(lines[i])) continue;
+    const money = priceTokens(lines[i], true);
+    if (money.length) return money[money.length - 1].minor;
+  }
+  return 0;
+}
+
+// A receipt date is today or earlier, and not years old: a misread is skipped, not used.
+function plausibleReceiptDate(date, today) {
+  if (!date || !today) return !!date;
+  const now = Date.parse(today + "T00:00:00Z");
+  const then = Date.parse(date + "T00:00:00Z");
+  return Number.isFinite(then) && then <= now + 86400000 && now - then <= 3 * 366 * 86400000;
+}
+
 // Pulls merchant, total, and date off a shop receipt.
 function parseReceiptText(text, today, dayFirst) {
   const lines = cleanLines(text);
@@ -2708,6 +2789,16 @@ function parseReceiptText(text, today, dayFirst) {
   if (!lines.length) return found;
 
   let totalMinor = readLabeledTotal(lines);
+  // Subtotal plus tax checks the total: a misread total is replaced when the
+  // card or cash line agrees with the sum instead.
+  const sub = labelledAmount(lines, /\bsub\s*-?total\b/i);
+  const tax = labelledAmount(lines, /\b(?:sales\s*)?(?:tax|vat|gst|hst)\b/i);
+  if (sub && tax < sub) {
+    const sum = sub + tax;
+    const paid = lines.filter((line) => isCardLine(line) || /\b(?:debit|credit|tend(?:er(?:ed)?)?|paid|payment)\b/i.test(line))
+      .some((line) => priceTokens(line, true).some((item) => item.minor === sum));
+    if (!totalMinor || (totalMinor !== sum && paid) || totalMinor < sub) totalMinor = sum;
+  }
   if (!totalMinor) {
     // No labelled total: the largest real price, never a card, a year, or a street number.
     lines.forEach((line) => {
@@ -2720,11 +2811,23 @@ function parseReceiptText(text, today, dayFirst) {
   if (totalMinor > 0) { found.totalMinor = totalMinor; found.fields += 1; }
 
   for (let i = 0; i < lines.length && !found.date; i++) {
-    const date = parseLooseDate(lines[i], today, dayFirst);
-    if (date) { found.date = date; found.fields += 1; }
+    // "11/2O/2O26": the reader's O for 0 inside a date.
+    const date = parseLooseDate(lines[i].replace(/[\dOo]{1,4}[\/.-][\dOo]{1,2}[\/.-][\dOo]{2,4}/g, (m) => m.replace(/[Oo]/g, "0")), today, dayFirst);
+    if (date && plausibleReceiptDate(date, today)) { found.date = date; found.fields += 1; }
   }
 
-  const header = lines.slice(0, 8).map(merchantName).find(merchantLine);
+  // Only the header and the thank-you or web-address lines: an item called "Shell pasta" is not Shell.
+  const firstPrice = lines.findIndex((line) => /[$£€¥]\s?\d|\d[.,]\d{2}\b/.test(line));
+  const top = lines.slice(0, Math.min(8, firstPrice === -1 ? 8 : firstPrice));
+  let header = knownShop(top.concat(lines.filter((line) => /www\.|\.com\b|thank|shopping|visit/i.test(line))));
+  if (!header) {
+    let best = 0;
+    lines.slice(0, 8).map(merchantName).forEach((line, index) => {
+      if (!merchantLine(line)) return;
+      const score = merchantScore(line, index);
+      if (score > best) { best = score; header = line; }
+    });
+  }
   if (header) {
     found.merchant = header.replace(/[*#|]+/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
     found.fields += 1;
@@ -3498,6 +3601,8 @@ const SA = {
   driveRecord,
   routePaths,
   routeMapView,
+  padQuad,
+  repairAmounts,
   placeText,
   mapLink,
   cleanTrip,

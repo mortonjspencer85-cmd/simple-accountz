@@ -677,6 +677,7 @@
   .shutter { width: 74px; height: 74px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); cursor: pointer; }
   .shutter:active { transform: scale(.94); }
   .shutter.armed { border-color: var(--lime); background: rgba(180,255,106,.35); }
+  .cam-type { display: block; margin: 0 auto 10px; padding: 8px 16px; border: 0; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; font: inherit; font-size: 14px; }
   .cam-auto { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: #fff; font-size: 13px; font-weight: 600; }
   .cam-auto input { accent-color: var(--lime); width: 18px; height: 18px; }
   .cam-busy { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 28px;
@@ -890,13 +891,14 @@
           <button class="cam-icon" id="cam-torch" onclick="toggleTorch()" aria-label="Flash" hidden><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
         </div>
         <div class="cam-bottom">
+          <button class="cam-type" onclick="typeInstead()">Type it in instead</button>
           <div class="cam-zoom"><span id="cam-zoom-label">1.0x</span><input id="cam-zoom" type="range" min="1" max="6" step="0.1" value="1" aria-label="Zoom"></div>
           <div class="cam-row">
             <button class="cam-icon big" onclick="pickFromLibrary()" aria-label="Choose from photos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg></button>
             <button class="shutter" id="cam-shot" onclick="shoot(false)" aria-label="Take photo"><i></i></button>
             <button class="cam-icon big" id="cam-flip" onclick="flipCamera()" aria-label="Switch camera"><svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14.5-3.5L20 8M20 14a8 8 0 0 1-14.5 3.5L4 16"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></button>
           </div>
-          <label class="cam-auto"><input type="checkbox" id="cam-auto" checked onchange="setAutoScan(this.checked)"><span>Auto scan and fill in</span></label>
+          <label class="cam-auto"><input type="checkbox" id="cam-auto" checked onchange="setAutoScan(this.checked)"><span>Take the photo automatically</span></label>
         </div>
         <div class="cam-busy" id="cam-busy"><div><span id="cam-busy-text">Reading the page…</span><div class="bar"><i id="cam-busy-bar"></i></div></div></div>
       </div>
@@ -1358,6 +1360,7 @@
           <button class="hdr-icon" onclick="openDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
           <h2 class="title">Money</h2>
           <button class="pill small" onclick="beginReceipt()">Add expense</button>
+          <button class="pill-outline small" onclick="typeReceipt()">Type in a receipt</button>
           <button class="hdr-icon avatar" onclick="goProfile()" aria-label="Your profile and account"><span id="hdr-initial3">?</span></button>
         </div>
         <div class="seg" id="period">
@@ -1882,6 +1885,8 @@
           <h2 class="title" style="margin-bottom:12px">Camera</h2>
           <button class="choice" onclick="closeSheet(); beginInvoiceScan()">Scan an invoice<span>Photograph a paper invoice. It stays a draft until you send it.</span></button>
           <button class="choice" onclick="closeSheet(); beginReceipt()">Photo of a receipt<span>Take a picture of a paper receipt. It is filed when you save the expense.</span></button>
+          <button class="choice" onclick="closeSheet(); typeReceipt()">Type in a receipt<span>No photo. Enter the shop, date, and total yourself.</span></button>
+          <button class="choice" onclick="closeSheet(); typeInvoice()">Type in a paper invoice<span>No photo. Enter the client and total. It stays a draft.</span></button>
           <button class="textlink" onclick="closeSheet()">Cancel</button>
         </div>
         <div class="sheet" id="sheet-new">
@@ -1891,6 +1896,7 @@
           <button class="choice" onclick="closeSheet(); openInvoiceEditor()">Invoice<span>Starts a draft. Send stays off until it is complete.</span></button>
           <button class="choice preview-only" onclick="closeSheet(); show('editor-draft')">Receipt<span>Record a payment you already took. This does not mark an old invoice paid.</span></button>
           <button class="choice" onclick="closeSheet(); beginInvoiceScan()">Scan invoice<span>Photograph a paper invoice. It stays a draft until you send it.</span></button>
+          <button class="choice" onclick="closeSheet(); typeInvoice()">Type in a paper invoice<span>No photo. Enter the client and total. It stays a draft.</span></button>
           <button class="choice" onclick="closeSheet(); show('files')">Upload a file<span>PDF, image, CSV, or text. It stays on this device.</span></button>
           <button class="textlink" onclick="closeSheet()">Cancel</button>
         </div>
@@ -3826,7 +3832,8 @@
     if (!quad) return source;
     const kx = source.width / detectWidth;
     const ky = source.height / Math.round(detectWidth * source.height / source.width);
-    const corners = quad.corners.map((corner) => ({ x: corner.x * kx, y: corner.y * ky }));
+    // A margin round the page, so no edge of the receipt or invoice is cut off.
+    const corners = SA.padQuad(quad.corners.map((corner) => ({ x: corner.x * kx, y: corner.y * ky })), source.width, source.height, 0.035);
     const size = SA.straightenedSize(corners, 1500);
     if (!size) return source;
     const to = [{ x: 0, y: 0 }, { x: size.width, y: 0 }, { x: size.width, y: size.height }, { x: 0, y: size.height }];
@@ -3911,7 +3918,8 @@
     const mode = cam.mode;
     let scan = null;
     let failedRead = false;
-    if (cam.auto) {
+    // Every photo is read, tapped or automatic. The switch only decides who presses the shutter.
+    {
       try {
         camBusy(true, "Reading the page…", 0.2);
         const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9), (p) => camBusy(true, "Reading the page…", 0.2 + p * 0.75));
@@ -4012,25 +4020,26 @@
   }
 
   // Puts what was read into the form, leaving anything it is unsure of blank.
-  function applyScanToReceipt(scan) {
+  function applyScanToReceipt(scan, onlyEmpty) {
     const note = document.getElementById("receipt-scan-note");
+    const open = (id) => !onlyEmpty || !document.getElementById(id).value.trim();
     if (!scan || !scan.fields) {
       if (note) { note.textContent = "Could not read this one. Type the details in."; note.hidden = false; }
       return;
     }
     const filled = [];
-    if (scan.merchant) { document.getElementById("expense-merchant").value = scan.merchant; filled.push("merchant"); }
-    if (scan.totalMinor > 0) {
+    if (scan.merchant && open("expense-merchant")) { document.getElementById("expense-merchant").value = scan.merchant; filled.push("merchant"); }
+    if (scan.totalMinor > 0 && open("expense-total")) {
       document.getElementById("expense-total").value = SA.formatMoney(scan.totalMinor, businessCurrency);
       filled.push("total");
     }
-    if (scan.date) {
+    if (scan.date && (!onlyEmpty || document.getElementById("expense-date").dataset.iso === SA.LEDGER_TODAY)) {
       const field = document.getElementById("expense-date");
       field.value = shortDate(scan.date);
       field.dataset.iso = scan.date;
       filled.push("date");
     }
-    if (scan.category) document.getElementById("expense-category").value = scan.category;
+    if (scan.category && open("expense-category")) document.getElementById("expense-category").value = scan.category;
     if (note) {
       note.textContent = filled.length
         ? "Filled in the " + listWords(filled) + " from the photo. Check it before saving."
@@ -4039,15 +4048,16 @@
     }
   }
 
-  function applyScanToInvoice(scan) {
+  function applyScanToInvoice(scan, onlyEmpty) {
     const note = document.getElementById("invoice-scan-note");
+    const open = (id) => !onlyEmpty || !document.getElementById(id).value.trim();
     if (!scan || !scan.fields) {
       if (note) { note.textContent = "Could not read this one. Type the details in."; note.hidden = false; }
       return;
     }
     const filled = [];
-    if (scan.client) { document.getElementById("invoice-client").value = scan.client; filled.push("client"); }
-    if (scan.totalMinor > 0) {
+    if (scan.client && open("invoice-client")) { document.getElementById("invoice-client").value = scan.client; filled.push("client"); }
+    if (scan.totalMinor > 0 && open("invoice-total")) {
       document.getElementById("invoice-total").value = SA.formatMoney(scan.totalMinor, businessCurrency);
       filled.push("total");
     }
@@ -4179,8 +4189,41 @@
       document.getElementById("receipt-redo").hidden = false;
       document.getElementById("expense-save").textContent = "Save expense";
       show("expense");
-      applyScanToReceipt(scan);
+      if (scan === undefined) readChosenPhoto(dataUrl, "receipt", staged);
+      else applyScanToReceipt(scan);
     });
+  }
+
+  // A photo from the library is read too, so its details fill in like a camera shot.
+  // Fields the person has already typed are left alone.
+  let chosenRead = 0;
+  function readChosenPhoto(dataUrl, mode, staged) {
+    const token = ++chosenRead;
+    const note = document.getElementById(mode === "invoice" ? "invoice-scan-note" : "receipt-scan-note");
+    if (note) { note.textContent = "Reading the photo\u2026"; note.hidden = false; }
+    const still = () => token === chosenRead && (mode === "invoice" ? invoiceScan : receiptPhoto) === staged;
+    const image = new Image();
+    image.onload = async () => {
+      let scan = null;
+      try {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 2000 / Math.max(image.width || 1, image.height || 1));
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        const text = await readText(forReading(canvas).toDataURL("image/jpeg", 0.9));
+        scan = mode === "invoice"
+          ? SA.parseInvoiceText(text, SA.LEDGER_TODAY, countryCode !== "US")
+          : SA.parseReceiptText(text, SA.LEDGER_TODAY, countryCode !== "US");
+      } catch (error) {
+        scan = null;
+      }
+      if (!still()) return;
+      if (mode === "invoice") applyScanToInvoice(scan, true);
+      else applyScanToReceipt(scan, true);
+    };
+    image.onerror = () => { if (still()) (mode === "invoice" ? applyScanToInvoice : applyScanToReceipt)(null, true); };
+    image.src = dataUrl;
   }
 
   function readReceiptFile(event) {
@@ -4194,7 +4237,7 @@
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => acceptReceiptPhoto(String(reader.result || ""));
+    reader.onload = () => acceptReceiptPhoto(String(reader.result || ""), undefined);
     reader.readAsDataURL(file);
   }
 
@@ -4310,7 +4353,8 @@
       show("money");
       return;
     }
-    const staged = SA.stageReceiptPhoto(receiptPhoto ? receiptPhoto.photo : "");
+    const typed = !!(receiptPhoto && receiptPhoto.source === "typed");
+    const staged = typed ? { ok: true, photo: "" } : SA.stageReceiptPhoto(receiptPhoto ? receiptPhoto.photo : "");
     const note = document.getElementById("expense-note");
     if (!staged.ok) {
       note.textContent = "Take a photo of the receipt before saving.";
@@ -4331,10 +4375,10 @@
       currency: businessCurrency,
       accountId: SA.expenseAccountId(links, accountKind),
       category: document.getElementById("expense-category").value.trim(),
-      receiptPhoto: staged.photo
+      receiptPhoto: staged.photo || undefined
     }, businessCurrency);
     transactions = result.transactions;
-    if (result.added) showPull("Expense saved with the receipt photo.");
+    if (result.added) showPull(typed ? "Expense saved." : "Expense saved with the receipt photo.");
     else if (result.reason === "currency_mismatch") showPull("This expense is not in " + businessCurrency + ", so it was not added.");
     else showPull("That expense is already in the books.");
     renderAll();
@@ -4386,7 +4430,8 @@
       document.getElementById("invoice-save").textContent = "Save draft";
       document.getElementById("invoice-redo").hidden = false;
       show("invoice-review");
-      applyScanToInvoice(scan);
+      if (scan === undefined) readChosenPhoto(dataUrl, "invoice", staged);
+      else applyScanToInvoice(scan);
     });
   }
 
@@ -4401,7 +4446,7 @@
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => acceptInvoicePhoto(String(reader.result || ""));
+    reader.onload = () => acceptInvoicePhoto(String(reader.result || ""), undefined);
     reader.readAsDataURL(file);
   }
 
@@ -4445,6 +4490,58 @@
     document.getElementById("invoice-note").textContent = "Check the client and the total against the photo. Saving keeps a draft; it is not sent. Nothing is sent.";
   }
 
+  // ---- Typing a receipt or a paper invoice in by hand, with no photo ----
+  function typeInstead() {
+    const mode = cam.mode;
+    closeCamera();
+    if (mode === "invoice") typeInvoice();
+    else typeReceipt();
+  }
+
+  function typeReceipt() {
+    editingExpenseId = null;
+    receiptPhoto = { ok: true, source: "typed", photo: "" };
+    setReceiptEditable(true);
+    document.getElementById("expense-currency").textContent = businessCurrency;
+    ["expense-merchant", "expense-total", "expense-category"].forEach((id) => { document.getElementById(id).value = ""; });
+    const date = document.getElementById("expense-date");
+    date.value = shortDate(SA.LEDGER_TODAY);
+    date.dataset.iso = SA.LEDGER_TODAY;
+    const img = document.getElementById("receipt-photo");
+    img.hidden = true;
+    img.removeAttribute("src");
+    const card = document.getElementById("receipt-card");
+    card.hidden = false;
+    card.querySelector("h3").textContent = "Typed in";
+    card.querySelector("p").textContent = "No photo. Enter the shop, date, and total from the receipt.";
+    document.getElementById("receipt-scan-note").hidden = true;
+    document.getElementById("receipt-redo").hidden = true;
+    document.getElementById("expense-save").textContent = "Save expense";
+    document.getElementById("expense-note").textContent = "Nothing is filed until you save.";
+    show("expense");
+  }
+
+  function typeInvoice() {
+    editingScanId = null;
+    invoiceScan = { ok: true, source: "typed", photo: "", kind: "invoice" };
+    setInvoiceEditable(true);
+    document.getElementById("invoice-currency").textContent = businessCurrency;
+    document.getElementById("invoice-client").value = "";
+    document.getElementById("invoice-total").value = "";
+    const img = document.getElementById("invoice-photo");
+    img.hidden = true;
+    img.removeAttribute("src");
+    const card = document.getElementById("invoice-card");
+    card.hidden = false;
+    card.querySelector("h3").textContent = "Typed in";
+    card.querySelector("p").textContent = "No photo. Enter the client and the total from the invoice.";
+    document.getElementById("invoice-scan-note").hidden = true;
+    document.getElementById("invoice-redo").hidden = true;
+    document.getElementById("invoice-save").textContent = "Save draft";
+    document.getElementById("invoice-note").textContent = "Saving keeps a draft. Nothing is sent.";
+    show("invoice-review");
+  }
+
   function backFromInvoice() {
     if (!editingScanId) invoiceScan = null;
     show(accountKind === "personal" ? "files" : "documents");
@@ -4485,7 +4582,8 @@
       show(accountKind === "personal" ? "files" : "documents");
       return;
     }
-    const staged = SA.stageInvoiceScan(invoiceScan ? invoiceScan.photo : "");
+    const typed = !!(invoiceScan && invoiceScan.source === "typed");
+    const staged = typed ? { ok: true, photo: "", kind: "invoice", source: "typed" } : SA.stageInvoiceScan(invoiceScan ? invoiceScan.photo : "");
     const note = document.getElementById("invoice-note");
     if (!staged.ok) {
       note.textContent = "Take a photo of the invoice before saving.";
