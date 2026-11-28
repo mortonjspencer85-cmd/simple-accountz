@@ -1144,10 +1144,14 @@ function resumeDrive(drive) {
 }
 
 // What gets saved with the expense: start, end, and the route.
+function cleanAddress(text) {
+  return String(text == null ? "" : text).replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
 function driveRecord(drive) {
   if (!drive) return null;
   const route = (Array.isArray(drive.route) ? drive.route : []).filter((segment) => segment.length);
-  return { start: drive.start || null, end: drive.end || null, route };
+  return { start: drive.start || null, end: drive.end || null, route, from: cleanAddress(drive.from), to: cleanAddress(drive.to) };
 }
 
 function driveStep(drive, fix) {
@@ -2033,7 +2037,8 @@ function emptyBooks() {
     autoHandled: [],
     autoSkip: [],
     deleted: {},
-    activity: []
+    activity: [],
+    budgets: cleanBudgets(null)
   };
 }
 
@@ -2052,7 +2057,8 @@ function serializeBooks(state) {
     autoHandled: Array.isArray(s.autoHandled) ? s.autoHandled : [],
     autoSkip: Array.isArray(s.autoSkip) ? s.autoSkip : [],
     deleted: cleanDeleted(s.deleted),
-    activity: cleanActivity(s.activity)
+    activity: cleanActivity(s.activity),
+    budgets: cleanBudgets(s.budgets)
   });
 }
 
@@ -2075,7 +2081,8 @@ function restoreBooks(text) {
     autoHandled: Array.isArray(raw.autoHandled) ? raw.autoHandled.filter((item) => typeof item === "string") : [],
     autoSkip: Array.isArray(raw.autoSkip) ? raw.autoSkip.filter((item) => typeof item === "string") : [],
     deleted: cleanDeleted(raw.deleted),
-    activity: cleanActivity(raw.activity)
+    activity: cleanActivity(raw.activity),
+    budgets: cleanBudgets(raw.budgets)
   };
 }
 
@@ -2157,7 +2164,8 @@ function mergeBooks(local, server) {
     autoHandled: unionStrings(mine.autoHandled, theirs.autoHandled),
     autoSkip: unionStrings(mine.autoSkip, theirs.autoSkip),
     // Newest first, both devices' entries kept, capped.
-    activity: unionById(mine.activity, theirs.activity).sort((a, b) => (a.at < b.at ? 1 : (a.at > b.at ? -1 : 0))).slice(0, ACTIVITY_MAX)
+    activity: unionById(mine.activity, theirs.activity).sort((a, b) => (a.at < b.at ? 1 : (a.at > b.at ? -1 : 0))).slice(0, ACTIVITY_MAX),
+    budgets: mergeBudgets(mine.budgets, theirs.budgets)
   };
 }
 
@@ -3341,6 +3349,10 @@ function cleanTrip(trip) {
   const end = cleanPlace(trip.end);
   if (start) out.start = start;
   if (end) out.end = end;
+  const from = cleanAddress(trip.from);
+  const to = cleanAddress(trip.to);
+  if (from) out.from = from;
+  if (to) out.to = to;
   const route = (Array.isArray(trip.route) ? trip.route : [])
     .map((segment) => (Array.isArray(segment) ? segment : []).map((pt) => cleanPlace({ lat: pt && pt[0], lon: pt && pt[1] })).filter(Boolean).map((pt) => [pt.lat, pt.lon]))
     .filter((segment) => segment.length);
@@ -3625,10 +3637,11 @@ function fitMap(points, width, height, pad, maxZoom) {
 }
 
 // Directions in the map app the person uses. A typed destination works in all three.
-function mapLinks(start, end, destination) {
-  const a = placeText(start).replace(" ", "");
+function mapLinks(start, end, destination, origin) {
+  const typedFrom = cleanAddress(origin);
+  const a = typedFrom ? encodeURIComponent(typedFrom) : placeText(start).replace(" ", "");
   const b = placeText(end).replace(" ", "");
-  const dest = String(destination || "").trim().slice(0, 200);
+  const dest = cleanAddress(destination);
   const to = dest ? encodeURIComponent(dest) : b;
   if (!to && !a) return null;
   return {
@@ -3683,7 +3696,7 @@ function changePct(now, before) {
   return Math.round((now - before) / Math.abs(before) * 1000) / 10;
 }
 
-function periodBreakdown(transactions, period, today, currency) {
+function periodBreakdown(transactions, period, today, currency, monthCount) {
   const txs = Array.isArray(transactions) ? transactions : [];
   const bounds = periodBounds(period, today);
   if (!bounds) return null;
@@ -3707,7 +3720,7 @@ function periodBreakdown(transactions, period, today, currency) {
   const outs = inside.filter((tx) => tx.kind === "out");
   const ins = inside.filter((tx) => tx.kind === "in");
   const months = [];
-  for (let back = 5; back >= 0; back--) {
+  for (let back = Math.max(1, Math.min(12, monthCount || 6)) - 1; back >= 0; back--) {
     const start = monthStart(bounds.end, back);
     const end = back === 0 ? bounds.end : monthEnd(start);
     const totals = sumKind(txs, start, end, currency);
@@ -3797,11 +3810,11 @@ function auditBooks(state) {
 }
 
 // Fills in a category on every expense that has none. Never changes one the owner set.
-function categorizeExpenses(transactions) {
+function categorizeExpenses(transactions, kind) {
   let changed = 0;
   const next = (Array.isArray(transactions) ? transactions : []).map((tx) => {
     if (tx.kind !== "out" || tx.category || tx.mileage) return tx;
-    const category = guessCategory(tx.name) || "Other";
+    const category = (kind === "personal" ? guessPersonalCategory(tx.name) : guessCategory(tx.name)) || "Other";
     changed += 1;
     return Object.assign({}, tx, { category });
   });
@@ -3810,6 +3823,12 @@ function categorizeExpenses(transactions) {
 
 // ---- Reports in plain words: ask a question, get the numbers ----
 const REPORT_INTENTS = [
+  ["setlimit", /\b(?:set|make|change|raise|lower)\b.*\bbudget\b.*\b(?:to|at)\b\s*\$?\s*\d/i],
+  ["afford", /\b(afford|can i buy|can i spend|should i buy|splurge)\b/i],
+  ["subscriptions", /\b(subscriptions?|recurring|memberships?|cancel)\b/i],
+  ["goal", /\b(goals?|emergency fund|saving for)\b/i],
+  ["budget", /\b(budgets?|on track|left to spend|how much can i spend|overspend\w*|over budget)\b/i],
+  ["save", /\b(save money|saving money|how (?:can|do) i save|cut costs?|cut back|reduce (?:my )?(?:spending|expenses|costs?)|lower (?:my )?(?:spending|costs?)|trim|cheaper|tips?|advice|suggest\w*|ideas?|coach|help me)\b/i],
   // "Account balances" before "check", so "check my account balances" shows the balances.
   ["balance", /\b(account balances?|bank balances?|balances|bank|accounts|cash on hand|checking account|savings)\b/i],
   ["check", /\b(check|audit|accura\w*|mistakes?|errors?|wrong|add up|verify|review)\b/i],
@@ -3852,8 +3871,87 @@ function answerReport(question, state) {
   const money = (minor) => formatMoney(minor, currency);
   const when = { month: "This month", last_month: "Last month", year: "This year", week: "This week" }[period];
   const lines = [];
+  const actions = [];
+  let follow = ["How is my budget?", "How can I save money?", "Check my books"];
   let title = "";
-  if (intent === "check") {
+  const kind = s.kind === "personal" ? "personal" : "business";
+  const today = s.today || LEDGER_TODAY;
+  const budget = cleanBudget(s.budget && (s.budget.limits || s.budget.goals) ? s.budget : null);
+  const exponent = CURRENCIES[currency] ? CURRENCIES[currency].exponent : 2;
+  const bst = budgetStatus(s.transactions || [], budget, today, currency, kind);
+  if (intent === "setlimit") {
+    const m = /(?:set|make|change|raise|lower)\s+(?:my\s+|the\s+)?(.+?)\s+budget\s+(?:to|at)\s+\$?\s*([\d,]+(?:\.\d{1,2})?)/i.exec(question) || /budget\s+(?:for|on)\s+(.+?)\s+(?:to|at)\s+\$?\s*([\d,]+(?:\.\d{1,2})?)/i.exec(question);
+    const amount = m ? parseDecimalToScale(m[2].replace(/,/g, ""), exponent) : { ok: false };
+    if (!m || !amount.ok || amount.value <= 0) {
+      title = "Set a budget line";
+      lines.push("Tell me the category and the amount, like: set Dining budget to $300.");
+    } else {
+      const typed = m[1].trim().toLowerCase();
+      const known = budgetCategories(kind).concat(Object.keys(budget.limits), bst.rows.map((row) => row.name));
+      const name = known.filter((c) => c.toLowerCase() === typed)[0] || known.filter((c) => c.toLowerCase().indexOf(typed) === 0)[0] || (typed.charAt(0).toUpperCase() + typed.slice(1)).slice(0, 40);
+      title = "Set " + name + " to " + money(amount.value) + "?";
+      lines.push((budget.limits[name] ? "It is " + money(budget.limits[name]) + " now. " : "") + "So far this month you have spent " + money((bst.rows.filter((row) => row.name === name)[0] || { spent: 0 }).spent) + " on " + name + ".");
+      actions.push({ op: "setLimit", arg: name, amount: amount.value, label: "Yes, set " + name + " to " + money(amount.value) });
+    }
+    follow = ["How is my budget?", "Set budgets for me"];
+  } else if (intent === "afford") {
+    const m = /\$?\s*([\d,]+(?:\.\d{1,2})?)/.exec(question);
+    const amount = m ? parseDecimalToScale(m[1].replace(/,/g, ""), exponent) : { ok: false };
+    title = "Can you afford it?";
+    if (!amount.ok || amount.value <= 0) lines.push("Tell me the price, like: can I afford $250?");
+    else {
+      const verdict = canAfford(s.transactions || [], budget, today, currency, kind, amount.value);
+      if (!verdict.known) { lines.push("I need a budget to answer that well. Set one and I will tell you straight away."); actions.push({ op: "autoBudget", label: "Set budgets for me" }); }
+      else if (verdict.fits) lines.push("Yes. " + money(verdict.left) + " is left in this month's budget. After " + money(amount.value) + " you would have " + money(verdict.after) + ", about " + money(verdict.perDayAfter) + " a day for the last " + (bst.daysLeft + 1) + " days.");
+      else lines.push("Not this month without going over. You have " + money(Math.max(0, verdict.left)) + " left and it costs " + money(amount.value) + ", so you would be " + money(-verdict.after) + " over. Waiting until next month, or trimming " + money(-verdict.after) + " from a flexible category, would fix it.");
+    }
+    follow = ["How is my budget?", "How can I save money?"];
+  } else if (intent === "subscriptions") {
+    const found = findRecurring(s.transactions || [], currency);
+    title = "Recurring charges";
+    if (!found.length) lines.push("I do not see any charge that repeats every month yet. I need two or more months of expenses to spot them.");
+    else {
+      found.slice(0, 8).forEach((item) => lines.push(item.name + ": " + money(item.monthlyMinor) + " a month, seen " + item.count + " months"));
+      const total = found.reduce((sum, item) => sum + item.monthlyMinor, 0);
+      lines.push("Together: " + money(total) + " a month, " + money(total * 12) + " a year. Cancel anything you no longer use.");
+    }
+    follow = ["How can I save money?", "How is my budget?"];
+  } else if (intent === "goal") {
+    title = "Your goals";
+    if (!budget.goals.length) { lines.push("You have no savings goals yet. A goal with a date lets me tell you how much to save each week."); actions.push({ op: "newGoal", label: "Add a goal" }); }
+    else budget.goals.forEach((goal) => {
+      const g = goalProgress(goal, today);
+      lines.push(goal.name + ": " + money(goal.savedMinor) + " of " + money(goal.targetMinor) + " (" + g.pct + "%)" + (g.done ? ", reached" : g.perWeek ? ", save " + money(g.perWeek) + " a week" : ""));
+    });
+    actions.push({ op: "openBudget", label: "Open budget and goals" });
+    follow = ["How is my budget?", "How can I save money?"];
+  } else if (intent === "budget") {
+    title = (kind === "personal" ? "Your budget" : "Your business budget");
+    if (!bst.hasBudget) {
+      const proposal = suggestBudget(s.transactions || [], today, currency, kind);
+      const names = Object.keys(proposal).sort((a, b) => proposal[b] - proposal[a]);
+      if (!names.length) lines.push("There is nothing to build a budget from yet. Add a few expenses and ask me again.");
+      else {
+        lines.push("You have no budget yet. From what you spend, I would set:");
+        names.slice(0, 6).forEach((name) => lines.push(name + ": " + money(proposal[name]) + " a month"));
+        actions.push({ op: "autoBudget", label: "Set these budgets" });
+      }
+    } else {
+      lines.push("You have spent " + money(bst.budgetedSpent) + " of " + money(bst.totalLimit) + " (" + Math.round(bst.budgetedSpent / bst.totalLimit * 100) + "%) with " + bst.daysLeft + " days left. About " + money(bst.perDayLeft) + " a day keeps you inside it.");
+      bst.rows.filter((row) => row.budgeted && row.status !== "ok").forEach((row) => lines.push(row.name + ": " + money(row.spent) + " of " + money(row.limit) + (row.status === "over" ? " (over)" : " (heading over)")));
+      if (!bst.rows.some((row) => row.budgeted && row.status !== "ok")) lines.push("Every line is on track.");
+      actions.push({ op: "openBudget", label: "Open budget" });
+    }
+    follow = ["Can I afford $100?", "How can I save money?", "What are my subscriptions?"];
+  } else if (intent === "save") {
+    const tips = budgetCoach({ transactions: s.transactions || [], budget, today, currency, kind });
+    title = "Ways to spend smarter";
+    if (!tips.length) lines.push("Nothing stands out right now. Keep adding expenses and I will keep watching.");
+    tips.filter((tip) => tip.level !== "good").slice(0, 4).forEach((tip) => { lines.push(tip.title + ". " + tip.detail); if (tip.action) actions.push(tip.action); });
+    if (tips.some((tip) => tip.level === "good")) lines.push(tips.filter((tip) => tip.level === "good")[0].title + ".");
+    actions.push({ op: "openBudget", label: "Open budget" });
+    follow = ["How is my budget?", "What are my subscriptions?", "Set a savings goal"];
+  } else if (intent === "check") {
     const found = auditBooks(s);
     title = "I checked your books";
     found.forEach((row) => lines.push((row.level === "check" ? "Look: " : row.level === "fixed" ? "Done: " : "") + row.title + ". " + row.detail));
@@ -3891,7 +3989,401 @@ function answerReport(question, state) {
     if (b.marginPct != null) lines.push("You keep " + b.marginPct + " cents of every dollar that comes in.");
     if (b.byCategory[0]) lines.push("Biggest cost: " + b.byCategory[0].name + ", " + money(b.byCategory[0].minor) + ".");
   }
-  return { intent, period, title, lines, breakdown: b };
+  const seen = {};
+  const unique = actions.filter((a) => { const key = a.op + "|" + (a.arg || ""); if (seen[key]) return false; seen[key] = true; return true; });
+  return { intent, period, title, lines, breakdown: b, actions: unique.slice(0, 4), followUps: follow };
+}
+
+// ---- Budgeting: limits, progress, goals, and a coach that reads the books ----
+// A budget is a monthly limit per category, kept separately for the business and personal books.
+// Everything here works on plain data, so the same rules run in the browser and in the store apps.
+
+const PERSONAL_CATEGORIES = ["Groceries", "Dining", "Transport", "Housing", "Utilities", "Health", "Shopping", "Entertainment", "Subscriptions", "Insurance", "Savings", "Other"];
+const BUSINESS_CATEGORIES = ["Materials", "Supplies", "Travel", "Car and travel", "Utilities", "Insurance", "Software", "Marketing", "Meals", "Equipment", "Fees", "Other"];
+// Things people can usually cut back. The rest (rent, insurance, utilities, health) mostly cannot.
+const FIXED_CATEGORIES = ["Housing", "Insurance", "Utilities"];
+const FLEXIBLE_CATEGORIES = ["Dining", "Shopping", "Entertainment", "Subscriptions", "Marketing", "Meals", "Software", "Other"];
+
+const PERSONAL_RULES = [
+  [/netflix|spotify|hulu|disney\+?|hbo|youtube|apple\.com\/bill|icloud|prime video|audible|patreon|subscription/i, "Subscriptions"],
+  [/whole foods|trader joe|kroger|safeway|aldi|publix|wegmans|shoprite|stop & shop|grocer|supermarket|food lion|giant|costco|sam'?s club|h-?e-?b/i, "Groceries"],
+  [/starbucks|dunkin|mcdonald|chipotle|subway|panera|wendy|burger|taco|pizza|domino|chick-?fil|doordash|grubhub|uber eats|restaurant|diner|cafe|coffee|bar & grill|kitchen/i, "Dining"],
+  [/shell|exxon|chevron|sunoco|speedway|wawa|sheetz|gas station|fuel|uber|lyft|septa|transit|metro|parking|toll|amtrak/i, "Transport"],
+  [/rent|mortgage|landlord|hoa|property/i, "Housing"],
+  [/electric|gas bill|water|sewer|comcast|xfinity|verizon|t-?mobile|at&t|internet|utility|phone/i, "Utilities"],
+  [/cvs|walgreens|rite aid|pharmacy|doctor|dental|clinic|hospital|health|medical|vision/i, "Health"],
+  [/insurance|geico|progressive|state farm|allstate/i, "Insurance"],
+  [/amazon|target|walmart|best buy|ikea|home depot|lowe'?s|tj ?maxx|marshalls|kohl|macy|old navy|nike/i, "Shopping"],
+  [/cinema|amc|movie|steam|playstation|xbox|nintendo|ticketmaster|concert|museum|zoo|bowling|golf|gym/i, "Entertainment"],
+  [/savings|transfer to savings|401k|ira|invest/i, "Savings"]
+];
+
+function guessPersonalCategory(name) {
+  const text = String(name || "");
+  for (let i = 0; i < PERSONAL_RULES.length; i++) if (PERSONAL_RULES[i][0].test(text)) return PERSONAL_RULES[i][1];
+  return "";
+}
+
+function categoryOf(tx, kind) {
+  if (tx.category) return tx.category;
+  if (tx.mileage) return "Car and travel";
+  return (kind === "personal" ? guessPersonalCategory(tx.name) : guessCategory(tx.name)) || "Other";
+}
+
+function budgetCategories(kind) { return kind === "personal" ? PERSONAL_CATEGORIES : BUSINESS_CATEGORIES; }
+
+function cleanBudget(raw) {
+  const out = { limits: {}, goals: [] };
+  if (!raw || typeof raw !== "object") return out;
+  const limits = raw.limits && typeof raw.limits === "object" ? raw.limits : {};
+  Object.keys(limits).slice(0, 40).forEach((name) => {
+    const minor = limits[name];
+    const label = String(name).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 40);
+    if (label && Number.isSafeInteger(minor) && minor > 0 && minor < 1e12) out.limits[label] = minor;
+  });
+  (Array.isArray(raw.goals) ? raw.goals : []).slice(0, 20).forEach((goal) => {
+    if (!goal || typeof goal.id !== "string" || typeof goal.name !== "string") return;
+    if (!Number.isSafeInteger(goal.targetMinor) || goal.targetMinor <= 0) return;
+    out.goals.push({
+      id: goal.id.slice(0, 60), name: goal.name.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 60),
+      targetMinor: goal.targetMinor, savedMinor: Number.isSafeInteger(goal.savedMinor) && goal.savedMinor >= 0 ? goal.savedMinor : 0,
+      due: /^\d{4}-\d{2}-\d{2}$/.test(String(goal.due || "")) ? goal.due : "", createdAt: String(goal.createdAt || "").slice(0, 10)
+    });
+  });
+  return out;
+}
+
+function cleanBudgets(raw) {
+  const value = raw && typeof raw === "object" ? raw : {};
+  return { business: cleanBudget(value.business), personal: cleanBudget(value.personal) };
+}
+
+// Two devices' budgets: every limit and goal from both, this device's winning where they disagree.
+function mergeBudgets(mine, theirs) {
+  const a = cleanBudgets(mine);
+  const b = cleanBudgets(theirs);
+  const one = (x, y) => ({ limits: Object.assign({}, y.limits, x.limits), goals: unionById(x.goals, y.goals) });
+  return { business: one(a.business, b.business), personal: one(a.personal, b.personal) };
+}
+
+function daysInMonthOf(date) {
+  const parts = date.split("-").map(Number);
+  return new Date(Date.UTC(parts[0], parts[1], 0)).getUTCDate();
+}
+
+// Spending this month against the limits: how much is used, what is left, and where each line is heading.
+function budgetStatus(transactions, budget, today, currency, kind) {
+  const limits = (budget && budget.limits) || {};
+  const start = today.slice(0, 8) + "01";
+  const day = Number(today.slice(8, 10));
+  const days = daysInMonthOf(today);
+  const spent = {};
+  (Array.isArray(transactions) ? transactions : []).forEach((tx) => {
+    if (tx.kind !== "out" || tx.currency !== currency || tx.date < start || tx.date > today) return;
+    const name = categoryOf(tx, kind);
+    spent[name] = (spent[name] || 0) + tx.amountMinor;
+  });
+  const names = Object.keys(limits).concat(Object.keys(spent).filter((name) => !(name in limits)));
+  const rows = names.map((name) => {
+    const limit = limits[name] || 0;
+    const used = spent[name] || 0;
+    // Rent, insurance, and utilities arrive in lumps, so they are not projected from the pace.
+    const projected = FIXED_CATEGORIES.indexOf(name) !== -1 ? used : Math.round(used / Math.max(1, day) * days);
+    let status = "ok";
+    if (limit) status = used > limit ? "over" : (FIXED_CATEGORIES.indexOf(name) !== -1 ? "ok" : (projected > limit * 1.05 || used > limit * 0.85 ? "watch" : "ok"));
+    return { name, limit, spent: used, left: limit - used, pct: limit ? Math.round(used / limit * 100) : 0, projected, status, flexible: FLEXIBLE_CATEGORIES.indexOf(name) !== -1, budgeted: !!limit };
+  }).sort((a, b) => (b.spent - a.spent) || (b.limit - a.limit));
+  const totalLimit = Object.keys(limits).reduce((sum, name) => sum + limits[name], 0);
+  const totalSpent = rows.reduce((sum, row) => sum + row.spent, 0);
+  const budgetedSpent = rows.filter((row) => row.budgeted).reduce((sum, row) => sum + row.spent, 0);
+  return {
+    month: today.slice(0, 7), day, days, daysLeft: days - day, totalLimit, totalSpent, budgetedSpent,
+    projected: rows.reduce((sum, row) => sum + row.projected, 0), rows, hasBudget: totalLimit > 0,
+    // What can still be spent per day without going over the whole budget.
+    perDayLeft: totalLimit ? Math.max(0, Math.floor((totalLimit - budgetedSpent) / Math.max(1, days - day + 1))) : 0
+  };
+}
+
+function roundUpTo(minor, step) { return Math.ceil(minor / step) * step; }
+
+// A budget worked out from what was actually spent: the average of the last three months
+// (this month's pace if there is less history), with a small trim on things people can cut.
+function suggestBudget(transactions, today, currency, kind) {
+  const totals = {};
+  const monthsSeen = {};
+  const thisMonth = today.slice(0, 7);
+  (Array.isArray(transactions) ? transactions : []).forEach((tx) => {
+    if (tx.kind !== "out" || tx.currency !== currency) return;
+    const key = tx.date.slice(0, 7);
+    if (key >= thisMonth) return;
+    if (key < monthStart(today, 3).slice(0, 7)) return;
+    const name = categoryOf(tx, kind);
+    totals[name] = (totals[name] || 0) + tx.amountMinor;
+    monthsSeen[key] = true;
+  });
+  let months = Object.keys(monthsSeen).length;
+  if (!months) {
+    // No finished months yet: use this month's pace.
+    const day = Math.max(1, Number(today.slice(8, 10)));
+    const days = daysInMonthOf(today);
+    (Array.isArray(transactions) ? transactions : []).forEach((tx) => {
+      if (tx.kind !== "out" || tx.currency !== currency || tx.date.slice(0, 7) !== thisMonth) return;
+      const name = categoryOf(tx, kind);
+      totals[name] = (totals[name] || 0) + Math.round(tx.amountMinor / day * days);
+    });
+    months = 1;
+  }
+  const limits = {};
+  Object.keys(totals).forEach((name) => {
+    let avg = totals[name] / months;
+    if (FLEXIBLE_CATEGORIES.indexOf(name) !== -1) avg *= 0.92;
+    const rounded = roundUpTo(Math.round(avg), avg >= 50000 ? 2500 : 500);
+    if (rounded > 0) limits[name] = rounded;
+  });
+  return limits;
+}
+
+// Charges that come back: the same name, about the same amount, in two or more different months.
+function findRecurring(transactions, currency) {
+  const groups = {};
+  (Array.isArray(transactions) ? transactions : []).forEach((tx) => {
+    if (tx.kind !== "out" || tx.currency !== currency || tx.mileage) return;
+    const key = String(tx.name || "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 14);
+    if (key.length < 3) return;
+    (groups[key] = groups[key] || []).push(tx);
+  });
+  const found = [];
+  Object.keys(groups).forEach((key) => {
+    const list = groups[key].sort((a, b) => (a.date < b.date ? -1 : 1));
+    const months = {};
+    list.forEach((tx) => { months[tx.date.slice(0, 7)] = tx; });
+    const keys = Object.keys(months).sort();
+    if (keys.length < 2) return;
+    const amounts = keys.map((k) => months[k].amountMinor);
+    const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    if (amounts.some((a) => Math.abs(a - avg) > avg * 0.05)) return;
+    // Rent, insurance, and utilities repeat, but they are not things to cancel.
+    if (/rent|mortgage|landlord|insurance|electric|water|sewer|gas bill|internet|phone|hoa/i.test(months[keys[0]].name)) return;
+    found.push({ name: months[keys[keys.length - 1]].name, monthlyMinor: Math.round(avg), count: keys.length, last: months[keys[keys.length - 1]].date });
+  });
+  return found.sort((a, b) => b.monthlyMinor - a.monthlyMinor);
+}
+
+function goalProgress(goal, today) {
+  const left = Math.max(0, goal.targetMinor - goal.savedMinor);
+  const pct = Math.min(100, Math.round(goal.savedMinor / goal.targetMinor * 100));
+  let weeks = 0;
+  if (goal.due) weeks = Math.max(0, Math.ceil((Date.parse(goal.due + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / (7 * 86400000)));
+  return { left, pct, weeks, perWeek: goal.due && weeks > 0 ? Math.ceil(left / weeks) : 0, done: left === 0, late: !!goal.due && weeks === 0 && left > 0 };
+}
+
+// The coach: plain advice drawn from the numbers. Each item says what it saw, and some offer a button.
+function budgetCoach(state) {
+  const s = state || {};
+  const kind = s.kind === "personal" ? "personal" : "business";
+  const today = s.today || LEDGER_TODAY;
+  const currency = s.currency || "USD";
+  const txs = Array.isArray(s.transactions) ? s.transactions : [];
+  const budget = cleanBudget(s.budget);
+  const money = (minor) => formatMoney(minor, currency);
+  const status = budgetStatus(txs, budget, today, currency, kind);
+  const tips = [];
+  const add = (id, level, title, detail, action) => tips.push({ id, level, title, detail, action: action || null });
+
+  if (!status.hasBudget) {
+    const spentAny = txs.some((tx) => tx.kind === "out" && tx.currency === currency);
+    add("start", "tip", "Set a budget", spentAny ? "I can work one out from what you actually spend, in one tap. You can change any line." : "Add a few expenses and I will build a budget from them.", spentAny ? { op: "autoBudget", label: "Set budgets for me" } : null);
+  } else {
+    status.rows.filter((row) => row.budgeted && row.status === "over").forEach((row) => {
+      add("over-" + row.name, "warn", row.name + " is over budget", money(row.spent) + " spent of " + money(row.limit) + ". " + (row.flexible ? "This one is easy to trim: aim to spend nothing more here this month." : "This is an essential, so it is harder to cut. If the limit was set too low, raise it to match real life."), { op: "openBudget", label: "Open budget" });
+    });
+    status.rows.filter((row) => row.budgeted && row.status === "watch").forEach((row) => {
+      add("watch-" + row.name, "tip", row.name + " is on track to go over", "At this pace you will spend about " + money(row.projected) + " against " + money(row.limit) + ". " + (row.limit - row.spent > 0 ? "About " + money(Math.floor((row.limit - row.spent) / Math.max(1, status.daysLeft + 1))) + " a day keeps you inside it." : "It is already used up, so hold off here until next month."));
+    });
+    if (status.projected > status.totalLimit * 1.05 && status.totalLimit) {
+      add("pace", "warn", "You are on pace to overspend", "About " + money(status.projected) + " by month end against a budget of " + money(status.totalLimit) + ". " + (status.perDayLeft > 0 ? "Spending " + money(status.perDayLeft) + " a day from here keeps you within it." : "The budget is already used up, so hold off on anything flexible until next month."));
+    } else if (status.totalLimit && status.day >= 10 && status.budgetedSpent < status.totalLimit * (status.day / status.days) * 0.8) {
+      add("under", "good", "You are under budget", "You have used " + money(status.budgetedSpent) + " of " + money(status.totalLimit) + ", ahead of where you need to be. The leftover could go to a goal.");
+    }
+    status.rows.filter((row) => !row.budgeted && row.spent >= 5000).forEach((row) => {
+      add("nolimit-" + row.name, "tip", row.name + " has no limit", money(row.spent) + " spent here this month with no budget line.", { op: "setLimit", arg: row.name, amount: roundUpTo(row.spent, 500), label: "Limit it to " + money(roundUpTo(row.spent, 500)) });
+    });
+  }
+
+  // A category that jumped against last month.
+  const lastStart = monthStart(today, 1);
+  const lastEnd = monthEnd(lastStart);
+  const before = {};
+  txs.forEach((tx) => {
+    if (tx.kind !== "out" || tx.currency !== currency || tx.date < lastStart || tx.date > lastEnd) return;
+    const name = categoryOf(tx, kind);
+    before[name] = (before[name] || 0) + tx.amountMinor;
+  });
+  const sameDay = Math.min(status.day, Number(lastEnd.slice(8, 10)));
+  const priorToDate = {};
+  txs.forEach((tx) => {
+    if (tx.kind !== "out" || tx.currency !== currency || tx.date < lastStart || tx.date > lastStart.slice(0, 8) + String(sameDay).padStart(2, "0")) return;
+    const name = categoryOf(tx, kind);
+    priorToDate[name] = (priorToDate[name] || 0) + tx.amountMinor;
+  });
+  status.rows.forEach((row) => {
+    const prev = priorToDate[row.name] || 0;
+    if (prev >= 2000 && row.spent > prev * 1.25 && row.spent - prev >= 3000 && status.day >= 5) {
+      add("jump-" + row.name, "tip", row.name + " is up " + Math.round((row.spent - prev) / prev * 100) + "%", money(row.spent) + " so far, against " + money(prev) + " by this point last month.");
+    }
+  });
+
+  // Charges that repeat every month.
+  const recurring = findRecurring(txs, currency);
+  if (recurring.length) {
+    const total = recurring.reduce((sum, item) => sum + item.monthlyMinor, 0);
+    add("recurring", "tip", recurring.length + " recurring charge" + (recurring.length === 1 ? "" : "s") + ", " + money(total) + " a month", recurring.slice(0, 5).map((item) => item.name + " " + money(item.monthlyMinor)).join(" · ") + ". Cancel anything you no longer use: " + money(total * 12) + " a year.");
+  }
+
+  // The biggest saving available, if the flexible spending were trimmed 10%.
+  const flexible = status.rows.filter((row) => row.flexible && row.spent > 0);
+  const flexTotal = flexible.reduce((sum, row) => sum + row.spent, 0);
+  if (flexTotal >= 5000 && status.day >= 10) {
+    const projectedFlex = Math.round(flexTotal / status.day * status.days);
+    add("trim", "tip", "Trimming flexible spending by 10% saves " + money(Math.round(projectedFlex * 0.1)) + " a month", "That is " + money(Math.round(projectedFlex * 1.2)) + " over a year. Biggest: " + flexible.sort((a, b) => b.spent - a.spent).slice(0, 2).map((row) => row.name).join(" and ") + ".");
+  }
+
+  // Money in, for both kinds of books.
+  const period = periodBreakdown(txs, "month", today, currency);
+  if (period && period.inMinor > 0 && status.day >= 7) {
+    const rate = Math.round(period.profitMinor / period.inMinor * 100);
+    if (kind === "business") {
+      if (period.profitMinor > 0) add("taxes", "tip", "Set aside for taxes", "A common rule is 25% to 30% of profit. On " + money(period.profitMinor) + " that is about " + money(Math.round(period.profitMinor * 0.27)) + " this month. This is a rule of thumb, not tax advice.");
+      if (rate < 10 && period.inMinor >= 20000) add("margin", "warn", "Thin margin: you keep " + rate + "% of what comes in", "Your biggest cost is " + ((period.byCategory[0] && period.byCategory[0].name) || "expenses") + ". A price rise of 5% would add " + money(Math.round(period.inMinor * 0.05)) + " a month.");
+      if (period.byCategory[0] && period.byCategory[0].share >= 45 && period.outMinor >= 20000) add("concentration", "tip", period.byCategory[0].name + " is " + period.byCategory[0].share + "% of your costs", "One category carrying that much is the first place to look for savings or a better supplier.");
+    } else if (rate >= 20) add("savings", "good", "You are saving " + rate + "% of what comes in", "That is " + money(period.profitMinor) + " this month. Putting it toward a goal makes it stick.");
+    else if (period.profitMinor < 0) add("deficit", "warn", "You spent " + money(-period.profitMinor) + " more than came in", "Look at the flexible categories first.");
+  }
+
+  // Business expenses with no receipt are harder to defend later.
+  if (kind === "business") {
+    const bare = txs.filter((tx) => tx.kind === "out" && !tx.receiptPhoto && !tx.mileage && tx.currency === currency && tx.date >= start3(today)).length;
+    if (bare >= 3) add("receipts", "tip", bare + " recent expenses have no receipt", "A photo of each one keeps your deductions safe if you are ever asked. Open an expense and add it.");
+  }
+
+  // Goals.
+  budget.goals.forEach((goal) => {
+    const g = goalProgress(goal, today);
+    if (g.done) add("goal-done-" + goal.id, "good", "Goal reached: " + goal.name, "You saved " + money(goal.targetMinor) + ". Time for the next one?");
+    else if (g.late) add("goal-late-" + goal.id, "warn", goal.name + " is past its date", money(g.left) + " still to go. Move the date or add to it.");
+    else if (g.perWeek) add("goal-" + goal.id, "tip", goal.name + ": save " + money(g.perWeek) + " a week", money(goal.savedMinor) + " of " + money(goal.targetMinor) + " saved, " + g.weeks + " weeks to go.");
+  });
+  if (!budget.goals.length && status.hasBudget) add("goal-start", "tip", "Give your savings a job", kind === "personal" ? "An emergency fund of three months of spending is a solid first goal: about " + money(status.totalLimit * 3) + "." : "A cash cushion of two months of costs protects the business: about " + money(status.totalLimit * 2) + ".", { op: "newGoal", label: "Add a goal" });
+
+  const order = { warn: 0, tip: 1, good: 2 };
+  return tips.sort((a, b) => order[a.level] - order[b.level]);
+}
+
+function start3(today) { return monthStart(today, 2); }
+
+// Can a purchase fit? Against what is left in the whole budget, and the flexible categories.
+function canAfford(transactions, budget, today, currency, kind, amountMinor) {
+  const status = budgetStatus(transactions, budget, today, currency, kind);
+  if (!status.hasBudget) return { known: false, status };
+  const left = status.totalLimit - status.budgetedSpent;
+  return { known: true, fits: amountMinor <= left, left, after: left - amountMinor, status, perDayAfter: Math.max(0, Math.floor((left - amountMinor) / Math.max(1, status.daysLeft + 1))) };
+}
+
+// ---- Plans: what each one includes, when the free plan runs out, and how to say so ----
+// One place for every limit, so changing what Free gets is a one-line edit.
+const PLAN_ORDER = ["free", "essentials", "plus", "premium"];
+const PLAN_NAMES = { free: "Free", essentials: "Essentials", plus: "Plus", premium: "Premium" };
+const PLAN_LIMITS = {
+  free: { scans: 8, budgetLines: 4, goals: 1, tips: 2, chartMonths: 3, questions: 8, exportBooks: false },
+  essentials: { scans: 40, budgetLines: 8, goals: 3, tips: 5, chartMonths: 6, questions: 40, exportBooks: true },
+  plus: { scans: 200, budgetLines: 99, goals: 10, tips: 99, chartMonths: 12, questions: 999, exportBooks: true },
+  premium: { scans: 9999, budgetLines: 99, goals: 20, tips: 99, chartMonths: 12, questions: 9999, exportBooks: true }
+};
+// Extras that can be bought on their own, once store purchases are connected.
+const ADDONS = [
+  { id: "scanpack", name: "Receipt scan pack", detail: "50 more auto-filled receipts and invoices", minor: 299, product: "com.simpleaccountz.app.scanpack50" },
+  { id: "taxpass", name: "Tax-season pass", detail: "30 days of spreadsheet, CSV, and accounting exports", minor: 499, product: "com.simpleaccountz.app.taxpass30" },
+  { id: "coachpass", name: "Budget coach pass", detail: "30 days of the full coach, goals, and 12-month charts", minor: 399, product: "com.simpleaccountz.app.coachpass30" }
+];
+
+function planLimits(tier) { return PLAN_LIMITS[tier] || PLAN_LIMITS.free; }
+
+// Can this tier do it? `used` is how many have been used (or how many exist, for budget lines and goals).
+// When it cannot, `need` is the cheapest plan that can.
+function planGate(tier, feature, used, extra) {
+  const have = planLimits(tier);
+  const bonus = Number(extra) || 0;
+  const allowedAt = (name) => {
+    const limits = planLimits(name);
+    return typeof limits[feature] === "boolean" ? limits[feature] : (used || 0) < limits[feature] + bonus;
+  };
+  if (allowedAt(tier)) return { ok: true, limit: typeof have[feature] === "boolean" ? 0 : have[feature] + bonus, need: tier };
+  const need = PLAN_ORDER.filter((name) => PLAN_ORDER.indexOf(name) > PLAN_ORDER.indexOf(tier) && allowedAt(name))[0] || "premium";
+  return { ok: false, limit: typeof have[feature] === "boolean" ? 0 : have[feature] + bonus, need };
+}
+
+// Two months free on the annual price, worked out from the real prices.
+function annualSaving(tier) {
+  const price = PLAN_MINOR[tier];
+  if (!price) return { minor: 0, months: 0 };
+  const minor = price.monthly * 12 - price.annual;
+  return { minor, months: Math.round(minor / price.monthly * 10) / 10 };
+}
+
+function trialDaysLeft(plan, at) {
+  if (!plan || plan.source !== "trial" || !plan.until) return 0;
+  return Math.max(0, Math.ceil((plan.until - at) / 86400000));
+}
+
+// What to tell someone who has hit a limit. Each message says what they hit, what they get, and what it costs.
+function upgradeCopy(reason, context) {
+  const c = context || {};
+  const plus = PLAN_MINOR.plus;
+  const price = formatMoney(plus.monthly, "USD") + " a month";
+  const copy = {
+    scans: {
+      title: "You have used your " + (c.limit || 8) + " free auto-fills this month",
+      body: "Your photos are still saved, and you can type the details yourself. Plus reads receipts and invoices for you, up to " + planLimits("plus").scans + " a month.",
+      bullets: ["Auto-fill from every receipt and invoice", "A full budget with goals and the whole coach", "Spreadsheet and accounting exports"]
+    },
+    budgetLines: {
+      title: "A fuller budget is on Plus",
+      body: "Free covers your " + (c.limit || 4) + " biggest lines. Plus lets you budget every category, so nothing slips by.",
+      bullets: ["A line for every category", "Up to " + planLimits("plus").goals + " savings goals", "The full coach, not just the top " + planLimits("free").tips + " tips"]
+    },
+    goals: {
+      title: "More savings goals are on Plus",
+      body: "Free keeps " + (c.limit || 1) + " goal. Plus keeps " + planLimits("plus").goals + ", each with a weekly amount worked out for you.",
+      bullets: ["Up to " + planLimits("plus").goals + " goals", "A weekly amount for each", "The full coach"]
+    },
+    tips: {
+      title: (c.hidden || "More") + " more insight" + (c.hidden === 1 ? "" : "s") + " waiting",
+      body: "Free shows the top " + (c.limit || 2) + ". Plus shows everything the coach found, including recurring charges, month-on-month jumps, and what to set aside for taxes.",
+      bullets: ["Every insight, every month", "Recurring charges and where to cut", "Savings and tax set-aside guidance"]
+    },
+    questions: {
+      title: "You have used your " + (c.limit || 8) + " free questions this month",
+      body: "Plus answers as many questions about your books as you like, and the answers use your whole history.",
+      bullets: ["Unlimited questions to the assistant", "Budget help, can-I-afford-it, and savings ideas", "12 months of charts"]
+    },
+    exportBooks: {
+      title: "Exports are on paid plans",
+      body: "Spreadsheet, CSV, and accounting-software files save hours at tax time. Essentials includes them.",
+      bullets: ["Spreadsheet and CSV", "QuickBooks, Xero, and bank files", "Everything for your accountant in one tap"]
+    },
+    chart: {
+      title: "See a longer history on Plus",
+      body: "Free shows the last " + planLimits("free").chartMonths + " months. Plus shows a full year, so seasons and trends stand out.",
+      bullets: ["12 months of charts", "Month-on-month changes", "The full coach"]
+    },
+    general: {
+      title: "Get more from Simple Accountz",
+      body: "Plus adds the full budget coach, savings goals, unlimited questions, 12 months of charts, and exports.",
+      bullets: ["The full coach and goals", "Auto-fill for receipts and invoices", "Exports for your accountant"]
+    }
+  };
+  const item = copy[reason] || copy.general;
+  return Object.assign({ price, saving: annualSaving("plus") }, item);
 }
 
 const SA = {
@@ -4051,7 +4543,9 @@ const SA = {
   resumeDrive,
   driveRecord,
   routePaths,
-  routeMapView,
+  routeMapView, cleanAddress,
+  PLAN_ORDER, PLAN_NAMES, PLAN_LIMITS, ADDONS, planLimits, planGate, annualSaving, trialDaysLeft, upgradeCopy,
+  PERSONAL_CATEGORIES, BUSINESS_CATEGORIES, FLEXIBLE_CATEGORIES, budgetCategories, guessPersonalCategory, categoryOf, cleanBudget, cleanBudgets, budgetStatus, suggestBudget, findRecurring, goalProgress, budgetCoach, canAfford, mergeBudgets,
   textLooksReadable, mergeScans, scanIsComplete, fixLabelWords, consistentTotal,
   checkDetails, mapWorld, mapLatLon, fitMap, mapLinks, periodBreakdown, previousBounds, auditBooks, categorizeExpenses, answerReport, reportIntent, askPeriod,
   padQuad,

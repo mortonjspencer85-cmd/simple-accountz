@@ -709,6 +709,59 @@
   .nav-app { display: block; padding: 10px 8px; border-radius: 14px; border: 1px solid rgba(127,127,127,.3); background: var(--paper, #fff); color: inherit; font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
   .nav-app b { display: block; font-size: 14px; }
   .nav-app span { display: block; font-size: 12px; opacity: .7; }
+  .bg-bar { height: 10px; border-radius: 5px; background: rgba(255,255,255,.28); margin: 10px 0 6px; overflow: hidden; }
+  .bg-bar i { display: block; height: 100%; width: 0; border-radius: 5px; background: var(--lime, #b4ff6a); transition: width .4s cubic-bezier(.2,.8,.2,1); }
+  #bg-hero.over .bg-bar i { background: #ff8a70; }
+  .donut-wrap { display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: center; }
+  @media (max-width: 420px) { .donut-wrap { grid-template-columns: 1fr; } .donut-wrap svg { max-width: 220px; margin: 0 auto; } }
+  .donut-wrap svg { width: 100%; height: auto; overflow: visible; }
+  .donut-slice { fill: none; stroke-width: 24; cursor: pointer; transition: opacity .15s, stroke-width .15s; }
+  .donut-slice.dim { opacity: .3; }
+  .donut-slice:hover, .donut-slice:focus { stroke-width: 28; outline: none; }
+  .donut-empty { fill: none; stroke: rgba(127,127,127,.25); stroke-width: 24; }
+  .donut-big { font: 700 15px sans-serif; fill: currentColor; }
+  .donut-small { font: 11px sans-serif; fill: currentColor; opacity: .7; }
+  .legend-row { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: center; width: 100%; padding: 7px 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .legend-row i { width: 12px; height: 12px; border-radius: 4px; }
+  .legend-row .v { font-size: 12px; opacity: .8; }
+  .bg-line { border-bottom: 1px solid rgba(127,127,127,.2); padding: 4px 0; }
+  .bg-line-head { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; width: 100%; padding: 8px 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .bg-line-head.static { cursor: default; }
+  .bg-line-head .bar { grid-column: 1 / -1; height: 7px; border-radius: 4px; background: rgba(127,127,127,.18); overflow: hidden; }
+  .bg-line-head .bar i { display: block; height: 100%; background: #2fa36b; border-radius: 4px; }
+  .bg-line.watch .bar i { background: #e0a100; }
+  .bg-line.over .bar i { background: #d4573b; }
+  .bg-line-head small { grid-column: 1 / -1; opacity: .75; }
+  .bg-line.over small { color: #d4573b; opacity: 1; font-weight: 700; }
+  .bg-edit { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+  .bg-edit .auth-input { flex: 1 1 120px; min-width: 0; margin: 0; }
+  .upsell { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
+  .upsell[hidden] { display: none; }
+  .upsell-card { position: relative; width: min(520px, 100%); background: var(--paper, #fff); color: inherit; border-radius: 24px 24px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 18px); max-height: 92vh; overflow: auto; }
+  .upsell-card h3 { margin: 0 28px 8px 0; font-size: 21px; line-height: 1.2; }
+  .upsell-card p { margin: 0 0 10px; opacity: .85; }
+  .upsell-card ul { margin: 6px 0 12px; padding: 0; list-style: none; }
+  .upsell-card li { padding: 4px 0 4px 26px; position: relative; }
+  .upsell-card li::before { content: "\2713"; position: absolute; left: 0; top: 4px; color: #2fa36b; font-weight: 800; }
+  .upsell-card .pill, .upsell-card .pill-outline { display: block; width: 100%; margin: 8px 0; }
+  .upsell-x { position: absolute; right: 12px; top: 8px; border: 0; background: none; font-size: 28px; color: inherit; cursor: pointer; }
+  .up-price { font-weight: 700; }
+  .upsell-home { margin: 14px 0; padding: 16px; border-radius: 18px; background: linear-gradient(135deg, #0f3d26, #1f8f5f); color: #fff; position: relative; }
+  .upsell-home h4 { margin: 0 24px 6px 0; font-size: 17px; }
+  .upsell-home p { margin: 0 0 10px; opacity: .92; font-size: 14px; }
+  .upsell-home .pill { background: var(--lime, #b4ff6a); color: #0b2a1a; }
+  .upsell-home .pill-outline { border-color: rgba(255,255,255,.6); color: #fff; margin-left: 6px; }
+  .upsell-home .x { position: absolute; right: 10px; top: 6px; border: 0; background: none; color: #fff; font-size: 22px; cursor: pointer; opacity: .8; }
+  .trial-banner { display: grid; gap: 4px; padding: 14px; border-radius: 16px; background: rgba(47,163,107,.12); border: 1px solid rgba(47,163,107,.4); margin: 10px 0; }
+  .trial-banner .pill { justify-self: start; margin-top: 6px; }
+  .plan-table { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); font-size: 12px; text-align: center; border: 1px solid rgba(127,127,127,.25); border-radius: 14px; overflow: hidden; }
+  .plan-table > div { padding: 8px 4px; border-bottom: 1px solid rgba(127,127,127,.15); }
+  .plan-table > div:nth-child(5n+1) { text-align: left; padding-left: 10px; font-weight: 600; }
+  .plan-table .head { font-weight: 800; background: rgba(127,127,127,.1); }
+  .plan-table .yes { color: #2fa36b; font-weight: 800; }
+  .plan-table .no { opacity: .35; }
+  .addon-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
+  .addon-row small { opacity: .75; }
   .tap-photo { cursor: zoom-in; }
   .photo-zoom { position: fixed; inset: 0; z-index: 80; background: #0b0b0b; display: flex; flex-direction: column; }
   .photo-zoom[hidden] { display: none; }
@@ -1036,18 +1089,22 @@
           <button class="card" onclick="showFiltered('overdue')"><span class="note">Overdue</span><strong id="card-overdue">1</strong><p>Tap to open</p></button>
           <button class="card" onclick="showFiltered('draft')"><span class="note">Drafts</span><strong id="card-drafts">1</strong><p>Not sent yet</p></button>
           <button class="card" onclick="openInsight('out')"><span class="note">Money out</span><strong id="card-out">$420.00</strong><p>Tap for details</p></button>
+          <button class="card" onclick="openBudget('home')"><span class="note">Budget</span><strong>Plan</strong><p>Limits, goals, and tips</p></button>
           <button class="card" onclick="show('banks')"><span class="note">Linked</span><strong id="card-linked">2</strong><p>Bank and card</p></button>
         </div>
         <div class="section-label">Recent</div>
+        <div class="upsell-home" data-upsell hidden></div>
         <div id="recent"></div>
         </div>
         <div id="home-personal" hidden>
+          <div class="upsell-home" data-upsell hidden></div>
           <button class="hero" onclick="show('money')" style="display:block;width:100%;text-align:left;border:0;cursor:pointer;font:inherit">
             <div class="kicker">Spent this month</div>
             <p class="amount" id="personal-spent">$0.00</p>
             <p style="margin:0;color:var(--linen)">Personal checking and card. The business books stay separate.</p>
           </button>
           <div class="dash">
+            <button class="card" onclick="openBudget('home')"><span class="note">Budget</span><strong>Plan</strong><p>Limits, goals, and tips</p></button>
             <button class="card" onclick="beginReceipt()"><span class="note">Receipt photo</span><strong>Take</strong><p>Picture of a receipt</p></button>
             <button class="card" onclick="show('banks')"><span class="note">Personal accounts</span><strong id="personal-linked">2</strong><p>Checking and credit</p></button>
           </div>
@@ -1477,6 +1534,7 @@
         <button class="card tap-card" onclick="openInsight('profit')"><h3 id="money-profit">$1,220.00 rough profit</h3><p>Calculated from dated payments and expenses. Not a full ledger.</p><span class="tap-more">Details &rsaquo;</span></button>
         <button class="card tap-card" id="forecast-card" onclick="openInsight('forecast')"><h3 id="forecast-net">Next 30 days</h3><p id="forecast-note">Open invoices coming in, minus what you usually spend.</p><span class="tap-more">Details &rsaquo;</span></button>
         <div class="quick-row">
+          <button class="pill-outline small" onclick="openBudget('money')">Budget</button>
           <button class="pill-outline small" onclick="beginMileage()">Drives</button>
           <button class="pill-outline small" onclick="openTimer()">Job timer</button>
           <button class="pill-outline small biz-only" onclick="show('clients')">Clients</button>
@@ -1578,7 +1636,7 @@
         <div class="field"><label>Merchant</label><input id="expense-merchant" value="Harbor Lumber"></div>
         <div class="field"><label>Date</label><input id="expense-date" value="Nov 18, 2026" data-iso="2026-11-18" readonly></div>
         <div class="field"><label>Total</label><input id="expense-total" value="$186.40"></div>
-        <div class="field"><label>Category</label><input id="expense-category" value="Materials"></div>
+        <div class="field"><label>Category</label><input id="expense-category" value="Materials" list="expense-cats"><datalist id="expense-cats"></datalist></div>
         <button class="textlink danger-link" id="expense-delete" onclick="deleteExpense()" hidden>Delete this expense</button>
         <div style="height:88px"></div>
         <div class="sticky">
@@ -1651,10 +1709,12 @@
         <button class="set-row live-only" onclick="show('account')"><span class="name">Account and sync</span><span class="sub" id="acct-sub">Not signed in · sign up to back up and sync</span></button>
         <div class="field live-only" style="margin-top:4px"><label>Business name</label><input id="biz-name" placeholder="Your business" onchange="setBusinessName(this.value)"></div>
         <button class="set-row" onclick="openAccountSetup()"><span class="name">Account type</span><span class="sub" id="account-sub">Business</span></button>
+        <button class="set-row live-only" id="notify-test-row" onclick="sendPushTest()"><span class="name">Send a test notification</span><span class="sub" id="notify-test-sub">Checks that this device can hear from Simple Accountz</span></button>
         <button class="set-row live-only" id="notify-row" onclick="toggleNotify()"><span class="name">Notify me about activity</span><span class="switch off" id="notify-switch" style="grid-row:1 / span 2;grid-column:2"></span><span class="sub" id="notify-sub">Off · tap to be told what happens</span></button>
         <button class="set-row" id="auto-row" onclick="toggleAuto()"><span class="name">Assistant works automatically</span><span class="switch" id="auto-switch" style="grid-row:1 / span 2;grid-column:2"></span><span class="sub" id="auto-sub">On · matches deposits, files expenses, starts monthly drafts</span></button>
         <button class="set-row" onclick="show('files')"><span class="name">Files</span><span class="sub">Scan an invoice or upload</span></button>
         <button class="preview-only set-row biz-only" onclick="show('business-profile')"><span class="name">Business profile</span><span class="sub">Field &amp; Co. · tax ID on file</span></button>
+        <button class="set-row live-only" id="plan-row" onclick="show('paywall')"><span class="name">Your plan</span><span class="sub" id="plan-sub">Free</span></button>
         <button class="preview-only set-row" id="platform-row" onclick="show('platform')" hidden><span class="name">Creator console</span><span class="sub" id="platform-sub">Spencer only</span></button>
         <button class="set-row" onclick="show('region')"><span class="name">Country and currency</span><span class="sub" id="region-sub">United States · USD</span></button>
         <button class="set-row" onclick="show('banks')"><span class="name">Banks and cards</span><span class="sub" id="banks-sub">Business checking and credit</span></button>
@@ -1689,6 +1749,7 @@
       <section class="screen no-tabs" id="paywall">
         <button class="back" onclick="show('settings')">Back</button>
         <h2 class="title">Plan</h2>
+        <div class="trial-banner" id="pw-trial" hidden><b id="pw-trial-title"></b><span id="pw-trial-sub"></span><button class="pill small" id="pw-trial-btn" onclick="startTrial()">Try Plus free for 14 days</button></div>
         <div class="seg" id="billseg" style="margin:12px 0">
           <button class="on" data-cadence="monthly">Monthly</button>
           <button data-cadence="annual">Annual</button>
@@ -1698,10 +1759,15 @@
           <button class="plan on" data-plan="plus"><b>Plus <em>$14.99</em></b><span class="note">10 invoices. Photos, your signature, reports, due reminders.</span></button>
           <button class="plan" data-plan="premium"><b>Premium <em>$21.99</em></b><span class="note">Unlimited invoices. Client signatures, deposits, version restore.</span></button>
         </div>
+        <div class="section-label">What each plan includes</div>
+        <div class="plan-table" id="plan-table"></div>
+        <div class="section-label">Add-ons</div>
+        <div id="addon-list"></div>
+        <p class="note" id="pw-note"></p>
         <div style="height:88px"></div>
         <div class="sticky">
           <div class="total"><small>Selected</small><span id="planlabel">Plus</span></div>
-          <button class="pill" onclick="show('settings')">Subscribe</button>
+          <button class="pill" onclick="buyPlan(selectedPlan(), cadence)">Choose this plan</button>
         </div>
       </section>
 
@@ -1729,12 +1795,15 @@
         <button class="back" onclick="show('money')">Back</button>
         <h2 class="title">Drives</h2>
         <div class="card" id="drive-card"><h3 class="timer-clock" id="drive-distance">0.0 mi</h3><p id="drive-state">Tap Start when you set off. Keep Simple Accountz open while you drive; it tracks the route and distance by GPS and files the trip when you tap End.</p><div class="smap" id="drive-map" hidden></div></div>
-        <div class="field"><label for="drive-dest">Where to? (optional)</label><input id="drive-dest" maxlength="200" placeholder="Address or place" autocomplete="street-address"></div>
-        <div class="nav-apps" aria-label="Get directions in">
-          <button class="nav-app" onclick="openNav('apple')"><b>Apple Maps</b><span>Directions</span></button>
-          <button class="nav-app" onclick="openNav('google')"><b>Google Maps</b><span>Directions</span></button>
-          <button class="nav-app" onclick="openNav('waze')"><b>Waze</b><span>Directions</span></button>
+        <div class="field"><label for="drive-from">From (leave blank to use where you are)</label><input id="drive-from" maxlength="200" list="recent-places" placeholder="Starting address" autocomplete="off" oninput="driveAddressChanged()"></div>
+        <div class="field"><label for="drive-dest">To (address or place)</label><input id="drive-dest" maxlength="200" list="recent-places" placeholder="1800 Market St, Philadelphia, PA" autocomplete="off" oninput="driveAddressChanged()"></div>
+        <datalist id="recent-places"></datalist>
+        <div class="nav-apps" id="nav-apps" aria-label="Start the drive and open directions in">
+          <button class="nav-app" onclick="openNav('apple')"><b>Apple Maps</b><span class="nav-sub">Start and go</span></button>
+          <button class="nav-app" onclick="openNav('google')"><b>Google Maps</b><span class="nav-sub">Start and go</span></button>
+          <button class="nav-app" onclick="openNav('waze')"><b>Waze</b><span class="nav-sub">Start and go</span></button>
         </div>
+        <p class="note" id="nav-note">The address carries over to the map app you pick, and is saved with the drive.</p>
         <div class="stack-btns">
           <button class="pill" id="drive-toggle" onclick="toggleDrive()">Start drive</button>
           <button class="pill-outline" id="drive-pause" onclick="toggleDrivePause()" hidden>Pause for a break</button>
@@ -1919,6 +1988,55 @@
         <div class="pz-stage" id="pz-stage"><img id="pz-img" alt="Photo"></div>
       </div>
 
+      <div class="upsell" id="upsell" hidden role="dialog" aria-label="Upgrade">
+        <div class="upsell-card">
+          <button class="upsell-x" onclick="closeUpgrade()" aria-label="Close">&times;</button>
+          <h3 id="up-title"></h3>
+          <p id="up-body"></p>
+          <ul id="up-list"></ul>
+          <p class="up-price" id="up-price"></p>
+          <button class="pill" id="up-main" onclick="upgradeMain()"></button>
+          <button class="pill-outline" onclick="closeUpgrade(); show('paywall')">See all plans</button>
+          <button class="textlink" onclick="closeUpgrade()">Not now</button>
+        </div>
+      </div>
+
+      <section class="screen no-tabs" id="budget">
+        <button class="back" onclick="show(budgetFrom || 'money')">Back</button>
+        <h2 class="title" id="bg-title">Budget</h2>
+        <div class="hero" id="bg-hero">
+          <div class="kicker" id="bg-kicker"></div>
+          <p class="amount" id="bg-amount"></p>
+          <div class="bg-bar"><i id="bg-fill"></i></div>
+          <p class="in-change" id="bg-sub"></p>
+        </div>
+        <div class="quick-row">
+          <button class="pill small" onclick="autoBudget()">Set budgets for me</button>
+          <button class="pill-outline small" id="bg-undo" onclick="undoBudget()" hidden>Undo</button>
+          <button class="pill-outline small" onclick="askBooks('How can I save money?')">Ask the coach</button>
+        </div>
+        <div class="section-label">Where the money goes</div>
+        <div class="donut-wrap"><svg id="bg-donut" viewBox="0 0 160 160" role="img" aria-label="Spending by category this month"></svg><div id="bg-legend"></div></div>
+        <div class="section-label">Last 6 months</div>
+        <div class="chart" id="bg-chart" role="group" aria-label="Money in and out, last 6 months"></div>
+        <p class="chart-read" id="bg-chart-read">Tap a month to see its numbers.</p>
+        <button class="textlink" id="bg-chart-lock" onclick="openUpgrade('chart')" hidden>See a full year with Plus</button>
+        <div class="section-label">Budget lines · tap one to change it</div>
+        <div id="bg-rows"></div>
+        <div class="section-label">What I noticed</div>
+        <div id="bg-tips"></div>
+        <div class="section-label">Savings goals</div>
+        <div id="bg-goals"></div>
+        <div class="bg-edit goal-form">
+          <input class="auth-input" id="bg-goal-name" maxlength="60" placeholder="Goal, like Emergency fund">
+          <input class="auth-input" id="bg-goal-target" inputmode="decimal" placeholder="Target amount">
+          <input class="auth-input" id="bg-goal-due" type="date" aria-label="Date to reach it by (optional)">
+          <button class="pill small" onclick="addGoal()">Add goal</button>
+        </div>
+        <p class="note" id="bg-goal-note"></p>
+        <div style="height:88px"></div>
+      </section>
+
       <section class="screen no-tabs" id="insight">
         <button class="back" onclick="backFromInsight()">Back</button>
         <h2 class="title" id="in-title">Details</h2>
@@ -1974,6 +2092,8 @@
         <button class="suggest biz-only preview-only" onclick="ask('recur','1042')">Repeat Oak Street monthly</button>
         <button class="suggest biz-only preview-only" onclick="ask('recur','1041')">Repeat Maria monthly</button>
         <button class="suggest biz-only preview-only" onclick="ask('deposit')">Request a 25% deposit</button>
+        <button class="suggest" onclick="askBooks('How is my budget?')">How&rsquo;s my budget?</button>
+        <button class="suggest" onclick="askBooks('How can I save money?')">Help me spend smarter</button>
         <button class="suggest biz-only" onclick="ask('weekly')">Who owes you this week</button>
         <div id="ai-action"></div>
         <div class="section-label">Ask about your books</div>
@@ -2485,7 +2605,7 @@
     if (autoUndo && (docs !== autoUndo.afterDocs || transactions !== autoUndo.afterTx)) autoUndo = null;
     if (!autoMode) { autoWaiting = []; return; }
     // Every expense gets a category, so reports and taxes are right. One the owner set is never changed.
-    const sorted = SA.categorizeExpenses(transactions);
+    const sorted = SA.categorizeExpenses(transactions, accountKind);
     if (sorted.changed) transactions = sorted.transactions;
     const result = SA.autopilot(docs, transactions, SA.LEDGER_TODAY, {
       kind: accountKind,
@@ -3442,6 +3562,549 @@
     renderTaxes();
   }
 
+  // ---- Plans and upgrade prompts ----
+  // Free covers the basics. The limits live in SA.PLAN_LIMITS. In the design preview everything is open.
+  const PLAN_KEY = "simpleaccountz.plan.v1";
+  const USAGE_KEY = "simpleaccountz.usage.v1";
+  const NUDGE_KEY = "simpleaccountz.nudge.v1";
+  let plan = loadPlan();
+
+  function loadPlan() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PLAN_KEY) || "null");
+      if (raw && SA.PLAN_ORDER.indexOf(raw.tier) !== -1) return { tier: raw.tier, until: Number(raw.until) || 0, source: String(raw.source || ""), trialAvailable: raw.trialAvailable !== false };
+    } catch (error) {}
+    return { tier: "free", until: 0, source: "", trialAvailable: true };
+  }
+
+  function savePlan() {
+    try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (error) {}
+  }
+
+  function takePlan(fromServer) {
+    if (!fromServer || SA.PLAN_ORDER.indexOf(fromServer.tier) === -1) return;
+    plan = { tier: fromServer.tier, until: Number(fromServer.until) || 0, source: String(fromServer.source || ""), trialAvailable: fromServer.trialAvailable !== false };
+    savePlan();
+  }
+
+  // The plan in force right now. A trial that has run out is Free again, even offline.
+  function currentTier() {
+    if (!LIVE) return "premium";
+    return plan.tier !== "free" && plan.until > Date.now() ? plan.tier : "free";
+  }
+
+  function usageNow() {
+    const month = SA.LEDGER_TODAY.slice(0, 7);
+    let used = null;
+    try { used = JSON.parse(localStorage.getItem(USAGE_KEY) || "null"); } catch (error) {}
+    if (!used || used.month !== month) used = { month, scans: 0, questions: 0, scanBonus: 0 };
+    return used;
+  }
+
+  function bumpUsage(kind) {
+    const used = usageNow();
+    used[kind] = (used[kind] || 0) + 1;
+    try { localStorage.setItem(USAGE_KEY, JSON.stringify(used)); } catch (error) {}
+    return used;
+  }
+
+  // Asks the plan. If it says no, shows why and what it would take.
+  function gate(feature, used, reason, context) {
+    const verdict = SA.planGate(currentTier(), feature, used, feature === "scans" ? usageNow().scanBonus : 0);
+    if (verdict.ok) return true;
+    openUpgrade(reason || feature, Object.assign({ limit: verdict.limit, need: verdict.need }, context || {}));
+    return false;
+  }
+
+  function openUpgrade(reason, context) {
+    const copy = SA.upgradeCopy(reason, context);
+    document.getElementById("up-title").textContent = copy.title;
+    document.getElementById("up-body").textContent = copy.body;
+    const list = document.getElementById("up-list");
+    list.innerHTML = "";
+    copy.bullets.forEach((text) => { const item = document.createElement("li"); item.textContent = text; list.appendChild(item); });
+    document.getElementById("up-price").textContent = "Plus is " + copy.price + ". Annual saves " + SA.formatMoney(copy.saving.minor, "USD") + ", about " + copy.saving.months + " months free.";
+    document.getElementById("up-main").textContent = plan.trialAvailable ? "Try Plus free for 14 days" : "Keep Plus";
+    document.getElementById("upsell").hidden = false;
+  }
+
+  function closeUpgrade() { document.getElementById("upsell").hidden = true; }
+
+  function upgradeMain() {
+    if (plan.trialAvailable) startTrial();
+    else { closeUpgrade(); show("paywall"); }
+  }
+
+  // The trial is real: 14 days of Plus on the server, once per account, no card.
+  async function startTrial() {
+    if (!LIVE) { showPull("This is the design preview. The live app starts the trial."); return; }
+    if (!sync.signedIn) {
+      closeUpgrade();
+      showPull("Create your free account first. The trial and your books stay with it.");
+      show("account");
+      setAcctView("signup");
+      return;
+    }
+    const done = await call("POST", "/api/plan/trial", {});
+    if (done.status === 200 && done.body) {
+      applyProfile(done.body);
+      closeUpgrade();
+      renderAll();
+      showPull("Plus is yours for 14 days. Everything is unlocked.");
+      return;
+    }
+    closeUpgrade();
+    if (done.status === 409) { await refreshProfile(); renderAll(); showPull(done.body && done.body.error === "already_paid" ? "You already have a paid plan." : "Your free trial was already used. Choose a plan to keep Plus."); show("paywall"); return; }
+    showPull("Could not start the trial just now. Try again in a minute.");
+  }
+
+  // Store purchases plug in here (window.SA_PURCHASE) once the store listings sell plans. Until
+  // then, we say so plainly and note the interest, rather than pretend a purchase happened.
+  async function buyPlan(tier, cadenceChoice) {
+    if (typeof window.SA_PURCHASE === "function") { try { return await window.SA_PURCHASE(tier, cadenceChoice); } catch (error) { showPull("The purchase did not go through. You were not charged."); return; } }
+    if (LIVE && sync.signedIn) call("POST", "/api/plan/interest", { tier });
+    showPull("Paid plans open in the app stores soon. We noted that you want " + SA.PLAN_NAMES[tier] + (plan.trialAvailable ? ". Your free trial works right now." : "."));
+  }
+
+  function selectedPlan() {
+    const on = document.querySelector("#plans .plan.on");
+    return on ? on.dataset.plan : "plus";
+  }
+
+  function renderPaywall() {
+    const banner = document.getElementById("pw-trial");
+    if (!banner) return;
+    const tier = currentTier();
+    const left = SA.trialDaysLeft(plan, Date.now());
+    banner.hidden = !LIVE;
+    if (LIVE) {
+      document.getElementById("pw-trial-title").textContent = tier !== "free" ? (left ? "Your Plus trial: " + left + (left === 1 ? " day" : " days") + " left" : "You are on " + SA.PLAN_NAMES[tier]) : (plan.trialAvailable ? "Try Plus free for 14 days" : "Your Plus trial has ended");
+      document.getElementById("pw-trial-sub").textContent = tier !== "free" ? (left ? "Choose a plan before it ends to keep the full coach, goals, and exports." : "") : (plan.trialAvailable ? "No card needed. Everything unlocked, then back to Free unless you choose a plan." : "Choose a plan to get the full coach, goals, charts, and exports back.");
+      document.getElementById("pw-trial-btn").hidden = !(tier === "free" && plan.trialAvailable);
+    }
+    const table = document.getElementById("plan-table");
+    table.innerHTML = "";
+    const cell = (text, cls) => { const d = document.createElement("div"); d.textContent = text; if (cls) d.className = cls; table.appendChild(d); };
+    cell("", "head");
+    SA.PLAN_ORDER.forEach((name) => cell(SA.PLAN_NAMES[name], "head"));
+    const rows = [
+      ["Auto-filled receipts a month", "scans"], ["Budget lines", "budgetLines"], ["Savings goals", "goals"], ["Coach insights", "tips"],
+      ["Chart history (months)", "chartMonths"], ["Questions to the assistant", "questions"], ["Spreadsheet and accounting exports", "exportBooks"]
+    ];
+    rows.forEach(([label, key]) => {
+      cell(label);
+      SA.PLAN_ORDER.forEach((name) => {
+        const value = SA.planLimits(name)[key];
+        if (typeof value === "boolean") cell(value ? "✓" : "–", value ? "yes" : "no");
+        else cell(value >= 99 ? "Unlimited" : String(value), value > SA.planLimits("free")[key] ? "yes" : "");
+      });
+    });
+    const addons = document.getElementById("addon-list");
+    addons.innerHTML = "";
+    SA.ADDONS.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "addon-row";
+      row.innerHTML = '<b class="n"></b><span class="p"></span><small class="d"></small><button class="pill-outline small">Notify me</button>';
+      row.querySelector(".n").textContent = item.name;
+      row.querySelector(".p").textContent = SA.formatMoney(item.minor, "USD");
+      row.querySelector(".d").textContent = item.detail;
+      row.querySelector("button").onclick = () => showPull(item.name + " opens when store purchases do. Your free trial unlocks all of this now.");
+      addons.appendChild(row);
+    });
+    document.getElementById("pw-note").textContent = "Plans are billed through the app store you installed from. Add-ons are one-time purchases.";
+  }
+
+  function renderPlanRow() {
+    const sub = document.getElementById("plan-sub");
+    if (!sub) return;
+    const tier = currentTier();
+    const left = SA.trialDaysLeft(plan, Date.now());
+    sub.textContent = tier === "free" ? "Free · tap to see what Plus adds" : SA.PLAN_NAMES[tier] + (left ? " trial · " + left + (left === 1 ? " day" : " days") + " left" : "");
+  }
+
+  // The nudge on Home: what the plan would do for this person, in their own numbers. Dismissible.
+  function renderUpsellCard() {
+    document.querySelectorAll("[data-upsell]").forEach((host) => {
+      host.innerHTML = "";
+      host.hidden = true;
+      if (!LIVE) return;
+      const tier = currentTier();
+      const left = SA.trialDaysLeft(plan, Date.now());
+      let title = "", body = "", main = "", mainAction = null, dismissible = true;
+      if (tier !== "free" && left) {
+        if (left > 5) return;
+        title = "Your Plus trial ends in " + left + (left === 1 ? " day" : " days");
+        body = "Keep the full budget coach, goals, 12-month charts, and exports.";
+        main = "Choose a plan";
+        mainAction = () => show("paywall");
+        dismissible = false;
+      } else if (tier === "free") {
+        let dismissed = 0;
+        try { dismissed = Number(localStorage.getItem(NUDGE_KEY)) || 0; } catch (error) {}
+        if (Date.now() - dismissed < 3 * 86400000) return;
+        const status = SA.budgetStatus(transactions, budgetNow(), SA.LEDGER_TODAY, businessCurrency, accountKind);
+        const flex = status.rows.filter((row) => row.flexible && row.spent > 0).sort((a, b) => b.spent - a.spent)[0];
+        if (!plan.trialAvailable) { title = "Your Plus trial has ended"; body = "Get the full coach, goals, and exports back with a plan."; main = "Choose a plan"; mainAction = () => show("paywall"); }
+        else if (flex && flex.spent >= 2000) { title = "You spent " + SA.formatMoney(flex.spent, businessCurrency) + " on " + flex.name + " this month"; body = "Plus shows where to trim it, builds your whole budget, and finds charges to cancel. Try it free for 14 days."; main = "Try Plus free"; mainAction = startTrial; }
+        else { title = "Your money, worked out for you"; body = "Plus builds your full budget, tracks savings goals, and answers unlimited questions. Try it free for 14 days, no card."; main = "Try Plus free"; mainAction = startTrial; }
+      } else return;
+      host.hidden = false;
+      const h = document.createElement("h4");
+      h.textContent = title;
+      const p = document.createElement("p");
+      p.textContent = body;
+      const go = document.createElement("button");
+      go.className = "pill small";
+      go.textContent = main;
+      go.onclick = mainAction;
+      const all = document.createElement("button");
+      all.className = "pill-outline small";
+      all.textContent = "See plans";
+      all.onclick = () => show("paywall");
+      host.appendChild(h);
+      host.appendChild(p);
+      host.appendChild(go);
+      host.appendChild(all);
+      if (dismissible) {
+        const x = document.createElement("button");
+        x.className = "x";
+        x.setAttribute("aria-label", "Not now");
+        x.textContent = "×";
+        x.onclick = () => { try { localStorage.setItem(NUDGE_KEY, String(Date.now())); } catch (error) {} renderUpsellCard(); };
+        host.appendChild(x);
+      }
+    });
+  }
+
+  // ---- Budget: limits, charts, the coach, and goals ----
+  let budgets = SA.cleanBudgets(null);
+  let budgetFrom = "money";
+  let budgetUndo = null;
+  let budgetOpenLine = "";
+  const DONUT_COLORS = ["#1f8f5f", "#3b78d8", "#e0a100", "#d4573b", "#8a5cd6", "#14a3a3", "#c2487f", "#6b7a8f", "#8bbf3f", "#e07a2f"];
+
+  function budgetNow() { return budgets[accountKind] || SA.cleanBudget(null); }
+
+  function setBudget(next, message) {
+    budgets = Object.assign({}, budgets, { [accountKind]: SA.cleanBudget(next) });
+    renderAll();
+    if (message) showPull(message);
+  }
+
+  function openBudget(from) {
+    const current = document.querySelector(".screen.on");
+    budgetFrom = from || (current && current.id !== "budget" ? current.id : budgetFrom) || "money";
+    show("budget");
+    renderBudget();
+  }
+
+  function moneyIn(text) {
+    const exponent = SA.CURRENCIES[businessCurrency] ? SA.CURRENCIES[businessCurrency].exponent : 2;
+    const parsed = SA.parseDecimalToScale(String(text || "").replace(/,/g, ""), exponent);
+    return parsed.ok && parsed.value > 0 ? parsed.value : 0;
+  }
+
+  // "Set budgets for me": limits worked out from real spending. One tap undoes it.
+  function autoBudget() {
+    const proposal = SA.suggestBudget(transactions, SA.LEDGER_TODAY, businessCurrency, accountKind);
+    if (!Object.keys(proposal).length) { showPull("Add a few expenses first, and I will build a budget from them."); return; }
+    budgetUndo = budgetNow();
+    // Free fills the biggest lines up to its limit; Plus fills every category.
+    const cap = SA.planLimits(currentTier()).budgetLines;
+    const have = budgetNow().limits;
+    const fresh = Object.keys(proposal).filter((name) => !(name in have)).sort((a, b) => proposal[b] - proposal[a]);
+    const room = Math.max(0, cap - Object.keys(have).length);
+    const take = fresh.slice(0, room);
+    const chosen = {};
+    Object.keys(proposal).forEach((name) => { if (name in have || take.indexOf(name) !== -1) chosen[name] = proposal[name]; });
+    setBudget({ limits: Object.assign({}, have, chosen), goals: budgetNow().goals }, "Budgets set from your spending. Tap any line to change it.");
+    if (fresh.length > take.length) setTimeout(() => openUpgrade("budgetLines", { limit: cap }), 700);
+    if (document.getElementById("budget").classList.contains("on")) renderBudget();
+  }
+
+  function undoBudget() {
+    if (!budgetUndo) return;
+    setBudget(budgetUndo, "Budgets put back.");
+    budgetUndo = null;
+    renderBudget();
+  }
+
+  function setLimit(name, minor) {
+    const next = budgetNow();
+    if (minor > 0 && !(name in next.limits) && !gate("budgetLines", Object.keys(next.limits).length, "budgetLines")) return;
+    const limits = Object.assign({}, next.limits);
+    if (minor > 0) limits[name] = minor; else delete limits[name];
+    setBudget({ limits, goals: next.goals }, minor > 0 ? name + " set to " + SA.formatMoney(minor, businessCurrency) + "." : name + " limit removed.");
+    budgetOpenLine = "";
+    if (document.getElementById("budget").classList.contains("on")) renderBudget();
+  }
+
+  function addGoal() {
+    const name = document.getElementById("bg-goal-name").value.trim();
+    const target = moneyIn(document.getElementById("bg-goal-target").value);
+    const due = document.getElementById("bg-goal-due").value;
+    const note = document.getElementById("bg-goal-note");
+    if (!name || !target) { note.textContent = "Give it a name and an amount."; return; }
+    if (!gate("goals", budgetNow().goals.length, "goals")) return;
+    const next = budgetNow();
+    const goals = next.goals.concat([{ id: "goal-" + Date.now().toString(36), name, targetMinor: target, savedMinor: 0, due: due && due > SA.LEDGER_TODAY ? due : "", createdAt: SA.LEDGER_TODAY }]);
+    setBudget({ limits: next.limits, goals }, "Goal added.");
+    ["bg-goal-name", "bg-goal-target", "bg-goal-due"].forEach((id) => { document.getElementById(id).value = ""; });
+    note.textContent = "";
+    renderBudget();
+  }
+
+  function addToGoal(id, text) {
+    const amount = moneyIn(text);
+    if (!amount) { showPull("Enter an amount."); return; }
+    const next = budgetNow();
+    setBudget({ limits: next.limits, goals: next.goals.map((g) => (g.id === id ? Object.assign({}, g, { savedMinor: g.savedMinor + amount }) : g)) }, "Added to your goal.");
+    renderBudget();
+  }
+
+  function deleteGoal(id) {
+    const next = budgetNow();
+    setBudget({ limits: next.limits, goals: next.goals.filter((g) => g.id !== id) }, "Goal removed.");
+    renderBudget();
+  }
+
+  function donutSlice(cx, cy, r, from, to) {
+    const point = (angle) => [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+    const a = point(from), b = point(to);
+    return "M" + a[0].toFixed(2) + " " + a[1].toFixed(2) + " A" + r + " " + r + " 0 " + (to - from > Math.PI ? 1 : 0) + " 1 " + b[0].toFixed(2) + " " + b[1].toFixed(2);
+  }
+
+  function drawDonut(rows) {
+    const svg = document.getElementById("bg-donut");
+    const legend = document.getElementById("bg-legend");
+    const ns = "http://www.w3.org/2000/svg";
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    legend.innerHTML = "";
+    const shown = rows.filter((row) => row.spent > 0);
+    const total = shown.reduce((sum, row) => sum + row.spent, 0);
+    const mid = document.createElementNS(ns, "text");
+    mid.setAttribute("x", 80); mid.setAttribute("y", 76); mid.setAttribute("text-anchor", "middle"); mid.setAttribute("class", "donut-big");
+    const sub = document.createElementNS(ns, "text");
+    sub.setAttribute("x", 80); sub.setAttribute("y", 94); sub.setAttribute("text-anchor", "middle"); sub.setAttribute("class", "donut-small");
+    const setMid = (top, bottom) => { mid.textContent = top; sub.textContent = bottom; };
+    setMid(total ? SA.formatMoney(total, businessCurrency) : "Nothing yet", total ? "spent this month" : "");
+    if (!total) {
+      const ring = document.createElementNS(ns, "circle");
+      ring.setAttribute("cx", 80); ring.setAttribute("cy", 80); ring.setAttribute("r", 58); ring.setAttribute("class", "donut-empty");
+      svg.appendChild(ring);
+    }
+    let angle = -Math.PI / 2;
+    shown.forEach((row, index) => {
+      const share = row.spent / total;
+      const color = DONUT_COLORS[index % DONUT_COLORS.length];
+      const sweep = Math.min(share * Math.PI * 2, Math.PI * 2 - 0.001);
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", donutSlice(80, 80, 58, angle, angle + sweep));
+      path.setAttribute("class", "donut-slice");
+      path.setAttribute("stroke", color);
+      path.setAttribute("tabindex", "0");
+      path.setAttribute("aria-label", row.name + ": " + SA.formatMoney(row.spent, businessCurrency) + ", " + Math.round(share * 100) + "%");
+      const show = () => { setMid(row.name, SA.formatMoney(row.spent, businessCurrency) + " · " + Math.round(share * 100) + "%"); svg.querySelectorAll(".donut-slice").forEach((n) => n.classList.toggle("dim", n !== path)); };
+      path.addEventListener("click", show);
+      path.addEventListener("mouseenter", show);
+      svg.appendChild(path);
+      angle += share * Math.PI * 2;
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "legend-row";
+      item.innerHTML = '<i></i><span class="n"></span><b class="v"></b>';
+      item.querySelector("i").style.background = color;
+      item.querySelector(".n").textContent = row.name;
+      item.querySelector(".v").textContent = SA.formatMoney(row.spent, businessCurrency) + " · " + Math.round(share * 100) + "%";
+      item.onclick = () => { show(); budgetOpenLine = row.name; renderBudgetRows(); };
+      legend.appendChild(item);
+    });
+    svg.appendChild(mid);
+    svg.appendChild(sub);
+  }
+
+  function renderBudgetRows() {
+    const host = document.getElementById("bg-rows");
+    host.innerHTML = "";
+    const status = SA.budgetStatus(transactions, budgetNow(), SA.LEDGER_TODAY, businessCurrency, accountKind);
+    const money = (minor) => SA.formatMoney(minor, businessCurrency);
+    status.rows.forEach((row) => {
+      const wrap = document.createElement("div");
+      wrap.className = "bg-line " + row.status;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "bg-line-head";
+      button.innerHTML = '<span class="n"></span><b class="v"></b><span class="bar"><i></i></span><small></small>';
+      button.querySelector(".n").textContent = row.name;
+      button.querySelector(".v").textContent = row.budgeted ? money(row.spent) + " of " + money(row.limit) : money(row.spent) + " · no limit";
+      button.querySelector(".bar i").style.width = (row.budgeted ? Math.min(100, row.pct) : 0) + "%";
+      button.querySelector("small").textContent = !row.budgeted ? "Tap to set a limit"
+        : row.status === "over" ? money(-row.left) + " over" : money(row.left) + " left" + (row.status === "watch" ? " · heading over" : "");
+      button.onclick = () => { budgetOpenLine = budgetOpenLine === row.name ? "" : row.name; renderBudgetRows(); };
+      wrap.appendChild(button);
+      if (budgetOpenLine === row.name) {
+        const form = document.createElement("div");
+        form.className = "bg-edit";
+        const input = document.createElement("input");
+        input.className = "auth-input";
+        input.inputMode = "decimal";
+        input.placeholder = "Monthly limit";
+        input.value = row.limit ? (row.limit / (SA.CURRENCIES[businessCurrency] && SA.CURRENCIES[businessCurrency].exponent === 0 ? 1 : 100)).toString() : "";
+        const save = document.createElement("button");
+        save.className = "pill small";
+        save.textContent = "Save";
+        save.onclick = () => setLimit(row.name, moneyIn(input.value));
+        const clear = document.createElement("button");
+        clear.className = "pill-outline small";
+        clear.textContent = row.budgeted ? "Remove" : "Cancel";
+        clear.onclick = () => (row.budgeted ? setLimit(row.name, 0) : (budgetOpenLine = "", renderBudgetRows()));
+        form.appendChild(input);
+        form.appendChild(save);
+        form.appendChild(clear);
+        wrap.appendChild(form);
+        const list = document.createElement("div");
+        list.className = "in-list";
+        txRows(list, transactions.filter((tx) => tx.kind === "out" && tx.currency === businessCurrency && tx.date >= SA.LEDGER_TODAY.slice(0, 8) + "01" && SA.categoryOf(tx, accountKind) === row.name).slice(0, 8));
+        wrap.appendChild(list);
+      }
+      host.appendChild(wrap);
+    });
+    // Add a line for a category with nothing spent yet.
+    const missing = SA.budgetCategories(accountKind).filter((name) => !status.rows.some((row) => row.name === name));
+    if (missing.length) {
+      const add = document.createElement("div");
+      add.className = "bg-edit";
+      const select = document.createElement("select");
+      select.className = "auth-input";
+      missing.forEach((name) => { const option = document.createElement("option"); option.value = name; option.textContent = name; select.appendChild(option); });
+      const input = document.createElement("input");
+      input.className = "auth-input";
+      input.inputMode = "decimal";
+      input.placeholder = "Monthly limit";
+      const go = document.createElement("button");
+      go.className = "pill small";
+      go.textContent = "Add line";
+      go.onclick = () => { const value = moneyIn(input.value); if (!value) { showPull("Enter an amount."); return; } setLimit(select.value, value); };
+      add.appendChild(select);
+      add.appendChild(input);
+      add.appendChild(go);
+      host.appendChild(add);
+    }
+  }
+
+  function renderBudgetTips() {
+    const host = document.getElementById("bg-tips");
+    host.innerHTML = "";
+    const tips = SA.budgetCoach({ transactions, budget: budgetNow(), today: SA.LEDGER_TODAY, currency: businessCurrency, kind: accountKind });
+    if (!tips.length) { host.innerHTML = '<p class="note">Nothing to flag. Keep adding expenses and I will keep watching.</p>'; return; }
+    // Free shows the most important few; the rest are one tap away.
+    const cap = SA.planLimits(currentTier()).tips;
+    const hidden = Math.max(0, tips.length - cap);
+    tips.slice(0, cap).forEach((tip) => {
+      const card = document.createElement("div");
+      card.className = "check-row " + (tip.level === "warn" ? "check" : tip.level === "good" ? "" : "check");
+      card.innerHTML = "<i></i><div><b></b><span></span></div>";
+      card.querySelector("b").textContent = tip.title;
+      card.querySelector("span").textContent = tip.detail;
+      if (tip.action) {
+        const act = document.createElement("button");
+        act.className = "pill-outline small";
+        act.textContent = tip.action.label;
+        act.onclick = () => runAiAction(tip.action);
+        card.querySelector("div").appendChild(act);
+      }
+      host.appendChild(card);
+    });
+    if (hidden > 0) {
+      const lock = document.createElement("div");
+      lock.className = "check-row check";
+      lock.innerHTML = "<i></i><div><b></b><span></span></div>";
+      lock.querySelector("b").textContent = hidden + " more insight" + (hidden === 1 ? "" : "s") + " found";
+      lock.querySelector("span").textContent = "Recurring charges, spending jumps, and what to set aside. Plus shows them all.";
+      const open = document.createElement("button");
+      open.className = "pill-outline small";
+      open.textContent = plan.trialAvailable ? "Unlock with a free trial" : "See plans";
+      open.onclick = () => openUpgrade("tips", { hidden, limit: cap });
+      lock.querySelector("div").appendChild(open);
+      host.appendChild(lock);
+    }
+  }
+
+  function renderBudgetGoals() {
+    const host = document.getElementById("bg-goals");
+    host.innerHTML = "";
+    const money = (minor) => SA.formatMoney(minor, businessCurrency);
+    budgetNow().goals.forEach((goal) => {
+      const g = SA.goalProgress(goal, SA.LEDGER_TODAY);
+      const card = document.createElement("div");
+      card.className = "bg-line " + (g.done ? "ok" : g.late ? "over" : "ok");
+      card.innerHTML = '<div class="bg-line-head static"><span class="n"></span><b class="v"></b><span class="bar"><i></i></span><small></small></div>';
+      card.querySelector(".n").textContent = goal.name;
+      card.querySelector(".v").textContent = money(goal.savedMinor) + " of " + money(goal.targetMinor);
+      card.querySelector(".bar i").style.width = g.pct + "%";
+      card.querySelector("small").textContent = g.done ? "Reached" : g.late ? "Past its date · " + money(g.left) + " to go"
+        : (g.perWeek ? "Save " + money(g.perWeek) + " a week to finish by " + shortDate(goal.due) : money(g.left) + " to go");
+      const form = document.createElement("div");
+      form.className = "bg-edit";
+      const input = document.createElement("input");
+      input.className = "auth-input";
+      input.inputMode = "decimal";
+      input.placeholder = "Add money";
+      const add = document.createElement("button");
+      add.className = "pill small";
+      add.textContent = "Add";
+      add.onclick = () => addToGoal(goal.id, input.value);
+      const del = document.createElement("button");
+      del.className = "pill-outline small danger-link";
+      del.textContent = "Remove";
+      del.onclick = () => deleteGoal(goal.id);
+      form.appendChild(input);
+      form.appendChild(add);
+      form.appendChild(del);
+      card.appendChild(form);
+      host.appendChild(card);
+    });
+    if (!budgetNow().goals.length) host.innerHTML = '<p class="note">No goals yet. Add one below and I will work out what to save each week.</p>';
+  }
+
+  function renderBudget() {
+    const el2 = (id) => document.getElementById(id);
+    const status = SA.budgetStatus(transactions, budgetNow(), SA.LEDGER_TODAY, businessCurrency, accountKind);
+    const money = (minor) => SA.formatMoney(minor, businessCurrency);
+    el2("bg-title").textContent = accountKind === "personal" ? "Budget" : "Business budget";
+    el2("bg-kicker").textContent = new Date(SA.LEDGER_TODAY + "T00:00:00").toLocaleString([], { month: "long", year: "numeric" }) + " · day " + status.day + " of " + status.days;
+    if (status.hasBudget) {
+      el2("bg-amount").textContent = money(Math.max(0, status.totalLimit - status.budgetedSpent)) + " left";
+      const pct = Math.min(100, Math.round(status.budgetedSpent / status.totalLimit * 100));
+      el2("bg-fill").style.width = pct + "%";
+      el2("bg-hero").classList.toggle("over", status.budgetedSpent > status.totalLimit);
+      el2("bg-sub").textContent = money(status.budgetedSpent) + " of " + money(status.totalLimit) + " spent" + (status.perDayLeft ? " · about " + money(status.perDayLeft) + " a day" : "") + " · heading for " + money(status.projected);
+    } else {
+      el2("bg-amount").textContent = money(status.totalSpent) + " spent";
+      el2("bg-fill").style.width = "0%";
+      el2("bg-hero").classList.remove("over");
+      el2("bg-sub").textContent = "No budget yet. Tap Set budgets for me.";
+    }
+    el2("bg-undo").hidden = !budgetUndo;
+    drawDonut(status.rows);
+    const months = SA.planLimits(currentTier()).chartMonths;
+    const chart = SA.periodBreakdown(transactions, "month", SA.LEDGER_TODAY, businessCurrency, months);
+    if (chart) drawChart(el2("bg-chart"), chart.months, "bg-chart-read", chart.months.length - 1);
+    el2("bg-chart-lock").hidden = months >= 12;
+    renderBudgetRows();
+    renderBudgetTips();
+    renderBudgetGoals();
+  }
+
+  // What the assistant's and the coach's buttons do.
+  function runAiAction(action) {
+    if (!action) return;
+    if (action.op === "openBudget") openBudget("assistant");
+    else if (action.op === "autoBudget") { autoBudget(); openBudget("assistant"); }
+    else if (action.op === "setLimit") { setLimit(action.arg, action.amount); openBudget("assistant"); }
+    else if (action.op === "newGoal") { openBudget("assistant"); const field = document.getElementById("bg-goal-name"); if (field) field.focus(); }
+  }
+
   // ---- Card details ----
   let insightKind = "profit";
   let insightPeriod = "month";
@@ -3516,7 +4179,7 @@
       button.classList.toggle("on", button.dataset.period === insightPeriod);
       button.onclick = () => { insightPeriod = button.dataset.period; renderInsight(); };
     });
-    const b = SA.periodBreakdown(transactions, insightPeriod, SA.LEDGER_TODAY, businessCurrency);
+    const b = SA.periodBreakdown(transactions, insightPeriod, SA.LEDGER_TODAY, businessCurrency, SA.planLimits(currentTier()).chartMonths);
     if (!b) return;
     const kind = insightKind;
     const money = (minor) => SA.formatMoney(minor, businessCurrency);
@@ -3598,12 +4261,29 @@
 
   // ---- Ask about your books, and the assistant's own checks ----
   function bookState() {
-    return { transactions, docs, today: SA.LEDGER_TODAY, currency: businessCurrency, bankItems: (bankState && bankState.items) || [] };
+    return { transactions, docs, today: SA.LEDGER_TODAY, currency: businessCurrency, bankItems: (bankState && bankState.items) || [], kind: accountKind, budget: budgetNow() };
   }
 
   function askBooks(question) {
     const q = String(question || "").trim();
     if (!q) return;
+    if (!SA.planGate(currentTier(), "questions", usageNow().questions).ok) {
+      const copy = SA.upgradeCopy("questions", { limit: SA.planLimits(currentTier()).questions });
+      assistantStarted = true;
+      show("assistant");
+      const room = document.getElementById("thread");
+      room.innerHTML = "";
+      [["user", q], ["ai", copy.title + "\n" + copy.body]].forEach(([who, text]) => { const bubble = document.createElement("div"); bubble.className = "bubble " + who; bubble.textContent = text; room.appendChild(bubble); });
+      const spot = document.getElementById("ai-action");
+      spot.innerHTML = "";
+      const more = document.createElement("button");
+      more.className = "pill small";
+      more.textContent = plan.trialAvailable ? "Try Plus free for 14 days" : "See plans";
+      more.onclick = () => openUpgrade("questions", { limit: SA.planLimits(currentTier()).questions });
+      spot.appendChild(more);
+      return;
+    }
+    bumpUsage("questions");
     const answer = SA.answerReport(q, bookState());
     assistantStarted = true;
     show("assistant");
@@ -3627,6 +4307,20 @@
       open.onclick = () => { insightFrom = "assistant"; insightKind = more; insightPeriod = answer.period === "week" ? "month" : answer.period; show("insight"); renderInsight(); };
       slot.appendChild(open);
     }
+    (answer.actions || []).forEach((action) => {
+      const button = document.createElement("button");
+      button.className = "pill small";
+      button.textContent = action.label;
+      button.onclick = () => runAiAction(action);
+      slot.appendChild(button);
+    });
+    (answer.followUps || []).forEach((text) => {
+      const chip = document.createElement("button");
+      chip.className = "suggest";
+      chip.textContent = text;
+      chip.onclick = () => (text === "Set budgets for me" ? runAiAction({ op: "autoBudget" }) : text === "Set a savings goal" ? runAiAction({ op: "newGoal" }) : askBooks(text));
+      slot.appendChild(chip);
+    });
     const input = document.getElementById("ask-input");
     if (input) input.value = "";
   }
@@ -3645,7 +4339,7 @@
         const fix = document.createElement("button");
         fix.className = "pill-outline small";
         fix.textContent = "Sort them";
-        fix.onclick = () => { transactions = SA.categorizeExpenses(transactions).transactions; renderAll(); showPull("Expenses sorted into categories."); };
+        fix.onclick = () => { transactions = SA.categorizeExpenses(transactions, accountKind).transactions; renderAll(); showPull("Expenses sorted into categories."); };
         item.querySelector("div").appendChild(fix);
       }
       host.appendChild(item);
@@ -3661,7 +4355,7 @@
     document.getElementById("report-income").textContent = SA.formatMoney(packet.incomeMinor, businessCurrency) + " in";
     document.getElementById("report-expense").textContent = SA.formatMoney(packet.expenseMinor, businessCurrency) + " in expenses · " + packet.start + " to " + packet.end;
     document.getElementById("report-tax").textContent = SA.formatMoney(packet.taxCollectedMinor, businessCurrency) + " · " + packet.taxName;
-    const chartData = SA.periodBreakdown(transactions, reportPeriod, SA.LEDGER_TODAY, businessCurrency);
+    const chartData = SA.periodBreakdown(transactions, reportPeriod, SA.LEDGER_TODAY, businessCurrency, SA.planLimits(currentTier()).chartMonths);
     if (chartData) drawChart(document.getElementById("report-chart"), chartData.months, "report-chart-read", chartData.months.length - 1);
     const open = docs.filter(doc => SA.isOpenInvoice(doc)).sort((a, b) => SA.balanceOf(b) - SA.balanceOf(a));
     document.getElementById("report-top").textContent = open.length
@@ -3701,6 +4395,7 @@
   }
 
   function downloadBooks(which, format) {
+    if (!gate("exportBooks", 0, "exportBooks")) return;
     const period = which === "tax" ? taxPeriod : reportPeriod;
     const csv = format === "csv";
     const book = csv
@@ -4428,8 +5123,14 @@
     // Every photo is read, tapped or automatic. The switch only decides who presses the shutter.
     {
       try {
-        camBusy(true, "Reading the page…", 0.2);
-        scan = await readPage(canvas, mode, (p) => camBusy(true, "Reading the page…", 0.2 + p * 0.75));
+        if (SA.planGate(currentTier(), "scans", usageNow().scans, usageNow().scanBonus).ok) {
+          bumpUsage("scans");
+          camBusy(true, "Reading the page…", 0.2);
+          scan = await readPage(canvas, mode, (p) => camBusy(true, "Reading the page…", 0.2 + p * 0.75));
+        } else {
+          scan = { capped: true, fields: 0 };
+          setTimeout(() => openUpgrade("scans", { limit: SA.planLimits(currentTier()).scans }), 900);
+        }
       } catch (error) {
         scan = null;
         failedRead = true;
@@ -4538,6 +5239,10 @@
   function applyScanToReceipt(scan, onlyEmpty) {
     const note = document.getElementById("receipt-scan-note");
     const open = (id) => !onlyEmpty || !document.getElementById(id).value.trim();
+    if (scan && scan.capped) {
+      if (note) { note.textContent = "Auto-fill is used up for this month. Type the details yourself, or see what Plus adds."; note.hidden = false; }
+      return;
+    }
     if (!scan || !scan.fields) {
       if (note) { note.textContent = "I could not read this photo clearly. Retake it closer and steady with the whole page in the box, or type the details in."; note.hidden = false; }
       return;
@@ -4566,6 +5271,10 @@
   function applyScanToInvoice(scan, onlyEmpty) {
     const note = document.getElementById("invoice-scan-note");
     const open = (id) => !onlyEmpty || !document.getElementById(id).value.trim();
+    if (scan && scan.capped) {
+      if (note) { note.textContent = "Auto-fill is used up for this month. Type the details yourself, or see what Plus adds."; note.hidden = false; }
+      return;
+    }
     if (!scan || !scan.fields) {
       if (note) { note.textContent = "I could not read this photo clearly. Retake it closer and steady with the whole page in the box, or type the details in."; note.hidden = false; }
       return;
@@ -4733,7 +5442,13 @@
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
         canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-        scan = await readPage(canvas, mode);
+        if (SA.planGate(currentTier(), "scans", usageNow().scans, usageNow().scanBonus).ok) {
+          bumpUsage("scans");
+          scan = await readPage(canvas, mode);
+        } else {
+          scan = { capped: true, fields: 0 };
+          setTimeout(() => openUpgrade("scans", { limit: SA.planLimits(currentTier()).scans }), 900);
+        }
       } catch (error) {
         scan = null;
       }
@@ -5305,7 +6020,7 @@
       else syncBanks(false);
       checkIdentity();
     });
-    if (sync.signedIn) setTimeout(() => { refreshProfile(); syncNow(false); loadBanks().then(() => syncBanks(false)); }, 0);
+    if (sync.signedIn) setTimeout(() => { refreshProfile(); syncNow(false); loadBanks().then(() => syncBanks(false)); registerPush(); }, 0);
   }
 
   function applyBooksState(saved) {
@@ -5314,6 +6029,7 @@
     businessTransactions = saved.business;
     personalTransactions = saved.personal;
     accountKind = saved.accountKind;
+    budgets = SA.cleanBudgets(saved.budgets);
     pendingKind = accountKind;
     transactions = accountKind === "personal" ? personalTransactions : businessTransactions;
     businessLinks = [];
@@ -5334,7 +6050,7 @@
     const business = accountKind === "business" ? transactions : businessTransactions;
     const personal = accountKind === "personal" ? transactions : personalTransactions;
     const text = SA.serializeBooks({
-      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip, deleted: deletedIds, activity: activityLog
+      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip, deleted: deletedIds, activity: activityLog, budgets
     });
     try {
       localStorage.setItem(SA.BOOKS_KEY, text);
@@ -5499,10 +6215,71 @@
     }
   }
 
+  // ---- Push: messages from the server, even when the app is closed ----
+  // Browsers, installed web apps, and desktop. (The store apps use scheduled reminders on the phone.)
+  function pushReady() {
+    return !window.SA_NATIVE && "serviceWorker" in navigator && "PushManager" in window && typeof Notification === "function";
+  }
+
+  function keyBytes(text) {
+    const pad = "=".repeat((4 - text.length % 4) % 4);
+    const raw = atob((text + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  }
+
+  // Tells the server about this device, so it can send to it. Safe to call as often as you like.
+  async function registerPush() {
+    if (!LIVE || !sync.signedIn || !notifyOn || !pushReady() || Notification.permission !== "granted" || idState.suspended) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const got = await call("GET", "/api/push/key");
+      const key = got.status === 200 && got.body && got.body.key;
+      if (!key) return false;
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+      const done = await call("POST", "/api/push/subscribe", sub.toJSON());
+      return done.status === 200;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async function forgetPush() {
+    try {
+      if (!pushReady()) return;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return;
+      if (sync.signedIn) await call("POST", "/api/push/unsubscribe", { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    } catch (error) {}
+  }
+
+  async function sendPushTest() {
+    const sub = document.getElementById("notify-test-sub");
+    const say = (text) => { if (sub) sub.textContent = text; };
+    if (!notifyOn) { say("Turn on notifications first (the row below)."); return; }
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (window.SA_NATIVE && plugins && plugins.LocalNotifications) {
+      try {
+        await plugins.LocalNotifications.schedule({ notifications: [{ id: 9100, title: "Simple Accountz", body: "Notifications are working on this phone.", schedule: { at: new Date(Date.now() + 1500) } }] });
+        say("Sent. It should appear in a moment.");
+      } catch (error) { say("This phone refused it. Check notification settings for Simple Accountz."); }
+      return;
+    }
+    if (!sync.signedIn) { say("Sign in first, so the server knows this device."); return; }
+    say("Sending…");
+    if (!(await registerPush())) { say(pushReady() ? "This device is not registered yet. Allow notifications, then try again." : "This browser cannot receive push. On iPhone, add Simple Accountz to your Home Screen first."); return; }
+    const done = await call("POST", "/api/push/test", {});
+    if (done.status === 200 && done.body && done.body.sent > 0) say("Sent to " + done.body.sent + (done.body.sent === 1 ? " device" : " devices") + ". It should arrive in a moment.");
+    else if (done.status === 403) say("Your account is suspended, so notifications are paused.");
+    else say("The server could not reach this device. Turn notifications off and on, then try again.");
+  }
+
   async function toggleNotify() {
     if (notifyOn) {
       notifyOn = false;
       try { localStorage.setItem(NOTIFY_KEY, "off"); } catch (error) {}
+      forgetPush();
       renderAll();
       return;
     }
@@ -5525,6 +6302,7 @@
     }
     notifyOn = true;
     try { localStorage.setItem(NOTIFY_KEY, "on"); } catch (error) {}
+    registerPush();
     markActivityRead();
     renderAll();
     showPull("Notifications are on. You will hear about overdue invoices and what the assistant does.");
@@ -5535,10 +6313,12 @@
     const sw = document.getElementById("notify-switch");
     const sub = document.getElementById("notify-sub");
     const blocked = !window.SA_NATIVE && typeof Notification === "function" && Notification.permission === "denied";
+    const iphoneWeb = !window.SA_NATIVE && /iPhone|iPad/.test(navigator.userAgent || "") && !pushReady();
     if (sw) sw.classList.toggle("off", !notifyOn);
     if (sub) sub.textContent = notifyOn
       ? "On · overdue invoices, payments, and assistant activity"
-      : (blocked ? "Blocked by this device. Allow notifications for this site, then tap again." : "Off · tap to be told what happens");
+      : (blocked ? "Blocked by this device. Allow notifications for this site, then tap again."
+        : (iphoneWeb ? "On iPhone: tap Share, then Add to Home Screen, and open Simple Accountz from there to turn this on." : "Off · tap to be told what happens"));
   }
 
   // On a phone, keep one notification queued for tomorrow morning naming what
@@ -5792,6 +6572,7 @@
   let idState = { verified: false, enabled: false, status: "none", note: "", hasDetails: false, role: "", suspended: false, suspendReason: "" };
   function applyProfile(profile) {
     if (!profile) return;
+    takePlan(profile.plan);
     idState = {
       verified: !!profile.identityVerified, enabled: !!profile.identityEnabled, status: String(profile.identityStatus || "none"),
       note: String(profile.identityNote || ""), hasDetails: !!profile.hasDetails, role: profile.role === "owner" || profile.role === "admin" ? profile.role : "",
@@ -5808,7 +6589,7 @@
     const business = accountKind === "business" ? transactions : businessTransactions;
     const personal = accountKind === "personal" ? transactions : personalTransactions;
     return JSON.parse(SA.serializeBooks({
-      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip, deleted: deletedIds, activity: activityLog
+      businessName, accountKind, docs, business, personal, uploads, autoMode, autoHandled, autoSkip, deleted: deletedIds, activity: activityLog, budgets
     }));
   }
 
@@ -5986,6 +6767,7 @@
     if (window.SA_NATIVE && profile && /^[a-f0-9]{64}$/.test(String(profile.token || ""))) sync.token = profile.token;
     applyProfile(profile);
     saveSync();
+    registerPush();
     ["auth-pass", "auth-code", "ra-pass", "ra-code", "rl-pass", "rl-code"].forEach((id) => { if (el(id)) el(id).value = ""; });
     needCode = false;
     resetToken = "";
@@ -6925,7 +7707,10 @@
       rateMinor: rate.value,
       date: document.getElementById("mile-date").value,
       purpose: document.getElementById("mile-purpose").value,
-      trip: pendingTrip,
+      trip: Object.assign({}, pendingTrip || {}, {
+        from: (pendingTrip && pendingTrip.from) || (document.getElementById("drive-from") || {}).value,
+        to: (pendingTrip && pendingTrip.to) || (document.getElementById("drive-dest") || {}).value
+      }),
       currency: businessCurrency,
       unit: SA.distanceUnit(countryCode)
     });
@@ -7078,6 +7863,7 @@
   }
 
   function exportFor(format) {
+    if (!gate("exportBooks", 0, "exportBooks")) return;
     const file = SA.accountingExport(format, docs, transactions, reportPeriod, SA.LEDGER_TODAY, businessCurrency, countryCode, bizName());
     const note = document.getElementById("acct-export-note");
     if (!file.ok) { if (note) note.textContent = "Could not make that file."; return; }
@@ -7161,13 +7947,24 @@
     if (drive && drive.paused) setDriveState("Paused at " + clock(drive.pausedAt || Date.now()) + ". Miles and route are not tracked until you resume.");
     else if (drive) setDriveState("Tracking since " + clock(drive.startedAt) + (drive.start ? " from " + SA.placeText(drive.start) : "") + ". Keep Simple Accountz open while you drive.");
     renderDriveMap(drive);
+    document.querySelectorAll("#nav-apps .nav-sub").forEach((node) => { node.textContent = drive ? "Directions" : "Start and go"; });
+    renderPlaces();
+    if (drive) {
+      const fromField = document.getElementById("drive-from");
+      const toField = document.getElementById("drive-dest");
+      if (fromField && !fromField.value && drive.from) fromField.value = drive.from;
+      if (toField && !toField.value && drive.to) toField.value = drive.to;
+    }
     renderRunning();
   }
 
   function toggleDrive() {
     if (readDrive()) { endDrive(); return; }
     if (!navigator.geolocation) { setDriveState("This device cannot share its location, so type the trip below."); return; }
-    writeDrive(SA.newDrive(Date.now()));
+    writeDrive(Object.assign(SA.newDrive(Date.now()), {
+      from: SA.cleanAddress((document.getElementById("drive-from") || {}).value),
+      to: SA.cleanAddress((document.getElementById("drive-dest") || {}).value)
+    }));
     watchDrive();
     renderDrive();
     showPull("Drive started. Keep Simple Accountz open while you drive.");
@@ -7578,13 +8375,56 @@
   }
 
   // Directions in Apple Maps, Google Maps, or Waze, from where you are to where you typed.
-  function openNav(app) {
+  const PLACES_KEY = "simpleaccountz.places.v1";
+  function recentPlaces() {
+    try {
+      const list = JSON.parse(localStorage.getItem(PLACES_KEY) || "[]");
+      return Array.isArray(list) ? list.filter((item) => typeof item === "string").slice(0, 8) : [];
+    } catch (error) { return []; }
+  }
+
+  function rememberPlace(text) {
+    const place = SA.cleanAddress(text);
+    if (!place) return;
+    const list = [place].concat(recentPlaces().filter((item) => item.toLowerCase() !== place.toLowerCase())).slice(0, 8);
+    try { localStorage.setItem(PLACES_KEY, JSON.stringify(list)); } catch (error) {}
+    renderPlaces();
+  }
+
+  function renderPlaces() {
+    const box = document.getElementById("recent-places");
+    if (!box) return;
+    box.innerHTML = "";
+    recentPlaces().forEach((place) => {
+      const option = document.createElement("option");
+      option.value = place;
+      box.appendChild(option);
+    });
+  }
+
+  // Keeps what is typed with the drive that is running, so it is filed with the trip.
+  function driveAddressChanged() {
     const drive = readDrive();
-    const dest = (document.getElementById("drive-dest") || {}).value || "";
-    const from = drive && drive.last ? placeOf(drive.last) : null;
-    const links = SA.mapLinks(from, null, dest);
-    if (!links) { showPull("Type where you are going first, or start the drive so the app knows where you are."); return; }
-    if (!readDrive()) showPull("Tip: tap Start drive too, so the miles are logged.");
+    if (!drive) return;
+    drive.from = SA.cleanAddress((document.getElementById("drive-from") || {}).value);
+    drive.to = SA.cleanAddress((document.getElementById("drive-dest") || {}).value);
+    writeDrive(drive);
+  }
+
+  // Starts tracking if it is not already, then opens the chosen map app with the typed addresses.
+  function openNav(app) {
+    const from = SA.cleanAddress((document.getElementById("drive-from") || {}).value);
+    const dest = SA.cleanAddress((document.getElementById("drive-dest") || {}).value);
+    if (!dest) { showPull("Type where you are going first."); const field = document.getElementById("drive-dest"); if (field) field.focus(); return; }
+    if (!readDrive() && navigator.geolocation) toggleDrive();
+    driveAddressChanged();
+    const drive = readDrive();
+    const here = drive && drive.last ? placeOf(drive.last) : null;
+    const links = SA.mapLinks(here, null, dest, from);
+    if (!links) return;
+    rememberPlace(dest);
+    if (from) rememberPlace(from);
+    try { localStorage.setItem("simpleaccountz.navapp", app); } catch (error) {}
     window.open(links[app], "_blank", "noopener");
   }
 
@@ -7617,9 +8457,9 @@
     show("drive-view");
     document.getElementById("dv2-title").textContent = tx.name || "Drive";
     document.getElementById("dv2-miles").textContent = SA.formatMoney(tx.amountMinor, tx.currency) + (m.distance ? " · " + m.distance : "");
-    const from = SA.placeText(m.start), to = SA.placeText(m.end);
+    const from = m.from || SA.placeText(m.start), to = m.to || SA.placeText(m.end);
     document.getElementById("dv2-sub").textContent = shortDate(tx.date) + (from ? " · from " + from : "") + (to ? " to " + to : "");
-    const links = SA.mapLinks(m.start, m.end, "");
+    const links = SA.mapLinks(m.start, m.end, m.to || "", m.from || "");
     ["apple", "google", "waze"].forEach((app) => {
       const a = document.getElementById("dv2-" + app);
       a.hidden = !links;
@@ -7707,8 +8547,8 @@
       row.appendChild(top);
       const sub = document.createElement("div");
       sub.className = "drive-sub";
-      const from = SA.placeText(tx.mileage.start);
-      const to = SA.placeText(tx.mileage.end);
+      const from = tx.mileage.from || SA.placeText(tx.mileage.start);
+      const to = tx.mileage.to || SA.placeText(tx.mileage.end);
       sub.textContent = tx.date + (from ? " · from " + from : "") + (to ? " to " + to : "");
       row.appendChild(sub);
       if (tx.mileage.route && tx.mileage.route.length) {
@@ -7800,8 +8640,17 @@
       + when + ". It stays on this device unless you are signed in, and it has not been emailed to anyone.");
   }
 
+  function renderCategoryChoices() {
+    const box = document.getElementById("expense-cats");
+    if (!box) return;
+    box.innerHTML = "";
+    SA.budgetCategories(accountKind).forEach((name) => { const option = document.createElement("option"); option.value = name; box.appendChild(option); });
+  }
+
   function renderAll() {
     runAutopilot();
+    try { renderPlanRow(); renderUpsellCard(); renderPaywall(); } catch (error) {}
+    try { renderCategoryChoices(); } catch (error) {}
     try { renderChecks(); } catch (error) {}
     renderAccountChrome();
     renderHome();
