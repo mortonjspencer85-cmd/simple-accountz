@@ -6,7 +6,7 @@
 <title>Simple Accountz</title>
 <meta name="description" content="Invoices, expenses, receipt photos, and an assistant that does the bookkeeping for you.">
 <meta name="theme-color" content="#163300">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; connect-src 'self' https://api.simpleaccountz.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -727,6 +727,8 @@
   .route-svg { display: block; width: 100%; height: 140px; margin-top: 12px; border-radius: 14px; background: var(--paper); }
   .route-svg path { fill: none; stroke: var(--forest); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
   .route-svg .dot-start { fill: #34c759; stroke: #fff; stroke-width: 2; }
+  .route-svg .map-credit { font: 9px sans-serif; fill: #333; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 3px; }
+  .route-svg.has-map path { stroke: #1a73e8; stroke-width: 4.5; }
   .route-svg .dot-end { fill: #ff3b30; stroke: #fff; stroke-width: 2; }
   .drive-row { padding: 12px 0; border-bottom: 1px solid var(--fog, #e8ebe6); }
   .drive-row .route-svg { height: 96px; background: var(--linen); }
@@ -1426,6 +1428,7 @@
         <button class="back" onclick="backFromInvoice()">Back</button>
         <h2 class="title">Scanned invoice</h2>
         <p class="scan-note" id="invoice-scan-note" hidden></p>
+        <div class="quick-row" id="invoice-redo"><button class="pill-outline small" onclick="retakeInvoice()">Retake photo</button><button class="pill-outline small danger-link" onclick="discardInvoice()">Delete photo</button></div>
         <p class="note" id="invoice-note">Check the client and the total. Nothing is sent.</p>
         <img class="receipt-shot" id="invoice-photo" alt="Scanned invoice" hidden>
         <div class="card" id="invoice-card" style="background:var(--linen)">
@@ -1463,6 +1466,7 @@
         <button class="back" onclick="backFromReceipt()">Back</button>
         <h2 class="title">Receipt</h2>
         <p class="scan-note" id="receipt-scan-note" hidden></p>
+        <div class="quick-row" id="receipt-redo"><button class="pill-outline small" onclick="retakeReceipt()">Retake photo</button><button class="pill-outline small danger-link" onclick="discardReceipt()">Delete photo</button></div>
         <p class="note" id="expense-note">Check the photo, then save. Nothing is filed until then.</p>
         <img class="receipt-shot" id="receipt-photo" alt="Receipt photo" hidden>
         <div class="card" id="receipt-card" style="background:var(--linen)">
@@ -4172,6 +4176,7 @@
       editingExpenseId = null;
       setReceiptEditable(true);
       fillReceiptForm("photo");
+      document.getElementById("receipt-redo").hidden = false;
       document.getElementById("expense-save").textContent = "Save expense";
       show("expense");
       applyScanToReceipt(scan);
@@ -4255,13 +4260,17 @@
     document.getElementById("expense-note").textContent = "Check the merchant, date, and total against the photo. Nothing is filed until you save.";
   }
 
+  // Back leaves the photo screen for the page it came from; it never reopens the camera.
   function backFromReceipt() {
-    if (editingExpenseId) {
-      show("money");
-      return;
-    }
-    beginReceipt();
+    if (!editingExpenseId) receiptPhoto = null;
+    show("money");
   }
+
+  // Not happy with the photo: throw it away and take another, or just throw it away.
+  function retakeReceipt() { receiptPhoto = null; beginReceipt(); }
+  function discardReceipt() { receiptPhoto = null; show("money"); showPull("Photo deleted. Nothing was saved."); }
+  function retakeInvoice() { invoiceScan = null; beginInvoiceScan(); }
+  function discardInvoice() { invoiceScan = null; show(accountKind === "personal" ? "files" : "documents"); showPull("Photo deleted. Nothing was saved."); }
 
   function openSavedExpense(tx) {
     editingExpenseId = tx.id;
@@ -4288,6 +4297,7 @@
       card.querySelector("h3").textContent = receiptPhoto ? "Sample receipt" : "No photo on this expense";
       card.querySelector("p").textContent = tx.name + " · " + shortDate(tx.date);
     }
+    document.getElementById("receipt-redo").hidden = true;
     document.getElementById("expense-note").textContent = "Already filed. Take a new photo from Add expense.";
     document.getElementById("expense-save").textContent = "Done";
     const wipe = document.getElementById("expense-delete");
@@ -4374,6 +4384,7 @@
       setInvoiceEditable(true);
       fillInvoiceForm("photo");
       document.getElementById("invoice-save").textContent = "Save draft";
+      document.getElementById("invoice-redo").hidden = false;
       show("invoice-review");
       applyScanToInvoice(scan);
     });
@@ -4435,15 +4446,13 @@
   }
 
   function backFromInvoice() {
-    if (editingScanId) {
-      show(accountKind === "personal" ? "files" : "documents");
-      return;
-    }
-    beginInvoiceScan();
+    if (!editingScanId) invoiceScan = null;
+    show(accountKind === "personal" ? "files" : "documents");
   }
 
   function openSavedScan(doc) {
     editingScanId = doc.id;
+    document.getElementById("invoice-redo").hidden = true;
     const wipe = document.getElementById("scan-delete");
     if (wipe) wipe.hidden = false;
     invoiceScan = doc.scan
@@ -6527,9 +6536,34 @@
     if (!svg) return;
     const ns = "http://www.w3.org/2000/svg";
     const box = svg.viewBox.baseVal;
-    const fit = SA.routePaths(route, box.width || 320, box.height || 140, 12);
+    const W = box.width || 320, H = box.height || 140;
+    let fit = SA.routePaths(route, W, H, 12);
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     svg.hidden = !fit.paths.length;
+    // A real street map under the route, with the attribution OpenStreetMap asks for.
+    const view = fit.paths.length && navigator.onLine !== false ? SA.routeMapView(route, W, H, 16) : null;
+    if (view) {
+      view.tiles.forEach((t) => {
+        const img = document.createElementNS(ns, "image");
+        img.setAttribute("href", t.url);
+        img.setAttribute("x", t.x); img.setAttribute("y", t.y);
+        img.setAttribute("width", 256); img.setAttribute("height", 256);
+        svg.appendChild(img);
+      });
+      const segs = route.filter((s) => Array.isArray(s) && s.length);
+      fit = {
+        paths: segs.map((s) => s.map((pt, i) => { const q = view.project(pt); return (i ? "L" : "M") + q.x + " " + q.y; }).join(" ")),
+        start: view.project(segs[0][0]),
+        end: view.project(segs[segs.length - 1][segs[segs.length - 1].length - 1])
+      };
+      const credit = document.createElementNS(ns, "text");
+      credit.setAttribute("class", "map-credit");
+      credit.setAttribute("x", W - 4); credit.setAttribute("y", H - 4);
+      credit.setAttribute("text-anchor", "end");
+      credit.textContent = "© OpenStreetMap";
+      svg.appendChild(credit);
+    }
+    svg.classList.toggle("has-map", !!view);
     fit.paths.forEach((d) => {
       const path = document.createElementNS(ns, "path");
       path.setAttribute("d", d);

@@ -1196,6 +1196,39 @@ function routePaths(route, width, height, pad) {
   return { paths, start: project(segments[0][0]), end: project(segments[segments.length - 1][segments[segments.length - 1].length - 1]) };
 }
 
+// Street-map view of a route: Web Mercator tiles at the closest zoom that fits it.
+function routeMapView(route, width, height, pad) {
+  const margin = pad == null ? 16 : pad;
+  const all = [].concat.apply([], (Array.isArray(route) ? route : []).filter((s) => Array.isArray(s)))
+    .filter((pt) => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]));
+  if (!all.length) return null;
+  const world = (pt, z) => {
+    const n = 256 * Math.pow(2, z), lat = Math.max(-85, Math.min(85, pt[0])) * Math.PI / 180;
+    return { x: (pt[1] + 180) / 360 * n, y: (1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2 * n };
+  };
+  let zoom = 17;
+  for (; zoom > 3; zoom--) {
+    const ps = all.map((pt) => world(pt, zoom));
+    const w = Math.max.apply(null, ps.map((p) => p.x)) - Math.min.apply(null, ps.map((p) => p.x));
+    const h = Math.max.apply(null, ps.map((p) => p.y)) - Math.min.apply(null, ps.map((p) => p.y));
+    if (w <= width - 2 * margin && h <= height - 2 * margin) break;
+  }
+  const ps = all.map((pt) => world(pt, zoom));
+  const cx = (Math.max.apply(null, ps.map((p) => p.x)) + Math.min.apply(null, ps.map((p) => p.x))) / 2;
+  const cy = (Math.max.apply(null, ps.map((p) => p.y)) + Math.min.apply(null, ps.map((p) => p.y))) / 2;
+  const left = cx - width / 2, top = cy - height / 2, count = Math.pow(2, zoom);
+  const tiles = [];
+  for (let ty = Math.floor(top / 256); ty <= Math.floor((top + height) / 256); ty++) {
+    if (ty < 0 || ty >= count) continue;
+    for (let tx = Math.floor(left / 256); tx <= Math.floor((left + width) / 256); tx++) {
+      const wrap = ((tx % count) + count) % count;
+      tiles.push({ url: "https://tile.openstreetmap.org/" + zoom + "/" + wrap + "/" + ty + ".png", x: Math.round(tx * 256 - left), y: Math.round(ty * 256 - top) });
+    }
+  }
+  const project = (pt) => { const p = world(pt, zoom); return { x: Math.round((p.x - left) * 10) / 10, y: Math.round((p.y - top) * 10) / 10 }; };
+  return { zoom, tiles, project };
+}
+
 function placeText(place) {
   return place && Number.isFinite(place.lat) && Number.isFinite(place.lon) ? place.lat.toFixed(5) + ", " + place.lon.toFixed(5) : "";
 }
@@ -2252,6 +2285,45 @@ function findDocumentQuad(gray, width, height) {
     }
   }
 
+  // First by difference from the surface; if that misses, by plain brightness
+  // (a white receipt on anything darker). Gaps from print or shadow are closed first.
+  return quadFromMask(closeMask(fg, width, height), width, height, cut)
+    || quadFromMask(closeMask(brightMask(gray), width, height), width, height, cut);
+}
+
+function brightMask(gray) {
+  const cut = otsuThreshold(gray);
+  const out = new Uint8Array(gray.length);
+  for (let i = 0; i < gray.length; i++) if (gray[i] > cut) out[i] = 1;
+  return out;
+}
+
+// Grow then shrink by one pixel: joins a page split by print or a fold without moving its edges.
+function closeMask(mask, width, height) {
+  const grow = new Uint8Array(mask.length);
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    let on = 0;
+    for (let dy = -1; dy <= 1 && !on; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const yy = y + dy, xx = x + dx;
+      if (yy >= 0 && yy < height && xx >= 0 && xx < width && mask[yy * width + xx]) { on = 1; break; }
+    }
+    grow[y * width + x] = on;
+  }
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    let all = 1;
+    for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const yy = y + dy, xx = x + dx;
+      if (yy < 0 || yy >= height || xx < 0 || xx >= width) continue;
+      if (!grow[yy * width + xx]) { all = 0; break; }
+    }
+    out[y * width + x] = all;
+  }
+  return out;
+}
+
+function quadFromMask(fg, width, height, cut) {
+  const n = width * height;
   // The page is the largest connected shape.
   const label = new Int32Array(n);
   const queue = new Int32Array(n);
@@ -2273,7 +2345,7 @@ function findDocumentQuad(gray, width, height) {
     }
     if (size > bestSize) { bestSize = size; best = next; }
   }
-  if (!best || bestSize < n * 0.06 || bestSize > n * 0.97) return null;
+  if (!best || bestSize < n * 0.04 || bestSize > n * 0.97) return null;
 
   // Its left and right edge on every row is its outline.
   const edge = [];
@@ -2291,7 +2363,7 @@ function findDocumentQuad(gray, width, height) {
   const touches = rect.some((c) => c.x <= margin || c.y <= margin || c.x >= width - 1 - margin || c.y >= height - 1 - margin);
   const corners = rect.map((c) => ({ x: Math.max(0, Math.min(width - 1, c.x)), y: Math.max(0, Math.min(height - 1, c.y)) }));
   const area = Math.abs(quadArea(corners));
-  if (area < n * 0.08) return null;
+  if (area < n * 0.06) return null;
   const sides = [0, 1, 2, 3].map((i) => Math.hypot(corners[(i + 1) % 4].x - corners[i].x, corners[(i + 1) % 4].y - corners[i].y));
   if (Math.min.apply(null, sides) < Math.min(width, height) * 0.12) return null;
   // A page fills its outline. A hand, a shadow, or a pattern does not.
@@ -2303,7 +2375,7 @@ function findDocumentQuad(gray, width, height) {
       if (label[y * width + x] === best) hit += 1;
     }
   }
-  if (!inside || hit / inside < 0.72) return null;
+  if (!inside || hit / inside < 0.64) return null;
   return { corners, area, fill: area / n, solid: hit / inside, threshold: cut, touches };
 }
 
@@ -3425,6 +3497,7 @@ const SA = {
   resumeDrive,
   driveRecord,
   routePaths,
+  routeMapView,
   placeText,
   mapLink,
   cleanTrip,
